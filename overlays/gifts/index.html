@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Regalos recientes</title>
+<!--HB_COMMON-->
+<style>
+  .hb-card { border-left-color: #f472b6; }
+  .gift-img { width: 2.6em; height: 2.6em; object-fit: contain; flex: none; }
+  .gift-line { line-height: 1.25; }
+  .coins { opacity: 0.75; font-size: 0.85em; }
+</style>
+</head>
+<body data-anchor="top-right">
+<div id="hb-root" class="hb-stack"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { width: 340, maxItems: 6, lifetimeSec: 30, minCoins: 0, showImage: true, showAvatar: false, showCoins: true, showPlatform: false };
+  var root = document.getElementById("hb-root");
+
+  function add(ev, replay) {
+    if (ev.type !== "gift" || !ev.gift) return;
+    var g = ev.gift;
+    if (g.coins < cfg.minCoins) return;
+    var card = HB.el("div", "hb-card");
+    var row = HB.el("div", "hb-row");
+    if (cfg.showAvatar) { var a = HB.img(ev.user.avatar, "hb-avatar"); if (a) row.appendChild(a); }
+    if (cfg.showImage) { var gi = HB.img(g.image, "gift-img"); if (gi) row.appendChild(gi); }
+    var body = HB.el("div", "gift-line");
+    if (cfg.showPlatform) body.appendChild(HB.platformBadge(ev));
+    body.appendChild(HB.el("span", "hb-who", ev.user.nickname || ev.user.uniqueId));
+    body.appendChild(document.createTextNode(" " + HB.t("ev.gift", { count: g.count, name: g.name })));
+    if (cfg.showCoins) body.appendChild(HB.el("div", "coins", HB.fmt(g.coins) + " " + HB.coinsLabel(ev)));
+    row.appendChild(body);
+    card.appendChild(row);
+    if (replay) card.style.animation = "none";
+    root.appendChild(card);
+    HB.trim(root, cfg.maxItems);
+    HB.expireAfter(card, cfg.lifetimeSec);
+  }
+
+  HB.start({ id: "gifts", onConfig: function (c) { cfg = c; root.style.width = c.width + "px"; }, onEvent: add });
+})();
+</script>
+</body>
+</html>

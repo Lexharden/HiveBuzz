@@ -1,0 +1,86 @@
+# Publica un release de GitHub con instaladores para Windows, macOS (Apple Silicon e Intel) y Linux,
+# junto con el `latest.json` del auto-update. Se dispara al subir una etiqueta `v*`:
+#
+#   bun scripts/set-version.mjs 0.2.0   # cambia la versión en los 3 sitios
+#   git commit -am "v0.2.0" && git tag v0.2.0 && git push --tags
+#
+# Secretos del repositorio (Settings → Secrets and variables → Actions):
+#   TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD   firma del auto-update (obligatorio)
+#   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+#   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID                          firma y notarización de macOS (opcional)
+# Variable del repositorio:
+#   HIVEBUZZ_SPOTIFY_CLIENT_ID                                       botón «Conectar con Spotify»
+#
+# NOTA: este flujo no se ha ejecutado todavía; revísalo en el primer release (usa un borrador).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: ""
+          - os: macos-latest # Apple Silicon
+            target: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+          - os: macos-15-intel # Intel
+            target: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            args: ""
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Dependencias de Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            libasound2-dev libdbus-1-dev libssl-dev pkg-config
+
+      - run: bun install --frozen-lockfile
+      - run: cd sidecar && bun install --frozen-lockfile
+
+      # El sidecar se compila para el mismo target que la app (nombre exigido por Tauri: tiktok-sidecar-<triple>).
+      - name: Sidecar
+        run: bun run sidecar:build
+        env:
+          TAURI_ENV_TARGET_TRIPLE: ${{ matrix.target }}
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HIVEBUZZ_SPOTIFY_CLIENT_ID: ${{ vars.HIVEBUZZ_SPOTIFY_CLIENT_ID }}
+          HIVEBUZZ_TWITCH_CLIENT_ID: ${{ vars.HIVEBUZZ_TWITCH_CLIENT_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: HiveBuzz ${{ github.ref_name }}
+          releaseDraft: true
+          includeUpdaterJson: true
+          args: --config src-tauri/tauri.release.conf.json ${{ matrix.args }}

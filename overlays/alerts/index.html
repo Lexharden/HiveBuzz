@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Alertas</title>
+<!--HB_COMMON-->
+<style>
+  #hb-root { align-items: center; max-width: 90vw; }
+  .alert { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+           text-shadow: 0 2px 8px rgba(0, 0, 0, 0.85); }
+  .alert.pop { animation: a-pop 0.35s ease-out; }
+  .alert.slide { animation: a-slide 0.4s ease-out; }
+  .alert.fade { animation: a-fade-in 0.5s ease-out; }
+  .alert.out { animation: a-out 0.45s ease-in forwards; }
+  .alert .media { max-height: 45vh; border-radius: 14px; }
+  .alert .who { display: flex; align-items: center; gap: 10px; }
+  .alert .who img { width: 44px; height: 44px; border-radius: 50%; }
+  .alert .title { font-weight: 800; color: var(--hb-accent); line-height: 1.1; }
+  .alert .text { font-weight: 600; line-height: 1.2; word-break: break-word; }
+  @keyframes a-pop { from { transform: scale(0.85) translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes a-slide { from { transform: translateX(-60px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes a-fade-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes a-out { to { opacity: 0; transform: translateY(-10px); } }
+</style>
+</head>
+<body data-anchor="center">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { titleSize: 40, textSize: 30, mediaMaxWidth: 60, animation: "pop" };
+  var root = document.getElementById("hb-root");
+  var queue = [], showing = false, MAX_QUEUE = 50;
+
+  function build(a) {
+    var el = HB.el("div", "alert " + (cfg.animation || "pop"));
+    var m = a.media;
+    if (m && HB.isLocalMedia(m.url)) {
+      var src = m.url + "?token=" + encodeURIComponent(HB.token);
+      var node;
+      if (m.kind === "video") {
+        node = HB.el("video", "media");
+        node.src = src; node.autoplay = true; node.loop = true; node.muted = true; node.playsInline = true;
+      } else {
+        node = HB.el("img", "media");
+        node.src = src;
+      }
+      node.style.maxWidth = cfg.mediaMaxWidth + "vw";
+      el.appendChild(node);
+    } else {
+      var gi = HB.img(a.imageUrl, "media");
+      if (gi) { gi.style.maxHeight = "25vh"; el.appendChild(gi); }
+    }
+    var avatar = HB.img(a.avatar, "");
+    if (a.title || avatar) {
+      var who = HB.el("div", "who");
+      if (avatar) who.appendChild(avatar);
+      if (a.title) { var t = HB.el("div", "title", a.title); t.style.fontSize = cfg.titleSize + "px"; who.appendChild(t); }
+      el.appendChild(who);
+    }
+    if (a.text) { var x = HB.el("div", "text", a.text); x.style.fontSize = cfg.textSize + "px"; el.appendChild(x); }
+    return el;
+  }
+
+  function next() {
+    if (showing || queue.length === 0) return;
+    showing = true;
+    var a = queue.shift();
+    var el = build(a);
+    root.appendChild(el);
+    var ms = HB.clamp(Number(a.durationMs) || 5000, 500, 60000);
+    setTimeout(function () {
+      el.classList.remove("pop", "slide", "fade");
+      el.classList.add("out");
+      setTimeout(function () { el.remove(); showing = false; next(); }, 480);
+    }, ms);
+  }
+
+  HB.start({
+    id: "alerts",
+    onConfig: function (c) { cfg = c; },
+    onOverlay: function (channel, data) {
+      if (channel !== "alerts" || !data) return;
+      if (queue.length < MAX_QUEUE) queue.push(data);
+      next();
+    }
+  });
+})();
+</script>
+</body>
+</html>

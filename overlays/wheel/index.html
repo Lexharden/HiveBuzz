@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Ruleta</title>
+<!--HB_COMMON-->
+<style>
+  #hb-root { align-items: center; }
+  .wheel { position: relative; }
+  .wheel svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .wheel .disc { transform-origin: 0 0; }
+  .wheel .seg-label { font-weight: 800; pointer-events: none; }
+  .wheel .pointer { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6)); }
+  .winner { text-align: center; font-weight: 800; font-size: 1.6em; padding: 6px 18px; margin-top: 8px; }
+  .winner .by { display: block; font-size: 0.55em; opacity: 0.8; font-weight: 600; }
+</style>
+</head>
+<body data-anchor="center">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var NS = "http://www.w3.org/2000/svg";
+  var cfg = { size: 420, pointerColor: "#ffffff", showWhenIdle: false, resultSec: 6 };
+  var segments = [];
+  var spinning = false;
+  var hideTimer = null;
+  var root = document.getElementById("hb-root");
+  var wheel = HB.el("div", "wheel");
+  var winnerBox = HB.el("div", "hb-card winner");
+  winnerBox.style.display = "none";
+  root.appendChild(wheel);
+  root.appendChild(winnerBox);
+
+  function svg(tag, attrs) {
+    var e = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, String(attrs[k])); });
+    return e;
+  }
+
+  function polar(r, deg) {
+    var a = (deg - 90) * Math.PI / 180;   // 0° = arriba, sentido horario
+    return [r * Math.cos(a), r * Math.sin(a)];
+  }
+
+  function short(label) { return label.length > 16 ? label.slice(0, 15) + "…" : label; }
+
+  var disc = null;
+
+  function build() {
+    while (wheel.firstChild) wheel.removeChild(wheel.firstChild);
+    wheel.style.width = wheel.style.height = cfg.size + "px";
+    var s = svg("svg", { viewBox: "-105 -105 210 210" });
+    disc = svg("g", { "class": "disc" });
+    var n = segments.length;
+    if (n === 0) {
+      disc.appendChild(svg("circle", { r: 100, fill: "#3f3f46" }));
+    } else if (n === 1) {
+      disc.appendChild(svg("circle", { r: 100, fill: segments[0].color }));
+    }
+    segments.forEach(function (seg, i) {
+      if (n < 2) return;
+      var a0 = (i * 360) / n, a1 = ((i + 1) * 360) / n;
+      var p0 = polar(100, a0), p1 = polar(100, a1);
+      var path = svg("path", { d: "M0 0 L" + p0[0].toFixed(3) + " " + p0[1].toFixed(3) + " A100 100 0 " + (a1 - a0 > 180 ? 1 : 0) + " 1 " + p1[0].toFixed(3) + " " + p1[1].toFixed(3) + " Z", fill: seg.color, stroke: "rgba(0,0,0,0.35)", "stroke-width": 0.8 });
+      disc.appendChild(path);
+    });
+    segments.forEach(function (seg, i) {
+      var mid = ((i + 0.5) * 360) / Math.max(n, 1);
+      var t = svg("text", { "class": "seg-label", x: 0, y: 0, "text-anchor": "end", "dominant-baseline": "middle", fill: "#ffffff", stroke: "rgba(0,0,0,0.55)", "stroke-width": 0.5, "font-size": n > 12 ? 6 : 8, transform: "rotate(" + (mid - 90) + ") translate(92 0)" });
+      t.textContent = short(seg.label);
+      disc.appendChild(t);
+    });
+    s.appendChild(disc);
+    s.appendChild(svg("circle", { r: 7, fill: "#18181b", stroke: "#fff", "stroke-width": 1.5 }));
+    var ptr = svg("path", { "class": "pointer", d: "M0 -92 L-9 -112 L9 -112 Z", fill: cfg.pointerColor, stroke: "rgba(0,0,0,0.5)", "stroke-width": 1 });
+    s.appendChild(ptr);
+    wheel.appendChild(s);
+  }
+
+  function setVisible(v) { wheel.style.display = v ? "" : "none"; }
+
+  function showIdle() {
+    setVisible(cfg.showWhenIdle && segments.length > 0);
+  }
+
+  function spin(d) {
+    if (!Array.isArray(d.segments) || d.segments.length === 0) return;
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    segments = d.segments;
+    build();
+    setVisible(true);
+    winnerBox.style.display = "none";
+    spinning = true;
+    var n = segments.length;
+    var winner = HB.clamp(Number(d.winner) || 0, 0, n - 1);
+    // El centro del premio ganador debe quedar bajo el puntero (arriba), con algo de holgura aleatoria dentro de su porción.
+    var slice = 360 / n;
+    var jitter = (Math.random() - 0.5) * slice * 0.6;
+    var finalDeg = 360 * 6 - ((winner + 0.5) * slice + jitter);
+    var dur = HB.clamp(Number(d.durationMs) || 6000, 500, 60000);
+    disc.style.transition = "none";
+    disc.style.transform = "rotate(0deg)";
+    void disc.getBoundingClientRect();
+    disc.style.transition = "transform " + dur + "ms cubic-bezier(0.12, 0.6, 0.1, 1)";
+    disc.style.transform = "rotate(" + finalDeg.toFixed(2) + "deg)";
+    setTimeout(function () {
+      spinning = false;
+      winnerBox.textContent = "";
+      winnerBox.appendChild(document.createTextNode(segments[winner].label));
+      if (d.user) winnerBox.appendChild(HB.el("span", "by", d.user));
+      winnerBox.style.display = "";
+      hideTimer = setTimeout(function () {
+        winnerBox.style.display = "none";
+        showIdle();
+      }, Math.max(1, cfg.resultSec) * 1000);
+    }, dur);
+  }
+
+  HB.start({
+    id: "wheel",
+    onConfig: function (c) { cfg = c; if (!spinning) { build(); showIdle(); } },
+    onOverlay: function (channel, d) {
+      if (channel !== "wheel" || !d) return;
+      if (d.kind === "idle" && Array.isArray(d.segments)) {
+        if (spinning) return;
+        segments = d.segments;
+        build();
+        showIdle();
+      } else if (d.kind === "spin") {
+        spin(d);
+      }
+    }
+  });
+  build();
+  showIdle();
+})();
+</script>
+</body>
+</html>

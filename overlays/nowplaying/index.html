@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Sonando ahora</title>
+<!--HB_COMMON-->
+<style>
+  .np { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+  .np .cover { width: var(--np-cover, 72px); height: var(--np-cover, 72px); border-radius: 8px; object-fit: cover; flex: none; }
+  .np .info { min-width: 0; flex: 1; }
+  .np .label { font-size: 0.7em; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; }
+  .np .title { font-weight: 800; font-size: 1.15em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .artist { opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .by { font-size: 0.8em; color: var(--hb-accent); margin-top: 2px; }
+  .np .bar { height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); margin-top: 8px; overflow: hidden; }
+  .np .bar > i { display: block; height: 100%; width: 0; background: var(--hb-accent); }
+  .np.paused .bar > i { opacity: 0.5; }
+</style>
+</head>
+<body data-anchor="bottom-left">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { width: 420, coverSize: 72, showCover: true, showProgress: true, showRequester: true, hideWhenPaused: false };
+  var now = null;        // último estado recibido de HiveBuzz
+  var receivedAt = 0;    // reloj local en el que llegó, para animar el progreso entre sondeos
+  var root = document.getElementById("hb-root");
+  var card = HB.el("div", "hb-card np");
+  card.style.animation = "none";
+  card.style.display = "none";
+  root.appendChild(card);
+
+  function progressNow() {
+    if (!now || !now.durationMs) return 0;
+    var p = (Number(now.progressMs) || 0) + (now.playing ? Date.now() - receivedAt : 0);
+    return HB.clamp(p / now.durationMs, 0, 1);
+  }
+
+  function render() {
+    var visible = now && (now.playing || !cfg.hideWhenPaused);
+    if (!visible) { card.style.display = "none"; return; }
+    card.style.display = "";
+    card.style.width = cfg.width + "px";
+    card.style.setProperty("--np-cover", cfg.coverSize + "px");
+    card.classList.toggle("paused", !now.playing);
+    while (card.firstChild) card.removeChild(card.firstChild);
+    if (cfg.showCover) {
+      var cover = HB.img(now.image, "cover");
+      if (cover) card.appendChild(cover);
+    }
+    var info = HB.el("div", "info");
+    info.appendChild(HB.el("div", "label", HB.t(now.playing ? "np.playing" : "np.paused")));
+    info.appendChild(HB.el("div", "title", now.title));
+    info.appendChild(HB.el("div", "artist", now.artist));
+    if (cfg.showRequester && now.requestedBy) info.appendChild(HB.el("div", "by", HB.t("np.requestedBy", { user: "@" + now.requestedBy })));
+    if (cfg.showProgress) {
+      var bar = HB.el("div", "bar");
+      var fill = document.createElement("i");
+      fill.style.width = Math.round(progressNow() * 100) + "%";
+      bar.appendChild(fill);
+      info.appendChild(bar);
+    }
+    card.appendChild(info);
+  }
+
+  HB.start({
+    id: "nowplaying",
+    onConfig: function (c) { cfg = c; render(); },
+    onOverlay: function (channel, d) {
+      if (channel !== "nowplaying" || !d) return;
+      if (d.kind === "none") { now = null; render(); return; }
+      if (d.kind === "nowplaying" && typeof d.title === "string") {
+        now = d;
+        receivedAt = Date.now();
+        render();
+      }
+    }
+  });
+  setInterval(function () { if (now && now.playing && cfg.showProgress) render(); }, 1000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Chat</title>
+<!--HB_COMMON-->
+<style>
+  .badge { margin-right: 4px; }
+  .emotes img { height: 1.4em; vertical-align: middle; margin-left: 2px; }
+  .msg { line-height: 1.3; }
+</style>
+</head>
+<body data-anchor="bottom-left">
+<div id="hb-root" class="hb-stack"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { width: 420, maxMessages: 10, lifetimeSec: 0, showAvatar: true, showBadges: true, hideCommands: true, showEmotes: true, hideUsers: "", nameColor: "accent", showPlatform: false };
+  var root = document.getElementById("hb-root");
+  var hidden = new Set();
+
+  function applyConfig(c) {
+    cfg = c;
+    root.style.width = c.width + "px";
+    hidden = new Set(String(c.hideUsers || "").split(",").map(function (u) { return u.trim().replace(/^@/, "").toLowerCase(); }).filter(Boolean));
+  }
+
+  function add(ev, replay) {
+    if (ev.type !== "chat" || !ev.chat) return;
+    var text = ev.chat.text || "";
+    if (cfg.hideCommands && text.charAt(0) === "!") return;
+    if (hidden.has(String(ev.user.uniqueId || "").toLowerCase())) return;
+
+    var card = HB.el("div", "hb-card");
+    var row = HB.el("div", "hb-row");
+    if (cfg.showAvatar) { var a = HB.img(ev.user.avatar, "hb-avatar"); if (a) row.appendChild(a); }
+    var body = HB.el("div", "msg");
+    if (cfg.showPlatform) body.appendChild(HB.platformBadge(ev));
+    if (cfg.showBadges) {
+      if (ev.user.isModerator) body.appendChild(HB.el("span", "badge", "🛡️"));
+      if (ev.user.isSubscriber) body.appendChild(HB.el("span", "badge", "⭐"));
+    }
+    var who = HB.el("span", "hb-who", ev.user.nickname || ev.user.uniqueId);
+    if (cfg.nameColor === "perUser") who.style.color = HB.userColor(ev.user.id);
+    body.appendChild(who);
+    body.appendChild(document.createTextNode(": " + text));
+    if (cfg.showEmotes && ev.chat.emotes && ev.chat.emotes.length) {
+      var box = HB.el("span", "emotes");
+      ev.chat.emotes.forEach(function (e) { var i = HB.img(e.image, ""); if (i) box.appendChild(i); });
+      body.appendChild(box);
+    }
+    row.appendChild(body);
+    card.appendChild(row);
+    if (replay) card.style.animation = "none";
+    root.appendChild(card);
+    HB.trim(root, cfg.maxMessages);
+    HB.expireAfter(card, cfg.lifetimeSec);
+  }
+
+  HB.start({ id: "chat", onConfig: applyConfig, onEvent: add });
+})();
+</script>
+</body>
+</html>

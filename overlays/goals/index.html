@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Metas</title>
+<!--HB_COMMON-->
+<style>
+  #hb-root { gap: 10px; }
+  .goal { padding: 10px 14px; }
+  .goal-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 6px; font-weight: 700; }
+  .goal-head .nums { opacity: 0.85; font-weight: 600; flex: none; }
+  .track { border-radius: 999px; overflow: hidden; }
+  .fill { height: 100%; width: 0; background: var(--hb-accent); border-radius: 999px; transition: width 0.6s ease-out; }
+  .goal.done .fill { animation: hb-pulse 1.4s ease-in-out infinite; }
+</style>
+</head>
+<body data-anchor="bottom-right">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { width: 420, trackColor: "#3f3f46", barHeight: 22, goalId: "", showLabel: true, showNumbers: true, showPercent: true };
+  var goals = [];
+  var root = document.getElementById("hb-root");
+  var nodes = {};   // id -> { card, fill, name, nums } (se reutilizan para que la barra se anime)
+
+  function render() {
+    var visible = goals.filter(function (g) { return !cfg.goalId || g.id === cfg.goalId; });
+    var ids = new Set(visible.map(function (g) { return g.id; }));
+    Object.keys(nodes).forEach(function (id) { if (!ids.has(id)) { nodes[id].card.remove(); delete nodes[id]; } });
+
+    visible.forEach(function (g) {
+      var n = nodes[g.id];
+      if (!n) {
+        var card = HB.el("div", "hb-card goal");
+        card.style.animation = "none";
+        var head = HB.el("div", "goal-head");
+        var name = HB.el("div", "");
+        var nums = HB.el("div", "nums");
+        head.appendChild(name); head.appendChild(nums);
+        var track = HB.el("div", "track");
+        var fill = HB.el("div", "fill");
+        track.appendChild(fill);
+        card.appendChild(head); card.appendChild(track);
+        root.appendChild(card);
+        n = nodes[g.id] = { card: card, head: head, name: name, nums: nums, track: track, fill: fill };
+      }
+      n.card.style.width = cfg.width + "px";
+      n.head.style.display = cfg.showLabel || cfg.showNumbers || cfg.showPercent ? "flex" : "none";
+      n.name.textContent = cfg.showLabel ? g.name : "";
+      var parts = [];
+      if (cfg.showNumbers) parts.push(HB.fmt(g.current) + " / " + HB.fmt(g.target));
+      if (cfg.showPercent) parts.push(Math.floor(g.percent) + "%");
+      n.nums.textContent = parts.join(" · ");
+      n.track.style.height = cfg.barHeight + "px";
+      n.track.style.background = cfg.trackColor;
+      n.fill.style.width = HB.clamp(g.percent, 0, 100) + "%";
+      n.card.classList.toggle("done", g.percent >= 100);
+    });
+  }
+
+  HB.start({
+    id: "goals",
+    onConfig: function (c) { cfg = c; render(); },
+    onOverlay: function (channel, d) { if (channel === "goals" && d && Array.isArray(d.goals)) { goals = d.goals; render(); } }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "hivebuzz-sidecar",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "bun scripts/build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "typescript": "~6.0.3",
+    "vitest": "^4.0.0"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "^2.5.0"
+  }
+}

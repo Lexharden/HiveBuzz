@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Top donadores</title>
+<!--HB_COMMON-->
+<style>
+  #hb-root { gap: 0; }
+  .board { padding: 10px 14px; }
+  .board h2 { margin: 0 0 8px; font-size: 1.15em; color: var(--hb-accent); }
+  .entry { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .rank { width: 1.8em; text-align: center; font-weight: 800; flex: none; }
+  .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .coins { font-weight: 700; color: var(--hb-accent); flex: none; }
+  .empty { opacity: 0.6; font-size: 0.9em; padding: 4px 0; }
+</style>
+</head>
+<body data-anchor="top-left">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { width: 320, scope: "session", size: 5, title: "Top donadores", showAvatar: true, showCoins: true, medals: true };
+  var data = null;
+  var root = document.getElementById("hb-root");
+  var MEDALS = ["🥇", "🥈", "🥉"];
+
+  function render() {
+    root.textContent = "";
+    var card = HB.el("div", "hb-card board");
+    card.style.width = cfg.width + "px";
+    card.style.animation = "none";
+    if (cfg.title) card.appendChild(HB.el("h2", "", cfg.title));
+    var list = (data && data[cfg.scope]) || [];
+    if (list.length === 0) card.appendChild(HB.el("div", "empty", "—"));
+    list.slice(0, cfg.size).forEach(function (e, i) {
+      var row = HB.el("div", "entry");
+      row.appendChild(HB.el("div", "rank", cfg.medals && i < 3 ? MEDALS[i] : String(i + 1)));
+      if (cfg.showAvatar) { var a = HB.img(e.avatar, "hb-avatar"); if (a) row.appendChild(a); }
+      row.appendChild(HB.el("div", "name", e.nickname || e.uniqueId));
+      if (cfg.showCoins) row.appendChild(HB.el("div", "coins", HB.fmt(e.coins)));
+      card.appendChild(row);
+    });
+    root.appendChild(card);
+  }
+
+  HB.start({
+    id: "leaderboard",
+    onConfig: function (c) { cfg = c; render(); },
+    onOverlay: function (channel, d) { if (channel === "leaderboard") { data = d; render(); } }
+  });
+  render();
+})();
+</script>
+</body>
+</html>

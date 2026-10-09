@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Encuesta</title>
+<!--HB_COMMON-->
+<style>
+  .poll { padding: 12px 16px; }
+  .poll .question { font-weight: 800; font-size: 1.15em; margin-bottom: 8px; }
+  .poll .row { margin-bottom: 8px; }
+  .poll .row-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 3px; font-weight: 600; }
+  .poll .row-head .nums { opacity: 0.85; flex: none; }
+  .poll .track { border-radius: 999px; overflow: hidden; }
+  .poll .fill { height: 100%; width: 0; background: var(--hb-accent); border-radius: 999px; transition: width 0.4s ease-out; }
+  .poll .row.winner .row-head { color: var(--hb-accent); }
+  .poll .row.loser .fill { opacity: 0.45; }
+  .poll .foot { display: flex; justify-content: space-between; opacity: 0.8; font-size: 0.9em; margin-top: 4px; }
+  .poll.ended .timer { font-weight: 700; }
+</style>
+</head>
+<body data-anchor="top-left">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { width: 380, trackColor: "#3f3f46", barHeight: 26, showVotes: true, showPercent: true, showTimer: true, hideAfterSec: 15 };
+  var poll = null;      // último estado recibido
+  var receivedAt = 0;   // cuándo (reloj local) llegó el estado final, para ocultarlo pasado un rato
+  var root = document.getElementById("hb-root");
+  var card = HB.el("div", "hb-card poll");
+  card.style.animation = "none";
+  card.style.display = "none";
+  root.appendChild(card);
+
+  function remainingText() {
+    var s = Math.max(0, Math.ceil((poll.endsAtMs - Date.now()) / 1000));
+    return Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);
+  }
+
+  function render() {
+    if (!poll) { card.style.display = "none"; return; }
+    if (poll.ended && cfg.hideAfterSec > 0 && Date.now() - receivedAt > cfg.hideAfterSec * 1000) {
+      card.style.display = "none";
+      return;
+    }
+    card.style.display = "";
+    card.style.width = cfg.width + "px";
+    card.classList.toggle("ended", !!poll.ended);
+    while (card.firstChild) card.removeChild(card.firstChild);
+    card.appendChild(HB.el("div", "question", poll.question));
+    var total = poll.total || 0;
+    poll.options.forEach(function (o, i) {
+      var pct = total > 0 ? Math.round((o.votes / total) * 100) : 0;
+      var row = HB.el("div", "row");
+      if (poll.ended && poll.winners.length) row.classList.add(poll.winners.indexOf(i) >= 0 ? "winner" : "loser");
+      var head = HB.el("div", "row-head");
+      head.appendChild(HB.el("div", "label", (i + 1) + ". " + o.label));
+      var parts = [];
+      if (cfg.showVotes) parts.push(HB.fmt(o.votes));
+      if (cfg.showPercent) parts.push(pct + "%");
+      head.appendChild(HB.el("div", "nums", parts.join(" · ")));
+      var track = HB.el("div", "track");
+      track.style.height = cfg.barHeight + "px";
+      track.style.background = cfg.trackColor;
+      var fill = HB.el("div", "fill");
+      fill.style.width = pct + "%";
+      track.appendChild(fill);
+      row.appendChild(head); row.appendChild(track);
+      card.appendChild(row);
+    });
+    if (cfg.showTimer || cfg.showVotes) {
+      var foot = HB.el("div", "foot");
+      foot.appendChild(HB.el("div", "total", cfg.showVotes ? HB.t("poll.votes", { n: HB.fmt(total) }) : ""));
+      foot.appendChild(HB.el("div", "timer", cfg.showTimer ? (poll.ended ? HB.t("poll.ended") : remainingText()) : ""));
+      card.appendChild(foot);
+    }
+  }
+
+  HB.start({
+    id: "poll",
+    onConfig: function (c) { cfg = c; render(); },
+    onOverlay: function (channel, d) {
+      if (channel !== "poll" || !d) return;
+      if (d.kind === "none") { poll = null; render(); return; }
+      if (d.kind === "poll" && d.poll && Array.isArray(d.poll.options)) {
+        var wasEnded = poll && poll.ended && poll.id === d.poll.id;
+        poll = d.poll;
+        if (!wasEnded) receivedAt = Date.now();
+        render();
+      }
+    }
+  });
+  setInterval(render, 500);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+name: Reportar un problema
+description: Algo no funciona como esperabas
+labels: [bug]
+body:
+  - type: textarea
+    id: que
+    attributes:
+      label: ¿Qué pasó?
+      description: Cuéntalo con tus palabras. ¿Qué esperabas que pasara?
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: ¿Cómo se repite?
+      placeholder: "1. Abro Inicio  2. Escribo mi canal  3. Pulso Conectar…"
+  - type: input
+    id: version
+    attributes:
+      label: Versión de HiveBuzz
+      description: Aparece junto al logo, arriba a la izquierda (por ejemplo v0.2.0).
+  - type: dropdown
+    id: so
+    attributes:
+      label: Sistema operativo
+      options: [Windows, macOS, Linux]
+  - type: dropdown
+    id: plataforma
+    attributes:
+      label: Plataforma de directo
+      options: [TikTok, Twitch, Las dos, Ninguna]
+  - type: textarea
+    id: logs
+    attributes:
+      label: Registro (opcional)
+      description: En Ajustes → Registro puedes guardar un archivo. Revisa que no contenga nada privado antes de pegarlo.

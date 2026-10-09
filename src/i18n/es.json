@@ -1,0 +1,1174 @@
+{
+  "app": {
+    "name": "HiveBuzz",
+    "tagline": "Alertas, TTS y automatización para tu LIVE de TikTok",
+    "version": "Versión de HiveBuzz"
+  },
+  "tabs": {
+    "dashboard": "Inicio",
+    "rules": "Reglas",
+    "library": "Biblioteca",
+    "tts": "Voz (TTS)",
+    "settings": "Ajustes",
+    "overlays": "Overlays",
+    "goals": "Metas y timers",
+    "interact": "Bot y puntos",
+    "integrations": "Integraciones",
+    "stats": "Estadísticas",
+    "help": "Ayuda"
+  },
+  "status": {
+    "disconnected": "Desconectado",
+    "waiting_live": "Esperando LIVE",
+    "connected": "Conectado",
+    "signature_error": "Error de firma",
+    "reconnecting": "Reconectando",
+    "retryIn": "reintento {{n}} en {{s}} s"
+  },
+  "connect": {
+    "placeholder": "@usuario de TikTok",
+    "connect": "Conectar",
+    "disconnect": "Desconectar",
+    "busy": "…"
+  },
+  "feed": {
+    "title": "Eventos en vivo",
+    "empty": "Aún no hay eventos. Conéctate a un LIVE o usa el simulador.",
+    "clear": "Limpiar",
+    "gift": "{{count}}× {{name}} ({{coins}} monedas)",
+    "like": "{{count}} likes",
+    "follow": "empezó a seguirte",
+    "share": "compartió el LIVE",
+    "subscribe": "se suscribió",
+    "join": "entró al LIVE",
+    "emote": "envió un emote",
+    "liveEnd": "El LIVE terminó",
+    "bits": "{{coins}} bits ({{name}})",
+    "all": "Todo",
+    "filter": "Filtrar por plataforma",
+    "emptyFilter": "No hay eventos de esta plataforma todavía."
+  },
+  "simulator": {
+    "title": "Probar sin estar en directo",
+    "hint": "Genera eventos falsos para probar overlays y reglas sin estar en vivo.",
+    "gift": "Regalo combinable",
+    "bigGift": "Regalo grande",
+    "chat": "Chat",
+    "like": "Likes",
+    "follow": "Follow",
+    "share": "Share",
+    "subscribe": "Suscripción",
+    "join": "Entrada",
+    "burst": "Ráfaga de 20",
+    "platform": "Plataforma",
+    "sent": "Enviado: míralo en la lista de eventos y en tus overlays.",
+    "giftTwitch": "Bits",
+    "bigGiftTwitch": "Bits grandes"
+  },
+  "settings": {
+    "overlays": "Overlays",
+    "overlaysHint": "Copia la URL y pégala como Browser Source en OBS o TikTok LIVE Studio. Contiene tu token: no la compartas.",
+    "copy": "Copiar URL",
+    "copied": "Copiada",
+    "euler": "API key de Euler Stream",
+    "eulerHint": "Opcional. Sin ella se usa el tier gratuito. Se guarda en el llavero del sistema, no en la base de datos.",
+    "eulerSaved": "Hay una API key guardada",
+    "eulerPlaceholder": "Pega tu API key",
+    "save": "Guardar",
+    "remove": "Quitar",
+    "port": "Puerto del servidor local",
+    "portHint": "Solo escucha en 127.0.0.1. El cambio se aplica al reiniciar HiveBuzz.",
+    "serverError": "El servidor local no pudo arrancar"
+  },
+  "role": {
+    "moderator": "Moderador",
+    "subscriber": "Suscriptor",
+    "follower": "Seguidor"
+  },
+  "day": {
+    "mon": "L",
+    "tue": "M",
+    "wed": "X",
+    "thu": "J",
+    "fri": "V",
+    "sat": "S",
+    "sun": "D"
+  },
+  "trigger": {
+    "gift": "Regalo",
+    "follow": "Follow",
+    "share": "Share",
+    "subscribe": "Suscripción",
+    "join": "Entrada al LIVE",
+    "subEmote": "Emote de suscriptor",
+    "like": "Likes (cada N)",
+    "command": "Comando de chat",
+    "keyword": "Palabra clave",
+    "goalReached": "Meta alcanzada",
+    "timerEnded": "Timer terminado",
+    "giftName": "Nombre del regalo",
+    "giftNameHint": "Vacío = cualquiera",
+    "giftId": "ID del regalo",
+    "minCoins": "Monedas mínimas",
+    "minCoinsHint": "Valor total del regalo",
+    "likeEvery": "Disparar cada N likes",
+    "commandField": "Comando",
+    "commandHint": "Con o sin «!». Lo que se escriba después queda en {args}.",
+    "keywords": "Palabras clave",
+    "keywordsHint": "Separadas por comas",
+    "wholeWord": "Solo palabras completas",
+    "goalId": "ID de la meta",
+    "timerId": "ID del timer",
+    "noParams": "Este disparador no necesita parámetros.",
+    "api": "Llamada a la API local",
+    "apiName": "Nombre de la llamada",
+    "apiHint": "Se dispara con POST /api/trigger y este nombre (letras, números, - y _). Ver pestaña Integraciones."
+  },
+  "cond": {
+    "globalCooldown": "Cooldown global (s)",
+    "userCooldown": "Cooldown por usuario (s)",
+    "probability": "Probabilidad (%)",
+    "roles": "Roles permitidos",
+    "rolesHint": "Basta con uno. Sin marcar = todos.",
+    "minTeam": "Nivel de equipo mínimo",
+    "minGifter": "Nivel de donador mínimo",
+    "schedule": "Solo en cierto horario",
+    "from": "Desde",
+    "to": "Hasta",
+    "daysHint": "Sin días marcados = todos"
+  },
+  "rules": {
+    "title": "Reglas",
+    "queueStats": "En cola: {{pending}} · ejecutando: {{running}}",
+    "clearQueue": "Vaciar cola",
+    "new": "Nueva regla",
+    "empty": "Aún no hay reglas. Crea una para reaccionar a regalos, follows, comandos y más.",
+    "enabled": "Activa",
+    "test": "Probar",
+    "edit": "Editar",
+    "duplicate": "Duplicar",
+    "copy": "copia",
+    "delete": "Eliminar",
+    "confirmDelete": "¿Eliminar la regla «{{name}}»?",
+    "tested": {
+      "queued": "«{{name}}»: acción encolada.",
+      "dropped": "«{{name}}»: la cola está llena, se descartó.",
+      "empty": "«{{name}}»: no tiene acciones."
+    }
+  },
+  "editor": {
+    "newTitle": "Nueva regla",
+    "editTitle": "Editar regla",
+    "name": "Nombre",
+    "namePlaceholder": "Ej.: Gracias por la rosa",
+    "trigger": "Cuándo",
+    "triggerType": "Disparador",
+    "conditions": "Condiciones",
+    "conditionsHint": "Todas deben cumplirse para que la regla se ejecute.",
+    "plan": "Acciones",
+    "variables": "Variables en los textos: {user} {nickname} {gift} {count} {coins} {text} {args} {likes}",
+    "mode": {
+      "sequence": "En secuencia",
+      "parallel": "En paralelo"
+    },
+    "actionType": "Acción",
+    "delay": "Retardo (ms)",
+    "up": "Subir",
+    "down": "Bajar",
+    "removeStep": "Quitar acción",
+    "addStep": "Añadir acción",
+    "queue": "Cola",
+    "queueHint": "Cómo compite esta regla con las demás por ejecutarse.",
+    "priority": "Prioridad",
+    "priorityHint": "Vacío = automática (los regalos grandes se adelantan)",
+    "auto": "auto",
+    "ttl": "Caducidad (s)",
+    "ttlHint": "Si espera más que esto en la cola, se descarta",
+    "save": "Guardar",
+    "cancel": "Cancelar"
+  },
+  "actionType": {
+    "playSound": "Reproducir sonido",
+    "overlayAlert": "Alerta en overlay",
+    "tts": "Texto a voz",
+    "goalAdjust": "Modificar meta",
+    "timerControl": "Controlar timer",
+    "botMessage": "Mensaje del bot",
+    "pointsAdjust": "Sumar/restar puntos",
+    "spinWheel": "Girar la ruleta",
+    "startPoll": "Lanzar encuesta",
+    "webhook": "Webhook HTTP",
+    "tcpSend": "Comando TCP",
+    "wsSend": "Comando WebSocket",
+    "pressKeys": "Simular teclas",
+    "obs": "OBS Studio"
+  },
+  "action": {
+    "sounds": "Sonido(s)",
+    "soundsHint": "Si marcas varios, se elige uno al azar.",
+    "noSounds": "No hay sonidos. Impórtalos en la pestaña Biblioteca.",
+    "volume": "Volumen (%)",
+    "wait": "Esperar a que termine",
+    "alertTitle": "Título",
+    "alertText": "Texto",
+    "media": "Imagen / GIF / video",
+    "noMedia": "(ninguno)",
+    "imageUrl": "Imagen por URL",
+    "imageUrlHint": "Solo https. Ej.: {giftimage}",
+    "duration": "Duración (ms)",
+    "showAvatar": "Mostrar avatar",
+    "ttsText": "Texto a leer",
+    "voice": "Voz",
+    "autoVoice": "(automática)",
+    "rate": "Velocidad",
+    "json": "Parámetros (JSON)",
+    "jsonHint": "Este tipo de acción aún no tiene formulario.",
+    "jsonObject": "Debe ser un objeto JSON",
+    "goal": "Meta",
+    "chooseGoal": "(elige una meta)",
+    "timer": "Timer",
+    "chooseTimer": "(elige un timer)",
+    "operation": "Operación",
+    "amount": "Cantidad",
+    "seconds": "Segundos",
+    "amountHint": "Número o variable, p. ej. {coins}. Admite negativos.",
+    "goalOps": {
+      "add": "Sumar / restar",
+      "set": "Fijar progreso",
+      "reset": "Reiniciar"
+    },
+    "timerOps": {
+      "start": "Iniciar",
+      "pause": "Pausar",
+      "resume": "Reanudar",
+      "reset": "Reiniciar",
+      "add": "Sumar / restar tiempo"
+    },
+    "jsonInvalid": "JSON no válido (no se aplica hasta que lo sea)",
+    "spinWheelHint": "Gira la ruleta configurada en «Bot y puntos». No tiene parámetros.",
+    "botText": "Mensaje",
+    "botTextHint": "Lo escribe el bot en el chat (necesita la sesión de TikTok). Admite variables.",
+    "pointsAmount": "Cantidad",
+    "pointsAmountHint": "Entero con signo o variable, p. ej. -50 o {coins}",
+    "pointsTarget": "A quién",
+    "pointsTargetHint": "@usuario o variable; vacío = quien dispara la regla",
+    "pollQuestion": "Pregunta",
+    "pollOptions": "Opciones",
+    "pollOptionsHint": "Una por línea (2 a 8)",
+    "pollDuration": "Duración (s)",
+    "webhookUrl": "URL",
+    "webhookUrlHint": "http(s). Las variables se codifican solas para URL.",
+    "webhookMethod": "Método",
+    "webhookBodyJson": "Cuerpo JSON",
+    "webhookBodyHint": "Los textos admiten variables y se escapan solos.",
+    "webhookHeaders": "Cabeceras (JSON)",
+    "webhookHeadersHint": "Ej.: {\"Authorization\": \"Bearer …\"}. Se guardan con la regla, no en el llavero.",
+    "host": "Host",
+    "port": "Puerto",
+    "newline": "Añadir salto de línea",
+    "netMessage": "Mensaje",
+    "netMessageHint": "Texto con variables. Para JSON seguro usa «messageJson» en el editor avanzado.",
+    "wsUrl": "URL (ws:// o wss://)",
+    "keys": "Teclas",
+    "keysHint": "Combinación como ctrl+shift+f5. Varias, separadas por comas, se pulsan en orden.",
+    "holdMs": "Mantener (ms)",
+    "targetWindows": "Ventanas permitidas",
+    "targetWindowsHint": "Texto del título o del .exe de la ventana activa (separados por comas). Si la ventana activa no coincide, no se envía nada.",
+    "anyWindow": "Enviar a cualquier ventana",
+    "anyWindowWarning": "Peligroso: las teclas irán a lo que tengas en primer plano (navegador, chat…).",
+    "obsAction": "Acción de OBS",
+    "obsActions": {
+      "setScene": "Cambiar de escena",
+      "setSourceVisible": "Mostrar/ocultar fuente",
+      "setFilterEnabled": "Activar/desactivar filtro",
+      "startRecording": "Iniciar grabación",
+      "stopRecording": "Detener grabación"
+    },
+    "obsScene": "Escena",
+    "obsSource": "Fuente",
+    "obsFilter": "Filtro",
+    "obsVisible": "Mostrar (desmarcado = ocultar)",
+    "obsEnabled": "Activar (desmarcado = desactivar)",
+    "obsRevert": "Revertir tras (ms)",
+    "obsRevertHint": "Vacío = se queda así"
+  },
+  "library": {
+    "sounds": "Sonidos",
+    "soundsHint": "Archivos mp3, wav, ogg o flac. Se copian a la carpeta de datos de HiveBuzz.",
+    "media": "Imágenes, GIF y videos",
+    "mediaHint": "Para las alertas del overlay (png, jpg, gif, webp, mp4, webm).",
+    "import": "Importar",
+    "audioFiles": "Audio",
+    "mediaFiles": "Imágenes y videos",
+    "noSounds": "Aún no hay sonidos.",
+    "noMedia": "Aún no hay imágenes ni videos.",
+    "preview": "Escuchar",
+    "volume": "Volumen del sonido",
+    "confirmDelete": "¿Eliminar «{{name}}»?",
+    "rename": "Nuevo nombre"
+  },
+  "tts": {
+    "engines": "Motores de voz",
+    "enginesHint": "Piper es offline y de buena calidad; en Windows también están las voces del sistema (SAPI) y, opcionalmente, Edge-TTS.",
+    "installed": "instalado",
+    "notInstalled": "no instalado",
+    "installPiper": "Instalar Piper (≈22 MB)",
+    "piperManual": "Instala Piper a mano y configura su ruta.",
+    "voiceCount": "{{n}} voces disponibles",
+    "download": "Descargar",
+    "test": "Probar voz",
+    "testText": "Texto",
+    "voice": "Voz",
+    "noVoice": "(automática)",
+    "speak": "Hablar",
+    "skip": "Saltar",
+    "chatReader": "Lectura del chat",
+    "chatReaderHint": "Lee en voz alta los comentarios que cumplan estos filtros. Las acciones «Texto a voz» de las reglas funcionan aunque esto esté desactivado.",
+    "enabled": "Leer el chat automáticamente",
+    "command": "Solo con comando",
+    "commandHint": "Ej.: tts → solo se leen los mensajes «!tts hola». Vacío = todo el chat.",
+    "template": "Qué se dice",
+    "templateHint": "Variables: {nickname} {user} {text}",
+    "roles": "Quién puede",
+    "rolesHint": "Basta con un rol. Sin marcar = todos.",
+    "recentDonors": "Donadores recientes (min)",
+    "recentDonorsHint": "Solo quien regaló en los últimos N minutos",
+    "userCooldown": "Cooldown por usuario (s)",
+    "ignoreUsers": "Usuarios ignorados",
+    "ignoreUsersHint": "@usuarios separados por comas",
+    "ignoreBang": "No leer mensajes que empiecen por «!» (comandos de otros bots)",
+    "voices": "Voces",
+    "voiceMode": "Modo",
+    "mode": {
+      "single": "Una sola voz",
+      "byRole": "Por rol",
+      "randomPerUser": "Aleatoria por usuario"
+    },
+    "defaultVoice": "Voz predeterminada",
+    "rate": "Velocidad",
+    "volume": "Volumen",
+    "randomPool": "Voces a repartir",
+    "randomPoolHint": "Cada usuario recibe siempre la misma voz de esta lista.",
+    "filtersTitle": "Filtros de texto",
+    "filtersHint": "Se aplican a todo lo que se lee, venga del chat o de una regla.",
+    "skipLinks": "Quitar enlaces",
+    "stripEmojis": "Quitar emojis",
+    "profanity": "Filtro de groserías",
+    "maxChars": "Máximo de caracteres",
+    "maxRepeat": "Letras repetidas seguidas",
+    "maxRepeatHint": "«holaaaaa» → «holaaa». 0 = sin límite",
+    "profanityMode": "Si hay una grosería",
+    "profanitySkip": "No leer el mensaje",
+    "profanityCensor": "Sustituirla por «bip»",
+    "profanityWords": "Lista de palabras",
+    "profanityWordsHint": "Separadas por comas. Ignora mayúsculas, acentos y letras repetidas.",
+    "save": "Guardar",
+    "saved": "Guardado"
+  },
+  "overlay": {
+    "alerts": "Alertas",
+    "feed": "Feed de eventos",
+    "chat": "Chat en pantalla",
+    "gifts": "Regalos recientes",
+    "leaderboard": "Top donadores",
+    "goals": "Metas",
+    "timer": "Timer / subathon",
+    "counters": "Contadores",
+    "wheel": "Ruleta",
+    "poll": "Encuesta",
+    "nowplaying": "Sonando ahora"
+  },
+  "overlays": {
+    "groupStyle": "Estilo",
+    "groupBehavior": "Comportamiento",
+    "urlHint": "Añade esta URL como Browser Source en OBS o TikTok LIVE Studio. Los cambios se ven al instante, sin recargar.",
+    "test": "Probar",
+    "reset": "Restablecer",
+    "confirmReset": "¿Volver a los valores por defecto de este overlay?",
+    "noServer": "El servidor local no está disponible.",
+    "copyFailed": "No se pudo copiar al portapapeles.",
+    "previewHintTest": "Vista previa a 1920×1080. Usa «Probar» para mandarle contenido de ejemplo.",
+    "previewHintLive": "Vista previa a 1920×1080. Este overlay muestra datos reales."
+  },
+  "field": {
+    "fontFamily": "Fuente",
+    "fontSize": "Tamaño de texto (px)",
+    "textColor": "Color del texto",
+    "accentColor": "Color de acento",
+    "backgroundColor": "Color de fondo",
+    "backgroundOpacity": "Opacidad del fondo (%)",
+    "borderRadius": "Redondeo (px)",
+    "anchor": "Posición",
+    "margin": "Margen (px)",
+    "scale": "Escala (%)",
+    "width": "Ancho (px)",
+    "titleSize": "Tamaño del título (px)",
+    "textSize": "Tamaño del texto (px)",
+    "mediaMaxWidth": "Ancho máximo de la imagen (% de pantalla)",
+    "animation": "Animación",
+    "maxItems": "Máximo de elementos",
+    "maxMessages": "Máximo de mensajes",
+    "lifetimeSec": "Desaparece tras (s, 0 = nunca)",
+    "showAvatar": "Mostrar avatar",
+    "showChat": "Mostrar chat",
+    "showGift": "Mostrar regalos",
+    "showFollow": "Mostrar follows",
+    "showShare": "Mostrar shares",
+    "showSubscribe": "Mostrar suscripciones",
+    "showEmote": "Mostrar emotes",
+    "showBadges": "Mostrar insignias (mod / suscriptor)",
+    "showEmotes": "Mostrar emotes del chat",
+    "hideCommands": "Ocultar comandos (!algo)",
+    "hideUsers": "Ocultar a estos usuarios",
+    "nameColor": "Color del nombre",
+    "minCoins": "Monedas mínimas",
+    "showGiftImage": "Mostrar imagen del regalo",
+    "showCoins": "Mostrar monedas",
+    "scope": "Ranking de",
+    "boardSize": "Puestos a mostrar",
+    "title": "Título",
+    "medals": "Medallas en el top 3",
+    "trackColor": "Color del fondo de la barra",
+    "barHeight": "Alto de la barra (px)",
+    "goalId": "ID de la meta (vacío = todas)",
+    "showLabel": "Mostrar nombre",
+    "showNumbers": "Mostrar cifras",
+    "showPercent": "Mostrar porcentaje",
+    "digitSize": "Tamaño de los dígitos (px)",
+    "lowColor": "Color cuando queda poco",
+    "timerId": "ID del timer (vacío = el primero)",
+    "timeFormat": "Formato",
+    "lowSeconds": "Poco tiempo (s)",
+    "endText": "Texto al terminar",
+    "showLikes": "Mostrar likes",
+    "showViewers": "Mostrar espectadores",
+    "likesLabel": "Etiqueta de likes",
+    "viewersLabel": "Etiqueta de espectadores",
+    "layout": "Disposición",
+    "wheelSize": "Tamaño de la ruleta",
+    "pointerColor": "Color del puntero",
+    "showWhenIdle": "Mostrar en reposo",
+    "resultSec": "Segundos mostrando el premio",
+    "showVotes": "Mostrar votos",
+    "showTimer": "Mostrar cuenta atrás",
+    "hideAfterSec": "Ocultar tras terminar (s, 0 = nunca)",
+    "coverSize": "Tamaño de la carátula (px)",
+    "showCover": "Mostrar carátula",
+    "showProgress": "Mostrar barra de progreso",
+    "showRequester": "Mostrar quién la pidió",
+    "hideWhenPaused": "Ocultar en pausa",
+    "showPlatform": "Mostrar de qué plataforma viene (TikTok / Twitch)"
+  },
+  "font": {
+    "segoe": "Segoe UI",
+    "arial": "Arial",
+    "verdana": "Verdana",
+    "georgia": "Georgia",
+    "impact": "Impact",
+    "trebuchet": "Trebuchet MS",
+    "comic": "Comic Sans MS",
+    "courier": "Courier New"
+  },
+  "anchor": {
+    "topLeft": "Arriba a la izquierda",
+    "topRight": "Arriba a la derecha",
+    "bottomLeft": "Abajo a la izquierda",
+    "bottomRight": "Abajo a la derecha",
+    "center": "Centro"
+  },
+  "animation": {
+    "pop": "Aparecer con rebote",
+    "slide": "Deslizar",
+    "fade": "Desvanecer"
+  },
+  "nameColor": {
+    "accent": "Color de acento",
+    "perUser": "Un color por usuario"
+  },
+  "scope": {
+    "session": "La sesión (este LIVE)",
+    "day": "El día",
+    "all": "Todos los tiempos"
+  },
+  "format": {
+    "auto": "Automático",
+    "hms": "Horas:minutos:segundos",
+    "ms": "Minutos:segundos"
+  },
+  "layout": {
+    "row": "En fila",
+    "column": "En columna"
+  },
+  "goals": {
+    "title": "Metas",
+    "hint": "Barras de progreso de likes, follows, monedas… Avisan a las reglas (disparador «Meta alcanzada») cuando se completan.",
+    "new": "Nueva meta",
+    "newTitle": "Nueva meta",
+    "editTitle": "Editar meta",
+    "empty": "Aún no hay metas.",
+    "name": "Nombre",
+    "namePlaceholder": "Ej.: 5000 likes",
+    "target": "Objetivo",
+    "kind": "Qué cuenta",
+    "kinds": {
+      "likes": "Likes",
+      "follows": "Follows",
+      "shares": "Shares",
+      "subscribers": "Suscripciones",
+      "coins": "Monedas regaladas",
+      "gift": "Un regalo concreto"
+    },
+    "onReach": "Al alcanzarla",
+    "onReachOptions": {
+      "stop": "Quedarse completa",
+      "reset": "Volver a empezar",
+      "extend": "Subir el objetivo"
+    },
+    "onReachHint": {
+      "stop": "Avisa una sola vez y sigue contando.",
+      "reset": "Conserva el sobrante y empieza otra vuelta.",
+      "extend": "El objetivo sube y se sigue acumulando."
+    },
+    "extendBy": "Subir el objetivo en",
+    "resetOnSession": "Empezar de cero en cada LIVE nuevo",
+    "idHint": "ID (para reglas y overlays):",
+    "reached": "alcanzada {{n}} veces",
+    "adjustBy": "Ajuste rápido de",
+    "resetProgress": "Reiniciar",
+    "confirmDelete": "¿Eliminar «{{name}}»?"
+  },
+  "timers": {
+    "title": "Timers / subathon",
+    "hint": "Cuenta regresiva que los regalos, follows, etc. pueden extender. Al llegar a cero se dispara «Timer terminado».",
+    "new": "Nuevo timer",
+    "newTitle": "Nuevo timer",
+    "editTitle": "Editar timer",
+    "empty": "Aún no hay timers.",
+    "namePlaceholder": "Ej.: Subathon",
+    "startMinutes": "Duración inicial (min)",
+    "maxMinutes": "Tope (min)",
+    "maxHint": "El tiempo restante nunca lo supera. Vacío = sin tope.",
+    "extensions": "Qué lo extiende",
+    "extensionsHint": "Solo suma mientras el timer está en marcha o en pausa.",
+    "source": "Origen",
+    "sources": {
+      "coins": "Cada N monedas",
+      "likes": "Cada N likes",
+      "follow": "Cada follow",
+      "share": "Cada share",
+      "subscribe": "Cada suscripción",
+      "gift": "Cada unidad de un regalo"
+    },
+    "perCoins": "N monedas",
+    "perLikes": "N likes",
+    "addSeconds": "Suma (s)",
+    "addExtension": "Añadir extensión",
+    "status": {
+      "idle": "Parado",
+      "running": "En marcha",
+      "paused": "En pausa",
+      "ended": "Terminado"
+    },
+    "start": "Iniciar",
+    "pause": "Pausar",
+    "resume": "Reanudar",
+    "reset": "Reiniciar"
+  },
+  "session": {
+    "title": "Sesión",
+    "hint": "Una sesión nueva empieza sola al reconectar tras terminar un LIVE. Aquí puedes forzarla o borrar el histórico de donadores.",
+    "new": "Empezar sesión nueva",
+    "confirmNew": "¿Empezar una sesión nueva? Se vacía el ranking de la sesión y se reinician las metas que así lo piden.",
+    "clearHistory": "Borrar histórico de donadores",
+    "confirmClear": "¿Borrar TODO el histórico de donadores (día y todos los tiempos)? No se puede deshacer."
+  },
+  "interact": {
+    "save": "Guardar",
+    "saved": "Guardado",
+    "add": "Añadir",
+    "sections": {
+      "bot": "Chatbot",
+      "points": "Puntos",
+      "wheel": "Ruleta",
+      "poll": "Encuestas",
+      "login": "Sesión de TikTok"
+    },
+    "bot": {
+      "title": "Chatbot",
+      "hint": "Escribe en tu chat. Necesita iniciar sesión en TikTok (pestaña Sesión de TikTok).",
+      "enabled": "Activar el bot",
+      "minInterval": "Tiempo mínimo entre mensajes (ms)",
+      "commands": "Comandos",
+      "noCommands": "Aún no hay comandos.",
+      "names": "Nombres (separados por coma)",
+      "response": "Respuesta (admite {user}, {nickname}, {points}…)",
+      "timed": "Mensajes temporizados",
+      "text": "Texto",
+      "everyMinutes": "Cada (min)",
+      "minChat": "Mín. mensajes de chat",
+      "thanks": "Agradecimientos automáticos",
+      "thanksHint": "Variables: {nickname}, {gift}, {count}, {coins}.",
+      "thanksKinds": {
+        "gift": "Regalos",
+        "follow": "Follows",
+        "share": "Shares",
+        "subscribe": "Suscripciones"
+      },
+      "log": "Registro del bot",
+      "clearLog": "Limpiar",
+      "emptyLog": "Sin mensajes todavía.",
+      "testMessage": "Mensaje de prueba",
+      "send": "Enviar",
+      "state": {
+        "sent": "enviado",
+        "failed": "falló",
+        "dropped": "descartado"
+      }
+    },
+    "points": {
+      "title": "Sistema de puntos",
+      "hint": "Los espectadores ganan puntos y los canjean por recompensas.",
+      "enabled": "Activar puntos",
+      "currency": "Nombre de los puntos",
+      "watch": "Por ver",
+      "watchEvery": "Cada (min)",
+      "comment": "Por comentar",
+      "like": "Por likes",
+      "likeEvery": "Cada N likes",
+      "share": "Por compartir",
+      "follow": "Por seguir",
+      "subscribe": "Por suscribirse",
+      "perCoin": "Por moneda regalada",
+      "subMultiplier": "Multiplicador suscriptores",
+      "topSize": "Tamaño del !top",
+      "pointsCommand": "Comando de saldo",
+      "topCommand": "Comando de ranking",
+      "rewardsHint": "Las recompensas se crean en Reglas: ponle un coste en puntos a una regla de comando de chat.",
+      "viewers": "Espectadores",
+      "export": "Exportar CSV",
+      "import": "Importar CSV",
+      "search": "Buscar…",
+      "user": "Usuario",
+      "coins": "Monedas",
+      "sort": {
+        "points": "Más puntos",
+        "name": "Nombre",
+        "lastSeen": "Visto hace poco",
+        "coinsGifted": "Más monedas"
+      }
+    },
+    "wheel": {
+      "title": "Ruleta de premios",
+      "hint": "Lánzala con una regla (acción «spinWheel») o con el botón de prueba.",
+      "test": "Girar (prueba)",
+      "announce": "Mensaje del bot al ganar",
+      "prize": "Premio",
+      "weight": "Peso",
+      "actionHint": "Para que un premio ejecute acciones, edita su plan en la configuración avanzada."
+    },
+    "poll": {
+      "title": "Encuestas",
+      "hint": "Los espectadores votan escribiendo el número de la opción.",
+      "question": "Pregunta",
+      "options": "Opciones",
+      "optionsHint": "Una por línea (2 a 8).",
+      "duration": "Duración (s)",
+      "start": "Lanzar",
+      "stop": "Terminar ya",
+      "clear": "Quitar del overlay",
+      "ended": "terminada"
+    },
+    "login": {
+      "title": "Sesión de TikTok",
+      "hint": "Opcional: solo hace falta para que el bot escriba. La contraseña se escribe en la web de TikTok; HiveBuzz solo guarda las cookies de sesión en el llavero del sistema.",
+      "active": "Sesión guardada.",
+      "none": "Sin sesión: modo solo lectura.",
+      "start": "Abrir login de TikTok",
+      "finish": "Ya inicié sesión",
+      "logout": "Cerrar sesión",
+      "opened": "Inicia sesión en la ventana y pulsa «Ya inicié sesión».",
+      "saved": "Sesión guardada.",
+      "notYet": "Aún no se detecta la sesión.",
+      "reconnect": "Vuelve a conectar al LIVE para aplicar la sesión."
+    }
+  },
+  "integrations": {
+    "save": "Guardar",
+    "saved": "Guardado",
+    "obs": {
+      "title": "OBS Studio",
+      "hint": "Control por obs-websocket v5 (incluido en OBS 28 o superior). Se usa desde las acciones «OBS Studio».",
+      "host": "Host",
+      "port": "Puerto",
+      "password": "Contraseña",
+      "passwordSaved": "Hay una guardada en el llavero del sistema.",
+      "passwordNone": "Vacío = sin contraseña. Se guarda en el llavero, nunca en la base de datos.",
+      "test": "Probar conexión",
+      "ok": "Conectado. OBS {{obs}} · WebSocket {{ws}}",
+      "clearPassword": "Borrar contraseña",
+      "help": "En OBS: Herramientas → Ajustes del servidor WebSocket → Activar. Si OBS está en otro equipo, usa su IP; el tráfico no va cifrado."
+    },
+    "api": {
+      "title": "API local",
+      "hint": "Dispara reglas desde scripts, Streamer.bot o mods. Crea una regla con el disparador «Llamada a la API local».",
+      "trigger": "Disparar una regla (HTTP)",
+      "triggerHint": "Cuerpo JSON: name (obligatorio) y vars (texto, número o booleano; se usan como {user}…). Responde 202 si se encoló, 404 si ninguna regla activa usa el nombre.",
+      "ws": "Eventos en vivo (WebSocket)",
+      "wsHint": "Emite los eventos normalizados (LiveEvent) en JSON.",
+      "security": "Solo escucha en 127.0.0.1 y exige el token; no lo compartas (está en las URLs de los overlays)."
+    }
+  },
+  "stats": {
+    "streams": "Transmisiones",
+    "hint": "Una por LIVE (se separan al reconectar tras un fin de LIVE).",
+    "refresh": "Actualizar",
+    "empty": "Aún no hay transmisiones con actividad.",
+    "pick": "Elige una transmisión de la lista.",
+    "delete": "Borrar",
+    "coins": "Monedas",
+    "peak": "Pico de espectadores",
+    "gifts": "Regalos",
+    "chats": "Comentarios",
+    "likes": "Likes",
+    "follows": "Follows",
+    "shares": "Shares",
+    "subscribers": "Suscripciones",
+    "topDonors": "Top donadores",
+    "noDonors": "Nadie regaló en esta transmisión.",
+    "giftsByType": "Regalos por tipo",
+    "noGifts": "Sin regalos."
+  },
+  "spotify": {
+    "title": "Spotify",
+    "hint": "Pide canciones por chat (!sr) y muestra «Sonando ahora». Necesitas tu propia app gratuita en developer.spotify.com y Spotify Premium para la cola.",
+    "clientId": "Client ID",
+    "clientIdHint": "El de tu app de Spotify. Es público: no hace falta ningún secreto.",
+    "redirect": "Redirect URI",
+    "redirectHint": "Añádela tal cual en los ajustes de tu app de Spotify (Redirect URIs).",
+    "connect": "Conectar con Spotify",
+    "disconnect": "Desconectar",
+    "connected": "Conectado",
+    "notConnected": "Sin conectar",
+    "opened": "Autoriza en el navegador; esta pantalla se actualizará sola.",
+    "requests": "Peticiones por chat",
+    "enabled": "Activar peticiones de canciones",
+    "commands": "Comandos para pedir",
+    "commandsHint": "Sin «!», separados por comas",
+    "nowCommands": "Comandos «qué suena»",
+    "minRole": "Quién puede pedir",
+    "roles": {
+      "everyone": "Cualquiera",
+      "follower": "Seguidores",
+      "subscriber": "Suscriptores",
+      "moderator": "Moderadores"
+    },
+    "cost": "Coste en puntos",
+    "costHint": "0 = gratis",
+    "perUser": "Máx. en cola por persona",
+    "cooldown": "Espera entre peticiones (s)",
+    "maxDuration": "Duración máxima (s)",
+    "blockedTerms": "Bloquear si el título o artista contiene",
+    "blockedTermsHint": "Separados por comas",
+    "blockedUsers": "Usuarios bloqueados (@)",
+    "reply": "Responder en el chat",
+    "test": "Probar una petición",
+    "testHint": "Busca y añade a tu cola real de Spotify, sin pasar por roles ni puntos.",
+    "queueIt": "Añadir a la cola",
+    "queued": "Añadida: {{title}} — {{artist}}",
+    "help": "Overlay: «Sonando ahora» en la pestaña Overlays. Spotify solo permite encolar con una cuenta Premium y un dispositivo activo.",
+    "hintEasy": "Conecta tu cuenta y tu chat podrá pedir canciones con !sr. Verás qué suena en el overlay «Sonando ahora».",
+    "unavailable": "Spotify aún no está disponible en esta versión de HiveBuzz. Si tienes tu propia app de Spotify, ábrela en «Opciones avanzadas».",
+    "enabledEasy": "Dejar que el chat pida canciones (!sr nombre de la canción)",
+    "usage": "Tus espectadores escriben !sr y el nombre o el enlace de la canción; !song dice qué suena. Spotify debe estar abierto y reproduciendo, y la cola solo funciona con Spotify Premium.",
+    "options": "Opciones de las peticiones",
+    "moreOptions": "Más opciones",
+    "advanced": "Opciones avanzadas (usar mi propia app de Spotify)",
+    "advancedHint": "No hace falta para usar HiveBuzz. Solo si prefieres tu propia app de developer.spotify.com."
+  },
+  "system": {
+    "save": "Guardar",
+    "saved": "Guardado",
+    "prefs": {
+      "title": "Aplicación",
+      "language": "Idioma",
+      "languageHint": "Interfaz y textos de los overlays (los overlays toman el idioma con ?lang=en en su URL).",
+      "closeToTray": "Al cerrar la ventana, seguir en la bandeja del sistema",
+      "startMinimized": "Al iniciar con el sistema, empezar minimizado",
+      "autostart": "Iniciar HiveBuzz con el sistema"
+    },
+    "update": {
+      "title": "Actualizaciones",
+      "repo": "Repositorio de GitHub",
+      "repoHint": "usuario/repo con los releases de HiveBuzz. Sin esto no se busca nada.",
+      "auto": "Comprobar al abrir",
+      "check": "Buscar actualización",
+      "latest": "Estás al día (v{{version}}).",
+      "install": "Instalar v{{version}} y reiniciar",
+      "banner": "Hay una versión nueva de HiveBuzz: v{{version}}.",
+      "progress": "Descargando… {{done}} / {{total}} KB"
+    },
+    "profiles": {
+      "title": "Perfiles",
+      "hint": "Guarda tus reglas y la configuración de tus overlays con un nombre («Minecraft», «Charla»…) y cámbialas de un golpe. No incluyen metas, timers, puntos, bot ni ruleta.",
+      "namePlaceholder": "Nombre del perfil",
+      "saveCurrent": "Guardar lo actual como perfil",
+      "empty": "Aún no hay perfiles.",
+      "active": "último aplicado",
+      "counts": "{{rules}} reglas · {{overlays}} overlays personalizados",
+      "apply": "Aplicar",
+      "overwrite": "Actualizar",
+      "delete": "Borrar",
+      "created": "Perfil guardado.",
+      "updated": "Perfil actualizado con lo actual.",
+      "applied": "Perfil «{{name}}» aplicado.",
+      "confirmApply": "Aplicar «{{name}}» sustituye TODAS tus reglas y la configuración de tus overlays. ¿Continuar?",
+      "confirmOverwrite": "¿Sobrescribir «{{name}}» con tus reglas y overlays actuales?",
+      "confirmDelete": "¿Borrar el perfil «{{name}}»?"
+    },
+    "backup": {
+      "title": "Exportar / importar configuración",
+      "hint": "Un solo archivo .zip con reglas, metas, timers, overlays, perfiles, ajustes, y tus sonidos e imágenes.",
+      "export": "Exportar configuración",
+      "import": "Importar configuración",
+      "exported": "Exportado.",
+      "summary": "{{rules}} reglas · {{goals}} metas · {{timers}} timers · {{overlays}} overlays · {{sounds}} sonidos · {{media}} imágenes · {{profiles}} perfiles",
+      "skipped": "{{n}} elementos descartados",
+      "pending": "Importación lista. Se aplicará al reiniciar y SUSTITUIRÁ tus reglas, metas, timers, overlays, bibliotecas y perfiles.",
+      "restart": "Reiniciar ahora",
+      "cancel": "Cancelar importación",
+      "noticeOk": "Configuración importada ({{rules}} reglas).",
+      "noticeError": "No se pudo importar: {{error}}. Se conservó tu configuración anterior.",
+      "warning": "El archivo no incluye contraseñas, tokens ni sesiones (están en el llavero del sistema), pero sí lo que pongas en reglas, como las cabeceras de un webhook. Los espectadores y puntos no se exportan."
+    },
+    "logs": {
+      "title": "Registro (logs)",
+      "auto": "Actualizar solo",
+      "export": "Guardar en archivo",
+      "clear": "Limpiar",
+      "empty": "Sin entradas."
+    }
+  },
+  "nav": {
+    "label": "Menú principal",
+    "connections": "Conexiones",
+    "groups": {
+      "automation": "Automatización",
+      "community": "Comunidad",
+      "screen": "Pantalla y sonido",
+      "connections": "Conectar con otros",
+      "app": "La aplicación"
+    }
+  },
+  "pageHints": {
+    "dashboard": "Conecta tus directos y mira qué está pasando en tiempo real.",
+    "rules": "Dile a HiveBuzz qué hacer cuando alguien regala, comenta o te sigue.",
+    "goals": "Barras de progreso y cuentas atrás que tu comunidad puede llenar.",
+    "interact": "El bot de tu chat, los puntos de tus espectadores, la ruleta y las encuestas.",
+    "stats": "Un resumen de cada directo: monedas, espectadores y quién te apoyó.",
+    "overlays": "Lo que se ve en pantalla (alertas, chat, metas…). Cópialo a OBS con un clic.",
+    "library": "Tus sonidos, imágenes y videos para las alertas.",
+    "tts": "Que HiveBuzz lea en voz alta los mensajes del chat.",
+    "integrations": "Conecta OBS, Spotify y otros programas.",
+    "settings": "Idioma, inicio con Windows, copias de seguridad y actualizaciones.",
+    "help": "El recorrido interactivo, qué hay en cada parte del menú y respuestas rápidas."
+  },
+  "platform": {
+    "tiktok": "TikTok",
+    "twitch": "Twitch"
+  },
+  "conn": {
+    "state": {
+      "disconnected": "Sin conectar",
+      "signatureError": "TikTok no aceptó la conexión; se reintentará sola",
+      "reconnecting": "Reconectando…",
+      "tiktok": {
+        "waitingLive": "Esperando a que abras tu directo",
+        "connected": "Conectado · recibiendo eventos"
+      },
+      "twitch": {
+        "connecting": "Conectando…",
+        "offline": "Tu canal no está en directo (el chat ya se lee)",
+        "full": "En directo · chat, seguidores y espectadores",
+        "chat": "Conectado · leyendo el chat",
+        "notOwner": "Conectado · leyendo el chat (la sesión es de otra cuenta)"
+      }
+    },
+    "short": {
+      "disconnected": "sin conectar",
+      "waiting_live": "esperando",
+      "connected": "conectado",
+      "signature_error": "error",
+      "reconnecting": "reconectando"
+    },
+    "tiktok": {
+      "label": "Tu usuario de TikTok",
+      "placeholder": "@tu_usuario",
+      "help": "Conéctate cuando abras tu directo; si aún no lo abriste, HiveBuzz espera por ti."
+    },
+    "twitch": {
+      "label": "Tu canal de Twitch",
+      "placeholder": "tu_canal",
+      "help": "Para leer el chat no necesitas iniciar sesión: escribe el nombre de tu canal."
+    }
+  },
+  "twitch": {
+    "login": {
+      "title": "Entrar con Twitch",
+      "starting": "Preparando el código…",
+      "step1": "Se abrirá twitch.tv/activate en tu navegador.",
+      "step2": "Escribe este código y acepta.",
+      "step3": "Vuelve aquí: lo detectamos solos.",
+      "yourCode": "Tu código",
+      "copy": "Copiar código",
+      "open": "Abrir twitch.tv/activate",
+      "waiting": "Esperando que aceptes en Twitch… (el código caduca en {{time}})",
+      "done": "¡Listo! Ya hemos entrado con tu cuenta de Twitch.",
+      "retry": "Intentar de nuevo",
+      "close": "Cerrar",
+      "cancel": "Cancelar",
+      "privacy": "Nunca escribes tu contraseña en HiveBuzz. Solo se pide permiso para ver tus seguidores y se guarda de forma segura en tu equipo."
+    },
+    "upgrade": {
+      "pitch": "¿Quieres ver también tus nuevos seguidores, saber cuándo estás en directo y cuántos te ven? Entra con tu cuenta de Twitch (es opcional).",
+      "button": "Entrar con Twitch",
+      "loggedAs": "Sesión iniciada como {{login}}",
+      "logged": "Sesión de Twitch iniciada",
+      "logout": "Cerrar sesión",
+      "otherChannel": "Para ver seguidores y espectadores, el canal debe ser el de tu cuenta ({{login}}).",
+      "benefits": "Con la sesión: seguidores nuevos, estado del directo y número de espectadores."
+    },
+    "advanced": {
+      "title": "Twitch · opciones avanzadas",
+      "hint": "No hace falta para usar HiveBuzz. Solo si quieres usar tu propia aplicación de Twitch.",
+      "clientId": "Client ID propio",
+      "clientIdHint": "Se crea en dev.twitch.tv/console (tipo «Público»). Vacío = el de HiveBuzz.",
+      "unavailable": "Esta versión de HiveBuzz no trae el inicio de sesión de Twitch integrado; el chat funciona igual. Si tienes tu propio Client ID, ponlo aquí."
+    }
+  },
+  "start": {
+    "title": "Primeros pasos",
+    "progress": "{{done}} de {{total}} hechos",
+    "hide": "Ocultar",
+    "connect": {
+      "title": "Conecta tu directo",
+      "hint": "Escribe tu usuario en la tarjeta de TikTok o de Twitch y pulsa Conectar."
+    },
+    "overlay": {
+      "title": "Pon una alerta en OBS",
+      "hint": "Copia la dirección de un overlay y añádela a OBS como «Navegador».",
+      "action": "Ver overlays",
+      "done": "Ya lo hice"
+    },
+    "test": {
+      "title": "Prueba una alerta",
+      "hint": "Abre «Probar sin estar en directo» (abajo) y pulsa un botón."
+    },
+    "rule": {
+      "title": "Crea tu primera regla",
+      "hint": "Por ejemplo: «cuando alguien me siga, suena un sonido».",
+      "action": "Crear regla"
+    }
+  },
+  "tour": {
+    "counter": "Paso {{n}} de {{total}}",
+    "next": "Siguiente",
+    "back": "Atrás",
+    "skip": "Salir",
+    "finish": "Terminar",
+    "done": "✓ ¡Perfecto!",
+    "waiting": {
+      "gs_tested": "Haz clic en «Probar sin estar en directo» y pulsa un botón. Te esperamos…",
+      "page": "Haz clic en esa opción del menú. Te esperamos…"
+    },
+    "offer": {
+      "title": "¿Primera vez en HiveBuzz?",
+      "body": "Te enseñamos la app en un par de minutos, paso a paso y probando tú mismo.",
+      "start": "Empezar recorrido",
+      "later": "Ahora no"
+    },
+    "steps": {
+      "welcome": {
+        "title": "¡Bienvenido a HiveBuzz!",
+        "body": "Te enseño lo básico en un par de minutos. Puedes salir cuando quieras con «Salir» o la tecla Esc, y repetirlo desde «Ayuda»."
+      },
+      "connections": {
+        "title": "Conecta tus directos",
+        "body": "Aquí conectas TikTok y Twitch. Escribe tu usuario o canal y pulsa Conectar. Debajo verás el estado en palabras claras."
+      },
+      "simulate": {
+        "title": "Pruébalo sin estar en directo",
+        "body": "Abre este recuadro y pulsa cualquier botón: HiveBuzz enviará un evento de mentira, como si alguien regalara o escribiera en tu chat."
+      },
+      "feed": {
+        "title": "Lo que pasa, en vivo",
+        "body": "Cada regalo, mensaje o follow aparece aquí. Si usas TikTok y Twitch a la vez, puedes filtrar por plataforma."
+      },
+      "menu": {
+        "title": "El menú",
+        "body": "Todo lo demás está en este menú, agrupado por lo que quieres hacer. Abajo siempre ves si TikTok y Twitch están conectados."
+      },
+      "goRules": {
+        "title": "Entra en Reglas",
+        "body": "Las reglas son el corazón de HiveBuzz. Haz clic en «Reglas» en el menú para verlas."
+      },
+      "help": {
+        "body": "Aquí está la explicación de cada pantalla, un glosario y respuestas rápidas. También puedes repetir este recorrido cuando quieras."
+      },
+      "finish": {
+        "title": "¡Listo!",
+        "body": "Ya conoces lo básico. Empieza conectando tu directo y creando tu primera regla; la lista de «Primeros pasos» en Inicio te guía."
+      }
+    }
+  },
+  "help": {
+    "tour": {
+      "title": "Recorrido interactivo",
+      "body": "Un paseo de pocos minutos por la app: conectas, pruebas una alerta y conoces cada parte del menú.",
+      "start": "Empezar recorrido"
+    },
+    "menu": {
+      "title": "Qué hay en cada parte del menú",
+      "hint": "Todo lo que encontrarás, pantalla por pantalla.",
+      "go": "Ir a {{name}}"
+    },
+    "sections": {
+      "dashboard": {
+        "what": "Aquí conectas tus directos y ves todo lo que pasa, en vivo.",
+        "i1": "Una tarjeta para TikTok y otra para Twitch: escribe tu usuario y pulsa Conectar.",
+        "i2": "El estado de cada conexión en palabras claras.",
+        "i3": "La lista de eventos (regalos, mensajes, seguidores…) a medida que ocurren.",
+        "i4": "Un simulador para probarlo todo sin estar en directo, y la lista de primeros pasos."
+      },
+      "rules": {
+        "what": "Aquí decides qué pasa cuando ocurre algo en tu directo: «cuando pasa X, haz Y».",
+        "i1": "Disparadores: regalos, follows, comandos del chat, palabras clave, likes y más.",
+        "i2": "Acciones: sonido, alerta en pantalla, voz, mensaje del bot, tecla, OBS, webhook…",
+        "i3": "Condiciones: tiempo de espera, roles, probabilidad y horario.",
+        "i4": "Botón «Probar» para ver una regla en acción sin esperar a que ocurra."
+      },
+      "goals": {
+        "what": "Barras de progreso y cuentas atrás que tu comunidad va llenando.",
+        "i1": "Metas de likes, follows, monedas o de un regalo concreto.",
+        "i2": "Timers tipo «subathon» que los regalos alargan.",
+        "i3": "Al completarse pueden disparar una regla (por ejemplo, una celebración).",
+        "i4": "Se guardan solas: no pierdes el progreso al cerrar la app."
+      },
+      "interact": {
+        "what": "Todo lo que hace tu chat más divertido.",
+        "i1": "Chatbot: comandos como !discord, respuestas automáticas y agradecimientos.",
+        "i2": "Puntos: tus espectadores los ganan y los canjean por recompensas.",
+        "i3": "Ruleta de premios y encuestas que se votan escribiendo un número.",
+        "i4": "Sesión de TikTok: solo hace falta si quieres que el bot escriba en tu chat."
+      },
+      "stats": {
+        "what": "Un resumen de cada directo, para saber cómo te fue.",
+        "i1": "Monedas ganadas y pico de espectadores.",
+        "i2": "Quién te apoyó más (top de donadores).",
+        "i3": "Regalos por tipo y actividad del chat.",
+        "i4": "Puedes borrar los resúmenes que no quieras."
+      },
+      "overlays": {
+        "what": "Lo que tu audiencia ve en pantalla: alertas, chat, metas…",
+        "i1": "Alertas, chat, regalos, metas, timer, ruleta, encuestas y «Sonando ahora».",
+        "i2": "Cada uno tiene su dirección: cópiala en OBS como fuente «Navegador».",
+        "i3": "Cambia colores, fuente, tamaño y posición viendo la vista previa en vivo.",
+        "i4": "Puedes mostrar de qué plataforma viene cada mensaje."
+      },
+      "library": {
+        "what": "Tus archivos para las alertas.",
+        "i1": "Sonidos (mp3, wav, ogg, flac) con volumen propio y botón para escucharlos.",
+        "i2": "Imágenes, GIF y videos para las alertas.",
+        "i3": "Los archivos se copian a la carpeta de HiveBuzz.",
+        "i4": "Viajan contigo cuando exportas tu configuración."
+      },
+      "tts": {
+        "what": "Que HiveBuzz lea mensajes en voz alta (texto a voz).",
+        "i1": "Voces gratis sin internet (Piper) y las del sistema.",
+        "i2": "Puede leer el chat con filtros: solo comandos, suscriptores, moderadores…",
+        "i3": "Filtros de groserías, enlaces y emojis.",
+        "i4": "Botón «Saltar» para cortar lo que está sonando."
+      },
+      "integrations": {
+        "what": "Conecta HiveBuzz con otros programas.",
+        "i1": "OBS: cambia de escena o muestra fuentes desde una regla.",
+        "i2": "Spotify: tus espectadores piden canciones con !sr y ves qué suena.",
+        "i3": "API local: otros programas pueden disparar tus reglas.",
+        "i4": "Twitch avanzado: usar tu propia aplicación (casi nadie lo necesita)."
+      },
+      "settings": {
+        "what": "Ajustes de la aplicación y tus copias de seguridad.",
+        "i1": "Idioma, iniciar con Windows y bandeja del sistema.",
+        "i2": "Perfiles: cambia todas tus reglas y overlays de golpe («Minecraft», «Charla»).",
+        "i3": "Exportar e importar tu configuración completa.",
+        "i4": "Actualizaciones, registro (logs) y clave de Euler Stream."
+      }
+    },
+    "glossary": {
+      "title": "Glosario",
+      "hint": "Las palabras que verás por la app.",
+      "event": {
+        "term": "Evento",
+        "def": "Algo que pasa en tu directo: un regalo, un mensaje, un seguidor…"
+      },
+      "rule": {
+        "term": "Regla",
+        "def": "Una orden automática: «cuando pasa X, haz Y»."
+      },
+      "trigger": {
+        "term": "Disparador",
+        "def": "El «cuando» de una regla: lo que la activa."
+      },
+      "action": {
+        "term": "Acción",
+        "def": "El «haz» de una regla: sonido, alerta, voz, mensaje…"
+      },
+      "overlay": {
+        "term": "Overlay",
+        "def": "Una capa que se superpone a tu directo (alertas, chat, metas). Se añade a OBS con su dirección."
+      },
+      "session": {
+        "term": "Sesión",
+        "def": "Un directo. HiveBuzz empieza una nueva al volver a conectar tras terminar el anterior."
+      },
+      "points": {
+        "term": "Puntos",
+        "def": "La moneda de tu comunidad: se ganan viendo y comentando, y se canjean por recompensas."
+      },
+      "tts": {
+        "term": "TTS",
+        "def": "Texto a voz: leer mensajes en voz alta."
+      },
+      "cooldown": {
+        "term": "Cooldown",
+        "def": "El tiempo de espera antes de que una regla pueda repetirse."
+      }
+    },
+    "faq": {
+      "title": "Preguntas rápidas",
+      "obs": {
+        "q": "¿Cómo pongo una alerta en OBS?",
+        "a": "Ve a Overlays, elige «Alertas» y pulsa Copiar. En OBS añade una fuente «Navegador», pega la dirección y pon 1920×1080."
+      },
+      "bot": {
+        "q": "¿Por qué mi bot no escribe?",
+        "a": "Nace apagado: actívalo en «Bot y puntos» e inicia sesión de TikTok en esa misma pantalla. En Twitch el bot no escribe (solo lee)."
+      },
+      "spotify": {
+        "q": "¿Necesito Spotify Premium?",
+        "a": "Para que los espectadores añadan canciones a la cola, sí: es una limitación de Spotify. Sin Premium solo se ve qué suena."
+      },
+      "safe": {
+        "q": "¿Es seguro?",
+        "a": "Todo corre en tu PC. Las contraseñas y sesiones se guardan en el llavero del sistema, los overlays piden un token y HiveBuzz nunca te pide tu contraseña de TikTok ni de Twitch."
+      },
+      "test": {
+        "q": "¿Cómo pruebo sin estar en directo?",
+        "a": "En Inicio abre «Probar sin estar en directo» y pulsa cualquier botón. También puedes usar «Probar» dentro de cada regla."
+      },
+      "update": {
+        "q": "¿Pierdo mis cosas si actualizo?",
+        "a": "No: tus datos están en una carpeta aparte. Aun así, en Ajustes puedes exportar una copia de seguridad antes de actualizar."
+      }
+    }
+  }
+}

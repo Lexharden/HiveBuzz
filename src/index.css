@@ -1,0 +1,28 @@
+@import "tailwindcss";
+
+/* Marca HiveBuzz: azul #00346e, amarillo #ffc113 y naranja #f94a20. El amarillo sustituye al «amber» de Tailwind,
+   así todo el acento de la interfaz sale de aquí. */
+@theme {
+  --color-amber-200: #ffe9a8;
+  --color-amber-300: #ffd75e;
+  --color-amber-400: #ffc113;
+  --color-amber-500: #e0a600;
+  --color-brand-600: #0a4a94;
+  --color-brand-700: #00346e;
+  --color-brand-800: #00264f;
+  --color-brand-900: #001a38;
+  --color-brand-950: #000f21;
+  /* Tercer color de marca: naranja #f94a20 (llamadas de atención, tutorial, progreso). */
+  --color-ember-300: #ff9a7c;
+  --color-ember-400: #fb6a43;
+  --color-ember-500: #f94a20;
+  --color-ember-600: #d93a14;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-brand-950 text-zinc-100 antialiased;
+}

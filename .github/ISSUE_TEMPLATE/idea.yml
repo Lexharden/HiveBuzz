@@ -1,0 +1,11 @@
+name: Proponer una idea
+description: Algo que te gustaría que HiveBuzz hiciera
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: ¿Qué te gustaría poder hacer?
+      description: Cuenta el problema o la situación, no solo la solución.
+    validations:
+      required: true

@@ -1,0 +1,16 @@
+# Fin de línea coherente en Windows, macOS y Linux
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binarios: nunca tocar
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.gif binary
+*.webp binary
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.zip binary

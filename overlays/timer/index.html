@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Timer</title>
+<!--HB_COMMON-->
+<style>
+  .timer { text-align: center; padding: 10px 22px; }
+  .timer .label { font-size: 0.9em; opacity: 0.85; margin-bottom: 2px; }
+  .timer .digits { font-variant-numeric: tabular-nums; font-weight: 800; line-height: 1.05; letter-spacing: 0.02em; }
+  .timer.low .digits { color: var(--hb-low, #ef4444); animation: hb-pulse 1s ease-in-out infinite; }
+  .timer.paused .digits { opacity: 0.6; }
+</style>
+</head>
+<body data-anchor="top-right">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { digitSize: 64, lowColor: "#ef4444", timerId: "", showLabel: true, format: "auto", lowSeconds: 60, endText: "¡Tiempo!" };
+  var timers = [];
+  var root = document.getElementById("hb-root");
+  var card = HB.el("div", "hb-card timer");
+  card.style.animation = "none";
+  var label = HB.el("div", "label");
+  var digits = HB.el("div", "digits", "--:--");
+  card.appendChild(label); card.appendChild(digits);
+  root.appendChild(card);
+
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+
+  function format(ms) {
+    var total = Math.max(0, Math.ceil(ms / 1000));
+    var h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
+    if (cfg.format === "ms") return pad(Math.floor(total / 60)) + ":" + pad(s);
+    if (cfg.format === "hms" || h > 0) return pad(h) + ":" + pad(m) + ":" + pad(s);
+    return pad(m) + ":" + pad(s);
+  }
+
+  function current() {
+    if (cfg.timerId) return timers.filter(function (t) { return t.id === cfg.timerId; })[0];
+    return timers[0];
+  }
+
+  // El overlay corre en la misma PC que HiveBuzz: cuenta hacia atrás con su reloj a partir de la hora de fin.
+  function tick() {
+    var t = current();
+    card.style.display = t ? "" : "none";
+    if (!t) return;
+    var ms = t.status === "running" ? Math.max(0, t.endsAtMs - Date.now()) : t.remainingMs;
+    var ended = t.status === "ended" || (t.status === "running" && ms <= 0);
+    label.style.display = cfg.showLabel ? "" : "none";
+    label.textContent = t.name;
+    digits.style.fontSize = cfg.digitSize + "px";
+    card.style.setProperty("--hb-low", cfg.lowColor);
+    digits.textContent = ended ? cfg.endText : format(ms);
+    card.classList.toggle("low", t.status === "running" && !ended && ms <= cfg.lowSeconds * 1000);
+    card.classList.toggle("paused", t.status === "paused");
+  }
+
+  HB.start({
+    id: "timer",
+    onConfig: function (c) { cfg = c; tick(); },
+    onOverlay: function (channel, d) { if (channel === "timer" && d && Array.isArray(d.timers)) { timers = d.timers; tick(); } }
+  });
+  setInterval(tick, 200);
+  tick();
+})();
+</script>
+</body>
+</html>

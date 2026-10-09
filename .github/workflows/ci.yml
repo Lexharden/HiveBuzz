@@ -1,0 +1,43 @@
+# Comprueba en Windows, macOS y Linux que todo compila y pasa las pruebas (en cada push y pull request).
+# NOTA: este flujo no se ha ejecutado todavía; revísalo la primera vez.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Dependencias de Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            libasound2-dev libdbus-1-dev libssl-dev pkg-config
+
+      - run: bun install --frozen-lockfile
+      - run: cd sidecar && bun install --frozen-lockfile
+      - run: bun run sidecar:build # Tauri exige que el binario externo exista al compilar
+      - run: bun run typecheck
+      - run: bun run build
+      - run: bunx vitest run
+      - run: cd sidecar && bun run test
+      - run: cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: bun scripts/set-version.mjs --show # las tres versiones deben coincidir

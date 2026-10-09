@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Feed de eventos</title>
+<!--HB_COMMON-->
+<style>
+  #hb-root { width: 460px; max-width: calc(100vw - 32px); }
+  .hb-card.gift { border-left-color: #f472b6; } .hb-card.chat { border-left-color: #60a5fa; }
+  .hb-card.follow, .hb-card.subscribe { border-left-color: #34d399; } .hb-card.share { border-left-color: #a78bfa; }
+</style>
+</head>
+<body data-anchor="bottom-left">
+<div id="hb-root" class="hb-stack"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { maxItems: 12, lifetimeSec: 20, showAvatar: true, showPlatform: false };
+  var root = document.getElementById("hb-root");
+  var FLAGS = { chat: "showChat", gift: "showGift", follow: "showFollow", share: "showShare", subscribe: "showSubscribe", emote: "showEmote" };
+
+  function describe(ev) {
+    switch (ev.type) {
+      case "chat": return ": " + ((ev.chat && ev.chat.text) || "");
+      case "gift": var g = ev.gift || {}; return " " + HB.t("ev.gift", { count: g.count, name: g.name }) + " (" + HB.fmt(g.coins) + " " + HB.coinsLabel(ev) + ")";
+      default: return " " + HB.t("ev." + ev.type, {});
+    }
+  }
+
+  function add(ev, replay) {
+    var flag = FLAGS[ev.type];
+    if (!flag || cfg[flag] === false) return;
+    var card = HB.el("div", "hb-card " + ev.type);
+    var row = HB.el("div", "hb-row");
+    if (cfg.showAvatar && ev.user) { var a = HB.img(ev.user.avatar, "hb-avatar"); if (a) row.appendChild(a); }
+    var text = HB.el("div");
+    if (cfg.showPlatform) text.appendChild(HB.platformBadge(ev));
+    text.appendChild(HB.el("span", "hb-who", (ev.user && (ev.user.nickname || ev.user.uniqueId)) || ""));
+    text.appendChild(document.createTextNode(describe(ev)));
+    row.appendChild(text);
+    card.appendChild(row);
+    if (replay) card.style.animation = "none";
+    root.appendChild(card);
+    HB.trim(root, cfg.maxItems);
+    HB.expireAfter(card, cfg.lifetimeSec);
+  }
+
+  HB.start({ id: "feed", onConfig: function (c) { cfg = c; }, onEvent: add });
+})();
+</script>
+</body>
+</html>

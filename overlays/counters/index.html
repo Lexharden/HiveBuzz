@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Contadores</title>
+<!--HB_COMMON-->
+<style>
+  .counters { display: flex; gap: 22px; padding: 10px 18px; }
+  .counters.column { flex-direction: column; gap: 8px; }
+  .stat { display: flex; flex-direction: column; align-items: center; min-width: 4.5em; }
+  .counters.column .stat { flex-direction: row; justify-content: space-between; gap: 14px; }
+  .stat .value { font-weight: 800; font-size: 1.6em; font-variant-numeric: tabular-nums; color: var(--hb-accent); }
+  .stat .name { opacity: 0.85; font-size: 0.85em; }
+</style>
+</head>
+<body data-anchor="top-left">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { showLikes: true, showViewers: true, likesLabel: "Likes", viewersLabel: "Espectadores", layout: "row" };
+  var data = { likes: 0, viewers: 0 };
+  var root = document.getElementById("hb-root");
+  var card = HB.el("div", "hb-card counters");
+  card.style.animation = "none";
+  root.appendChild(card);
+
+  function stat(name, value) {
+    var s = HB.el("div", "stat");
+    s.appendChild(HB.el("div", "value", HB.fmt(value)));
+    s.appendChild(HB.el("div", "name", name));
+    return s;
+  }
+
+  function render() {
+    card.textContent = "";
+    card.className = "hb-card counters" + (cfg.layout === "column" ? " column" : "");
+    var any = false;
+    if (cfg.showLikes) { card.appendChild(stat("♥ " + cfg.likesLabel, data.likes)); any = true; }
+    if (cfg.showViewers) { card.appendChild(stat("👁 " + cfg.viewersLabel, data.viewers)); any = true; }
+    card.style.display = any ? "" : "none";
+  }
+
+  HB.start({
+    id: "counters",
+    onConfig: function (c) { cfg = c; render(); },
+    onOverlay: function (channel, d) { if (channel === "counters" && d) { data = d; render(); } }
+  });
+  render();
+})();
+</script>
+</body>
+</html>
