@@ -65,11 +65,11 @@ jobs:
         env:
           TAURI_ENV_TARGET_TRIPLE: ${{ matrix.target }}
 
-      - uses: tauri-apps/tauri-action@v0
+      # Los secretos opcionales (firma del auto-update y de macOS) solo se exportan si tienen valor: Tauri trata una
+      # variable definida pero VACÍA como un valor real (p. ej. una identidad de firma "") y la compilación de macOS falla.
+      - name: Exportar secretos opcionales
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HIVEBUZZ_SPOTIFY_CLIENT_ID: ${{ vars.HIVEBUZZ_SPOTIFY_CLIENT_ID }}
-          HIVEBUZZ_TWITCH_CLIENT_ID: ${{ vars.HIVEBUZZ_TWITCH_CLIENT_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -78,6 +78,19 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          for name in TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            value="${!name}"
+            [ -n "$value" ] || continue
+            delim="EOF_$RANDOM$RANDOM"
+            { echo "$name<<$delim"; echo "$value"; echo "$delim"; } >> "$GITHUB_ENV"
+          done
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HIVEBUZZ_SPOTIFY_CLIENT_ID: ${{ vars.HIVEBUZZ_SPOTIFY_CLIENT_ID }}
+          HIVEBUZZ_TWITCH_CLIENT_ID: ${{ vars.HIVEBUZZ_TWITCH_CLIENT_ID }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: HiveBuzz ${{ github.ref_name }}
