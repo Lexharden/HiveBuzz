@@ -4,9 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.1.0] - 2026-10-09
+
+Primera versión pública. Incluye todo lo descrito en las fases 1 a 7 de más abajo.
+
 ### Fase 7 – Twitch y rediseño de la interfaz
 
 #### Añadido
+- **Scripts de compilación** `scripts/build.cmd|ps1` (Windows) y `scripts/build.sh` (Linux/macOS): comprueban el entorno, instalan, compilan y reúnen los instaladores con SHA-256 en `release/<versión>/`.
 - **Logo e iconos propios** (a partir de `public/hivebuzz.png`, con fondo transparente) para la ventana, la bandeja, los instaladores y el menú; **tercer color de marca** naranja #f94a20.
 - **Recorrido interactivo** (17 pasos; 2 de ellos esperan a que la persona pruebe el simulador o abra Reglas) con invitación la primera vez, y pantalla **Ayuda** con la explicación
   de cada parte del menú, glosario y preguntas frecuentes (español e inglés, con tests de que no falta ninguna).

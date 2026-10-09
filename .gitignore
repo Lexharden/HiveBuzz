@@ -36,3 +36,6 @@ src-tauri/target/
 # Generado por Tauri (esquemas para el editor) y herramientas locales
 src-tauri/gen/
 *.local
+
+# Instaladores reunidos por scripts/build.*
+release/

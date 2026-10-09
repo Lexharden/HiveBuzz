@@ -5,7 +5,7 @@
 #   git commit -am "v0.2.0" && git tag v0.2.0 && git push --tags
 #
 # Secretos del repositorio (Settings → Secrets and variables → Actions):
-#   TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD   firma del auto-update (obligatorio)
+#   TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD   firma del auto-update (opcional: sin ellos solo se omite el auto-update)
 #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
 #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID                          firma y notarización de macOS (opcional)
 # Variable del repositorio:
@@ -82,5 +82,6 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: HiveBuzz ${{ github.ref_name }}
           releaseDraft: true
-          includeUpdaterJson: true
-          args: --config src-tauri/tauri.release.conf.json ${{ matrix.args }}
+          # Sin clave de firma (secreto vacío) se publican los instaladores igualmente, sin los archivos del auto-update.
+          includeUpdaterJson: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          args: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && '--config src-tauri/tauri.release.conf.json' || '' }} ${{ matrix.args }}

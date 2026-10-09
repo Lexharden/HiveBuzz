@@ -115,6 +115,18 @@ HiveBuzz lee **TikTok y Twitch a la vez**. En *Inicio* hay una tarjeta por plata
 - **Resiliencia:** reconexión automática con backoff (1 s → 60 s con jitter), mensajes reenviados descartados por id, y reconexión si no llega ni un PING en 6 minutos.
 - **Interfaz:** menú lateral agrupado, pantalla de Inicio con tarjetas de conexión, lista de primeros pasos y simulador plegado (con selector de plataforma).
 
+## Compilar con un solo comando
+
+| Sistema | Comando |
+|---|---|
+| Windows | `scriptsuild.cmd` (o `.scriptsuild.ps1`) |
+| Linux y macOS | `./scripts/build.sh` |
+
+Hacen todo: comprueban las herramientas (Bun, Rust, Visual Studio C++ / bibliotecas de Linux / Xcode), instalan dependencias, validan el `.env`, compilan
+y dejan los instaladores con su suma SHA-256 en `release/<versión>/`. Opciones: `-Updater` / `--updater` (archivos firmados del auto-update; necesita la clave
+privada del `.env`), `-SkipInstall` / `--skip-install` y `-DryRun` / `--dry-run` (solo comprueba el entorno). Cada sistema compila **solo para sí mismo**:
+para las cuatro plataformas a la vez usa el flujo de GitHub (abajo).
+
 ## Distribución (Windows, macOS y Linux)
 
 | Plataforma | Qué se genera | Target del sidecar |
