@@ -11,14 +11,26 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-/** Extensiones de lo que se reparte (instaladores y sus firmas del auto-update). */
-const EXTENSIONS = [".exe", ".msi", ".dmg", ".appimage", ".deb", ".rpm", ".sig"];
+/** Extensiones de lo que se reparte (instaladores, el paquete de actualización de macOS y sus firmas). */
+const EXTENSIONS = [".exe", ".msi", ".dmg", ".appimage", ".deb", ".rpm", ".app.tar.gz", ".sig"];
 
-/** Carpetas de `bundle/` con instaladores; el resto (p. ej. `macos/*.app`) son restos intermedios. */
-const BUNDLE_DIRS = new Set(["nsis", "msi", "dmg", "appimage", "deb", "rpm"]);
+/** Carpetas de `bundle/` con instaladores. De `macos/` solo interesa la actualización (`.app.tar.gz`), no el `.app`. */
+const BUNDLE_DIRS = new Set(["nsis", "msi", "dmg", "appimage", "deb", "rpm", "macos"]);
 
 export function isArtifact(file) {
   return EXTENSIONS.some((e) => file.toLowerCase().endsWith(e));
+}
+
+/**
+ * ¿Es de esta versión? `target/` no se limpia entre compilaciones, así que puede haber instaladores viejos.
+ * Los nombres sin versión (p. ej. `HiveBuzz.app.tar.gz`) se regeneran siempre y se aceptan.
+ */
+export function isForVersion(file, version) {
+  const name = basename(file);
+  if (!/\d+\.\d+\.\d+/.test(name)) return true;
+  // Versión exacta, no como parte de otra (0.1.0 no debe aceptar 10.1.0).
+  const escaped = version.replace(/[.+-]/g, "\\$&");
+  return new RegExp(`(^|[^\\d.])${escaped}($|[^\\d])`).test(name);
 }
 
 /** Recorre `dir` y devuelve las rutas de todos los instaladores que contiene. */
@@ -29,9 +41,12 @@ export function findArtifacts(bundleRoot) {
     if (!BUNDLE_DIRS.has(sub.toLowerCase())) continue;
     const dir = join(bundleRoot, sub);
     if (!statSync(dir).isDirectory()) continue;
+    const macos = sub.toLowerCase() === "macos";
     for (const f of readdirSync(dir)) {
       const p = join(dir, f);
-      if (statSync(p).isFile() && isArtifact(f)) out.push(p);
+      if (!statSync(p).isFile() || !isArtifact(f)) continue;
+      if (macos && !/\.app\.tar\.gz(\.sig)?$/i.test(f)) continue;
+      out.push(p);
     }
   }
   return out;
@@ -56,7 +71,9 @@ const human = (n) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `
 
 function main() {
   const version = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version;
-  const found = bundleRoots(join(root, "src-tauri")).flatMap(findArtifacts);
+  const found = bundleRoots(join(root, "src-tauri"))
+    .flatMap(findArtifacts)
+    .filter((f) => isForVersion(f, version));
   if (found.length === 0) {
     console.error("❌ No se encontró ningún instalador en src-tauri/target/**/bundle. ¿Terminó bien la compilación?");
     process.exit(1);

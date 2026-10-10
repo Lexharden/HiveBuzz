@@ -1,7 +1,7 @@
-// Cambia la versión en TODOS los sitios a la vez (package.json, tauri.conf.json, Cargo.toml).
+// Cambia la versión en TODOS los sitios a la vez (package.json, sidecar/package.json, tauri.conf.json, Cargo.toml).
 //
 //   bun scripts/set-version.mjs 0.2.0
-//   bun scripts/set-version.mjs --show     (muestra las tres y avisa si no coinciden)
+//   bun scripts/set-version.mjs --show     (muestra todas y avisa si no coinciden)
 //
 // Después: git commit, `git tag v0.2.0` y `git push --tags` (dispara el release).
 
@@ -12,6 +12,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FILES = {
   package: join(root, "package.json"),
+  sidecar: join(root, "sidecar", "package.json"),
   tauri: join(root, "src-tauri", "tauri.conf.json"),
   cargo: join(root, "src-tauri", "Cargo.toml"),
 };
@@ -38,6 +39,7 @@ export function jsonVersion(text) {
 function read() {
   return {
     package: jsonVersion(readFileSync(FILES.package, "utf8")),
+    sidecar: jsonVersion(readFileSync(FILES.sidecar, "utf8")),
     tauri: jsonVersion(readFileSync(FILES.tauri, "utf8")),
     cargo: cargoVersion(readFileSync(FILES.cargo, "utf8")),
   };
@@ -49,7 +51,7 @@ function main() {
     const v = read();
     console.log(v);
     const same = new Set(Object.values(v)).size === 1;
-    console.log(same ? "✅ Las tres versiones coinciden." : "❌ Las versiones NO coinciden: usa `bun scripts/set-version.mjs X.Y.Z`.");
+    console.log(same ? "✅ Todas las versiones coinciden." : "❌ Las versiones NO coinciden: usa `bun scripts/set-version.mjs X.Y.Z`.");
     process.exit(same ? 0 : 1);
   }
   const version = arg.replace(/^v/, "");
@@ -58,9 +60,10 @@ function main() {
     process.exit(2);
   }
   writeFileSync(FILES.package, withJsonVersion(readFileSync(FILES.package, "utf8"), version));
+  writeFileSync(FILES.sidecar, withJsonVersion(readFileSync(FILES.sidecar, "utf8"), version));
   writeFileSync(FILES.tauri, withJsonVersion(readFileSync(FILES.tauri, "utf8"), version));
   writeFileSync(FILES.cargo, withCargoVersion(readFileSync(FILES.cargo, "utf8"), version));
-  console.log(`✅ Versión ${version} en package.json, tauri.conf.json y Cargo.toml.`);
+  console.log(`✅ Versión ${version} en package.json, sidecar/package.json, tauri.conf.json y Cargo.toml.`);
   console.log("   Recuerda: Cargo.lock se actualiza al compilar, y añade la entrada en CHANGELOG.md.");
 }
 

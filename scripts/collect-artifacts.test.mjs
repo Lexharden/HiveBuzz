@@ -2,12 +2,12 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { bundleRoots, findArtifacts, isArtifact, sha256 } from "./collect-artifacts.mjs";
+import { bundleRoots, findArtifacts, isArtifact, isForVersion, sha256 } from "./collect-artifacts.mjs";
 
 function fakeTauri() {
   const dir = mkdtempSync(join(tmpdir(), "hb-art-"));
   const bundle = join(dir, "target", "release", "bundle");
-  for (const [sub, files] of Object.entries({ nsis: ["HiveBuzz_1.0.0_x64-setup.exe", "HiveBuzz_1.0.0_x64-setup.exe.sig", "notas.txt"], msi: ["HiveBuzz.msi"], macos: ["HiveBuzz.app"], deb: ["hivebuzz.deb"] })) {
+  for (const [sub, files] of Object.entries({ nsis: ["HiveBuzz_1.0.0_x64-setup.exe", "HiveBuzz_1.0.0_x64-setup.exe.sig", "notas.txt"], msi: ["HiveBuzz.msi"], macos: ["HiveBuzz.app", "HiveBuzz.app.tar.gz", "HiveBuzz.app.tar.gz.sig", "otro.exe"], deb: ["hivebuzz.deb"] })) {
     mkdirSync(join(bundle, sub), { recursive: true });
     for (const f of files) writeFileSync(join(bundle, sub, f), "x");
   }
@@ -29,7 +29,24 @@ describe("collect-artifacts", () => {
     const roots = bundleRoots(dir);
     expect(roots).toHaveLength(2);
     const names = roots.flatMap(findArtifacts).map((p) => basename(p)).sort();
-    expect(names).toEqual(["HiveBuzz.msi", "HiveBuzz_1.0.0_x64-setup.exe", "HiveBuzz_1.0.0_x64-setup.exe.sig", "HiveBuzz_aarch64.dmg", "hivebuzz.deb"]);
+    expect(names).toEqual([
+      "HiveBuzz.app.tar.gz",
+      "HiveBuzz.app.tar.gz.sig",
+      "HiveBuzz.msi",
+      "HiveBuzz_1.0.0_x64-setup.exe",
+      "HiveBuzz_1.0.0_x64-setup.exe.sig",
+      "HiveBuzz_aarch64.dmg",
+      "hivebuzz.deb",
+    ]);
+  });
+
+  it("descarta instaladores de versiones anteriores que siguen en target/", () => {
+    expect(isForVersion("/t/HiveBuzz_0.2.0_x64-setup.exe", "0.2.0")).toBe(true);
+    expect(isForVersion("/t/HiveBuzz_0.1.0_x64-setup.exe", "0.2.0")).toBe(false);
+    expect(isForVersion("/t/HiveBuzz-0.1.0-1.x86_64.rpm", "0.2.0")).toBe(false);
+    expect(isForVersion("/t/HiveBuzz.app.tar.gz", "0.2.0")).toBe(true);
+    expect(isForVersion("/t/HiveBuzz_10.2.0_x64-setup.exe", "0.2.0")).toBe(false);
+    expect(isForVersion("/t/HiveBuzz-0.2.0-1.x86_64.rpm", "0.2.0")).toBe(true);
   });
 
   it("una carpeta sin compilar no da error ni resultados", () => {

@@ -4,6 +4,34 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Corregido
+- **TikTok**: el nivel de fan (Fans Club) y el de regalos se leen también de las insignias; en los mensajes de chat
+  TikTok no manda `fansClub`/`payGrade`, así que el filtro «Nivel de equipo mínimo» del TTS y de las reglas descartaba a todos.
+- **TikTok**: moderador, suscriptor y seguidor se deducen también de insignias y `followInfo` (likes, follows y entradas
+  no traen `userIdentity`); un follow marca al usuario como seguidor; los valores por defecto del protocolo («0», «»)
+  ya no mezclan a usuarios distintos bajo el id «0».
+- **Sidecar**: dos conexiones seguidas ya no dejan dos supervisores; los errores de la librería se registran legibles.
+- **Spotify**: el «403 Forbidden» se explica (cuenta no añadida en *User Management*); un refresh token inválido o un
+  cambio de Client ID cierran la sesión; conectar ya no desactiva luego las peticiones al guardar.
+- **Cola de acciones**: los canjes descartados sin ejecutarse (caducados o desplazados) devuelven los puntos; un job
+  se guarda antes de poder ejecutarse, así que no se repite al reiniciar.
+- **Twitch**: EventSub no pierde notificaciones al reconectarse; cancelar el inicio de sesión ya no se deshace.
+- **Overlays**: el historial que se reenvía al reconectar ya no duplica mensajes en OBS.
+- **App**: una segunda instancia muestra la ventana existente en vez de duplicar conexiones y acciones; actualizar en
+  Windows guarda antes el estado; sin llavero del sistema la app arranca igualmente; «cerrar a la bandeja» solo
+  afecta a la ventana principal.
+- **Seguridad**: CSP estricta en la ventana principal; importar una configuración ya no puede elegir el programa de
+  Piper ni un OBS remoto; las secuencias de teclas no pueden durar más de 60 s.
+- **Releases**: la etiqueta debe coincidir con la versión; la clave pública del auto-update se inyecta desde la variable
+  `TAURI_UPDATER_PUBKEY` (y el release falla si hay clave privada sin pública); un único borrador para todas las
+  plataformas; `collect-artifacts` incluye la actualización de macOS y descarta instaladores de versiones anteriores;
+  `set-version` también cambia `sidecar/package.json`.
+
+### Cambiado
+- **Spotify**: la interfaz guía para que cada streamer cree su propia app (las apps en modo desarrollo solo admiten
+  cuentas añadidas a mano). El Client ID integrado queda como opción.
+- **TTS**: el registro dice por qué no se leyó un mensaje del chat.
+
 ## [0.1.0] - 2026-10-09
 
 Primera versión pública. Incluye todo lo descrito en las fases 1 a 7 de más abajo.

@@ -1,17 +1,19 @@
 # Publica un release de GitHub con instaladores para Windows, macOS (Apple Silicon e Intel) y Linux,
 # junto con el `latest.json` del auto-update. Se dispara al subir una etiqueta `v*`:
 #
-#   bun scripts/set-version.mjs 0.2.0   # cambia la versión en los 3 sitios
+#   bun scripts/set-version.mjs 0.2.0   # cambia la versión en todos los sitios
 #   git commit -am "v0.2.0" && git tag v0.2.0 && git push --tags
 #
 # Secretos del repositorio (Settings → Secrets and variables → Actions):
 #   TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD   firma del auto-update (opcional: sin ellos solo se omite el auto-update)
 #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
 #   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID                          firma y notarización de macOS (opcional)
-# Variable del repositorio:
-#   HIVEBUZZ_SPOTIFY_CLIENT_ID                                       botón «Conectar con Spotify»
+# Variables del repositorio:
+#   TAURI_UPDATER_PUBKEY        clave PÚBLICA del auto-update (la que imprime `bun tauri signer generate`); obligatoria si hay clave privada
+#   HIVEBUZZ_SPOTIFY_CLIENT_ID  Client ID de Spotify integrado (opcional; ver README)
+#   HIVEBUZZ_TWITCH_CLIENT_ID   botón «Entrar con Twitch» (opcional)
 #
-# NOTA: este flujo no se ha ejecutado todavía; revísalo en el primer release (usa un borrador).
+# NOTA: este flujo no se ha ejecutado todavía; revísalo en el primer release (queda como borrador).
 name: release
 
 on:
@@ -19,7 +21,56 @@ on:
     tags: ["v*"]
 
 jobs:
+  # Comprobaciones previas y un único borrador de release para todas las plataformas (si cada job creara el
+  # suyo, dos jobs simultáneos podrían duplicarlo o pisarse el `latest.json`).
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.release.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+
+      - name: La etiqueta coincide con la versión
+        shell: bash
+        run: |
+          bun scripts/set-version.mjs --show
+          want="${GITHUB_REF_NAME#v}"
+          have="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).version)')"
+          if [ "$want" != "$have" ]; then
+            echo "::error::La etiqueta es $GITHUB_REF_NAME pero tauri.conf.json dice $have. Ejecuta 'bun scripts/set-version.mjs $want', haz commit y vuelve a etiquetar."
+            exit 1
+          fi
+
+      - name: Firma del auto-update con su clave pública
+        shell: bash
+        env:
+          HAS_PRIVATE: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+          PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+        run: |
+          conf="$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("src-tauri/tauri.conf.json","utf8")).plugins?.updater?.pubkey ?? "")')"
+          if [ "$HAS_PRIVATE" = "true" ] && [ -z "$PUBKEY" ] && [ -z "$conf" ]; then
+            echo "::error::Hay clave privada de firma pero ninguna clave pública: las apps instaladas rechazarían todas las actualizaciones. Define la variable TAURI_UPDATER_PUBKEY."
+            exit 1
+          fi
+
+      - name: Borrador del release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --draft --title "HiveBuzz $GITHUB_REF_NAME" --notes "Consulta CHANGELOG.md para ver los cambios."
+          fi
+          id="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id" | head -n1)"
+          [ -n "$id" ] || { echo "::error::No se encontró el release de $GITHUB_REF_NAME"; exit 1; }
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -65,6 +116,21 @@ jobs:
         env:
           TAURI_ENV_TARGET_TRIPLE: ${{ matrix.target }}
 
+      # La clave pública del auto-update entra en la configuración de release (la de desarrollo la deja vacía).
+      - name: Clave pública del auto-update
+        if: ${{ vars.TAURI_UPDATER_PUBKEY != '' }}
+        shell: bash
+        env:
+          PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+        run: |
+          bun -e '
+            const fs = require("fs");
+            const p = "src-tauri/tauri.release.conf.json";
+            const c = JSON.parse(fs.readFileSync(p, "utf8"));
+            c.plugins = { ...c.plugins, updater: { ...(c.plugins?.updater ?? {}), pubkey: process.env.PUBKEY.trim() } };
+            fs.writeFileSync(p, JSON.stringify(c, null, 2) + "\n");
+          '
+
       # Los secretos opcionales (firma del auto-update y de macOS) solo se exportan si tienen valor: Tauri trata una
       # variable definida pero VACÍA como un valor real (p. ej. una identidad de firma "") y la compilación de macOS falla.
       - name: Exportar secretos opcionales
@@ -92,9 +158,7 @@ jobs:
           HIVEBUZZ_SPOTIFY_CLIENT_ID: ${{ vars.HIVEBUZZ_SPOTIFY_CLIENT_ID }}
           HIVEBUZZ_TWITCH_CLIENT_ID: ${{ vars.HIVEBUZZ_TWITCH_CLIENT_ID }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: HiveBuzz ${{ github.ref_name }}
-          releaseDraft: true
+          releaseId: ${{ needs.prepare.outputs.release_id }}
           # Sin clave de firma (secreto vacío) se publican los instaladores igualmente, sin los archivos del auto-update.
           includeUpdaterJson: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
           args: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' && '--config src-tauri/tauri.release.conf.json' || '' }} ${{ matrix.args }}
