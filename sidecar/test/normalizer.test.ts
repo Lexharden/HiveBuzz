@@ -198,6 +198,7 @@ describe("likes agregados", () => {
 describe("otros eventos", () => {
   it("follow y share", () => {
     expect(n.social("follow", { common: { msgId: "f" }, user: ana }, 5)[0]?.type).toBe("follow");
+    expect(n.social("follow", { common: { msgId: "f2" }, user: ana }, 5)[0]?.user.isFollower).toBe(true);
     expect(n.social("share", { common: { msgId: "s" }, user: ana }, 5)[0]?.type).toBe("share");
   });
 
@@ -249,6 +250,26 @@ describe("otros eventos", () => {
     };
     const out = n.chat({ common: { msgId: "b1" }, user, content: "hola" }, 0);
     expect(out[0]?.user).toMatchObject({ gifterLevel: 7, teamLevel: 3 });
+  });
+
+  it("los roles se deducen de insignias y followInfo cuando no hay userIdentity", () => {
+    const user = {
+      ...ana,
+      followInfo: { followStatus: "1" },
+      badgeList: [{ sceneType: 1 }, { sceneType: 7 }],
+    };
+    const out = n.like({ common: { msgId: "r1" }, user, count: 1, total: "1" }, 0);
+    expect(out).toEqual([]);
+    const [ev] = n.flushAll(10);
+    expect(ev?.user).toMatchObject({ isModerator: true, isSubscriber: true, isFollower: true });
+  });
+
+  it("los valores por defecto del protobuf (\"0\", \"\") cuentan como ausentes", () => {
+    const user = { id: "0", idStr: "77", displayId: "carla", nickname: "" };
+    const out = n.chat({ common: { msgId: "z1" }, user, content: "hola" }, 0);
+    expect(out[0]?.user).toMatchObject({ id: "77", uniqueId: "carla", nickname: "carla" });
+    const g = n.gift({ ...gift({ msgId: "z2", type: 2 }), gift: { id: "0", name: "Lion", type: 2, diamondCount: 1 }, giftId: "6789" }, 0);
+    expect(g[0]?.gift?.id).toBe(6789);
   });
 
   it("createTime en segundos se convierte a ms; si falta, usa now", () => {

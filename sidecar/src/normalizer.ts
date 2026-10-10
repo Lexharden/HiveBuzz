@@ -18,6 +18,7 @@ import type {
   RawEmoteMessage,
   RawGiftMessage,
   RawIdentity,
+  RawBadge,
   RawLikeMessage,
   RawMemberMessage,
   RawSocialMessage,
@@ -90,7 +91,7 @@ export class Normalizer {
       const user = this.user(msg.user, msg.userIdentity);
       if (!user) return this.drop("gift", "sin usuario");
 
-      const giftId = Number(msg.gift?.id ?? msg.giftId ?? 0);
+      const giftId = Number(present(msg.gift?.id) || present(msg.giftId) || 0);
       const name = msg.gift?.name ?? "";
       const unitCoins = Math.max(0, Number(msg.gift?.diamondCount ?? 0));
       const image = msg.gift?.image?.urlList?.[0] ?? "";
@@ -165,7 +166,9 @@ export class Normalizer {
       if (this.isDuplicate(msgId)) return [];
       const user = this.user(msg.user);
       if (!user) return this.drop(kind, "sin usuario");
-      return [{ id: msgId, type: kind, user, ts: this.ts(msg.common, now) }];
+      // Quien sigue es seguidor desde ese instante, aunque el mensaje aún no lo refleje.
+      const who = kind === "follow" ? { ...user, isFollower: true } : user;
+      return [{ id: msgId, type: kind, user: who, ts: this.ts(msg.common, now) }];
     });
   }
 
@@ -295,19 +298,20 @@ export class Normalizer {
 
   private user(u: RawUser | undefined, identity?: RawIdentity): LiveUser | null {
     if (!u) return null;
-    const id = u.id ?? "";
-    const uniqueId = u.displayId ?? "";
+    const id = present(u.id) || present(u.idStr);
+    const uniqueId = present(u.displayId);
     if (!id && !uniqueId) return null;
     const gifterLevel = u.payGrade?.level || badgeLevel(u, BADGE_USER_GRADE);
     const teamLevel = u.fansClub?.data?.level || badgeLevel(u, BADGE_FANS);
     return {
       id: id || uniqueId,
       uniqueId,
-      nickname: u.nickname ?? uniqueId,
+      nickname: present(u.nickname) || uniqueId,
       avatar: u.avatarThumb?.urlList?.[0] ?? "",
-      isModerator: identity?.isModeratorOfAnchor ?? u.userAttr?.isAdmin ?? false,
-      isSubscriber: identity?.isSubscriberOfAnchor ?? u.isSubscribe ?? false,
-      isFollower: identity?.isFollowerOfAnchor ?? u.isFollower ?? false,
+      // `||` y no `??`: el protobuf manda `false` por defecto, que no debe tapar las otras fuentes.
+      isModerator: Boolean(identity?.isModeratorOfAnchor || u.userAttr?.isAdmin || hasBadge(u, BADGE_ADMIN)),
+      isSubscriber: Boolean(identity?.isSubscriberOfAnchor || u.isSubscribe || hasBadge(u, BADGE_SUBSCRIBER, BADGE_NEW_SUBSCRIBER)),
+      isFollower: Boolean(identity?.isFollowerOfAnchor || u.isFollower || Number(u.followInfo?.followStatus) > 0),
       ...(teamLevel && teamLevel > 0 ? { teamLevel } : {}),
       ...(gifterLevel && gifterLevel > 0 ? { gifterLevel } : {}),
     };
@@ -360,8 +364,24 @@ function describe(v: unknown): string {
   }
 }
 
+const BADGE_ADMIN = 1;
+const BADGE_SUBSCRIBER = 4;
+const BADGE_NEW_SUBSCRIBER = 7;
 const BADGE_USER_GRADE = 8;
 const BADGE_FANS = 10;
+
+/** El protobuf usa "0" y "" como «sin valor»; aquí ambos cuentan como ausentes. */
+function present(v: string | undefined): string {
+  return v && v !== "0" ? v : "";
+}
+
+function badgeScene(b: RawBadge): number | undefined {
+  return b.sceneType ?? b.badgeSceneType;
+}
+
+function hasBadge(u: RawUser, ...scenes: number[]): boolean {
+  return (u.badgeList ?? []).some((b) => scenes.includes(badgeScene(b) ?? -1));
+}
 
 /**
  * Nivel que TikTok pone en la insignia de cierta escena. En los mensajes de chat suele faltar
@@ -369,7 +389,7 @@ const BADGE_FANS = 10;
  */
 function badgeLevel(u: RawUser, scene: number): number | undefined {
   for (const b of u.badgeList ?? []) {
-    if ((b.sceneType ?? b.badgeSceneType) !== scene) continue;
+    if (badgeScene(b) !== scene) continue;
     const level = Number(b.privilegeLogExtra?.level);
     if (Number.isFinite(level) && level > 0) return level;
   }

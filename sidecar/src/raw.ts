@@ -20,7 +20,9 @@ export interface RawIdentity {
 }
 
 export interface RawUser {
+  /** El protobuf rellena los ausentes con "0"/"": no confiar en ellos sin `present()`. */
   id?: string;
+  idStr?: string;
   /** El @usuario (uniqueId) viaja en `displayId`. */
   displayId?: string;
   nickname?: string;
@@ -28,6 +30,8 @@ export interface RawUser {
   isFollower?: boolean;
   isSubscribe?: boolean;
   userAttr?: { isAdmin?: boolean };
+  /** `followStatus` > 0: sigue al anfitrión (string en el protocolo). */
+  followInfo?: { followStatus?: string | number };
   payGrade?: { level?: number };
   fansClub?: { data?: { level?: number } };
   /** Insignias del usuario; el nivel de fan y el de regalos también viajan aquí. */
@@ -35,7 +39,7 @@ export interface RawUser {
 }
 
 export interface RawBadge {
-  /** 8 = nivel de regalos, 10 = Fans Club. */
+  /** 1 = moderador, 4/7 = suscriptor, 8 = nivel de regalos, 10 = Fans Club. */
   sceneType?: number;
   /** Nombre que usa la capa «legacy» de la librería para el mismo campo. */
   badgeSceneType?: number;

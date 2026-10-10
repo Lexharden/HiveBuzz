@@ -466,4 +466,27 @@ describe("disconnect", () => {
     expect(w.clients.filter((c) => c.connected)).toHaveLength(1);
     await w.connector.disconnect();
   });
+
+  it("dos connect() sin esperar dejan un solo supervisor", async () => {
+    await w.connector.connect({ uniqueId: "ana" });
+    await w.clock.advance(0);
+    const a = w.connector.connect({ uniqueId: "bob" });
+    const b = w.connector.connect({ uniqueId: "carla" });
+    await Promise.all([a, b]);
+    await w.clock.advance(0);
+    expect(w.clients.filter((c) => c.connected)).toHaveLength(1);
+    await w.connector.disconnect();
+    await w.clock.advance(0);
+    expect(w.clients.filter((c) => c.connected)).toHaveLength(0);
+    expect(w.connector.state).toBe("disconnected");
+  });
+
+  it("los errores de la librería ({ info, exception }) se registran legibles", async () => {
+    await w.connector.connect({ uniqueId: "ana" });
+    await w.clock.advance(0);
+    lastClient(w).cb.onError({ info: "fallo de firma", exception: new Error("HTTP 429") });
+    const logs = w.out.flatMap((m) => (m.kind === "log" ? [m.message] : []));
+    expect(logs.some((l) => l.includes("fallo de firma: HTTP 429"))).toBe(true);
+    await w.connector.disconnect();
+  });
 });

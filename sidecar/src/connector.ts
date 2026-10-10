@@ -152,6 +152,8 @@ export class Connector {
   private lastViewers = { count: -1, at: 0 };
   /** El cliente mientras está conectado (con él se puede escribir en el chat). */
   private connectedClient: LiveClient | null = null;
+  /** `connect`/`disconnect` se ejecutan de uno en uno: dos `connect` seguidos no crean dos supervisores. */
+  private op: Promise<void> = Promise.resolve();
 
   constructor(private readonly deps: ConnectorDeps) {
     this.cfg = { ...DEFAULT_CONFIG, ...deps.config };
@@ -162,8 +164,23 @@ export class Connector {
   }
 
   /** Inicia (o reinicia) la conexión al LIVE de `target.uniqueId`. */
-  async connect(target: ConnectTarget): Promise<void> {
-    await this.disconnect();
+  connect(target: ConnectTarget): Promise<void> {
+    return this.serial(() => this.start(target));
+  }
+
+  /** Detiene la conexión y espera a que el supervisor termine. */
+  disconnect(): Promise<void> {
+    return this.serial(() => this.stop());
+  }
+
+  private serial(fn: () => Promise<void>): Promise<void> {
+    const next = this.op.then(fn, fn);
+    this.op = next.catch(() => {});
+    return next;
+  }
+
+  private async start(target: ConnectTarget): Promise<void> {
+    await this.stop();
     const uniqueId = target.uniqueId.trim().replace(/^@/, "");
     // El LRU de deduplicación se conserva entre reconexiones al mismo streamer.
     if (this.normalizerFor !== uniqueId) {
@@ -207,8 +224,7 @@ export class Connector {
     }
   }
 
-  /** Detiene la conexión y espera a que el supervisor termine. */
-  async disconnect(): Promise<void> {
+  private async stop(): Promise<void> {
     this.abort?.abort();
     const running = this.running;
     this.abort = null;
@@ -415,7 +431,20 @@ async function safeDisconnect(client: LiveClient): Promise<void> {
 }
 
 function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  if (err instanceof Error) return err.message;
+  // La librería emite `error` como `{ info, exception }`.
+  if (err && typeof err === "object") {
+    const { info, exception } = err as { info?: unknown; exception?: unknown };
+    if (info !== undefined || exception !== undefined) {
+      return [info, exception].filter((v) => v !== undefined).map(errMsg).join(": ");
+    }
+    try {
+      return JSON.stringify(err).slice(0, 300);
+    } catch {
+      // Objeto circular: cae al String de abajo.
+    }
+  }
+  return String(err);
 }
 
 function defaultSleep(ms: number, signal: AbortSignal): Promise<void> {
