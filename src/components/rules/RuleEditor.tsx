@@ -117,7 +117,13 @@ export function RuleEditor({ initial, isNew, actionTypes, sounds, media, voices,
       </Card>
 
       <Card title={t("editor.queue")} hint={t("editor.queueHint")}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
+          <Field label={t("editor.costPoints")} hint={t("editor.costPointsHint")}>
+            <NumberInput value={rule.costPoints ?? null} min={0} placeholder="0" onChange={(v) => setRule((r) => {
+              const { costPoints: _c, ...rest } = r;
+              return v === null || v <= 0 ? rest : { ...rest, costPoints: v };
+            })} />
+          </Field>
           <Field label={t("editor.priority")} hint={t("editor.priorityHint")}>
             <NumberInput value={rule.priority ?? null} min={-100} max={1000} placeholder={t("editor.auto")} onChange={(v) => setRule((r) => {
               const { priority: _p, ...rest } = r;

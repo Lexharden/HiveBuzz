@@ -276,6 +276,10 @@ apaga en *Overlays → Alertas*. Las reglas con «Mostrar alerta» añaden alert
   constante `CHROMIUM_VERSION` en `src-tauri/src/tts/edge.rs`.
 - Todo texto leído (del chat o de una regla) pasa por los filtros de groserías, enlaces, emojis,
   repeticiones y longitud.
+- **No hablar encima** (`src-tauri/src/mic.rs`): con la opción activada, un hilo escucha el micrófono con `cpal` y un
+  detector por energía (umbral en dBFS, 120 ms de ataque y un tiempo de silencio configurable) decide si el streamer
+  habla. La lectura espera a que calle; si empieza a hablar a mitad, se pausa y al reanudar retrocede 1,2 s (repite la
+  palabra), vuelve al principio o salta el mensaje. Una lectura que espera más de 30 s se descarta. No se graba audio.
 
 Pruebas con red (no corren por defecto): `cargo test edge_live -- --ignored` y
 `cargo test piper_live -- --ignored`.

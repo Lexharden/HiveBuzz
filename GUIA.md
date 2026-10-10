@@ -103,6 +103,9 @@ Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; 
   nombre y volumen; el botón *Escuchar* los previsualiza.
 - **Voz (TTS)**: instala **Piper** (offline, un clic) y una voz, o usa las voces de Windows / Edge-TTS. También puedes
   importar tu propio modelo de Piper (`.onnx` + `.onnx.json`) en *Voces personalizadas*.
+  En *No hablar encima de ti* activa el micrófono: la voz se calla mientras hablas y luego repite la palabra cortada
+  (o el mensaje, o lo salta). Ajusta la sensibilidad mirando el medidor y usa audífonos.
+- **Plantillas de reglas**: en *Reglas → 📋 Plantillas* añade con un clic agradecimientos, bienvenida, !discord, !redes…
   - *Lectura del chat*: lee comentarios con filtros (solo `!tts`, roles, donadores recientes, usuarios ignorados).
   - Filtros de groserías, enlaces, emojis, letras repetidas y límite de caracteres. Voz única, por rol o aleatoria por usuario.
   - Botón **Saltar** para cortar lo que está sonando.

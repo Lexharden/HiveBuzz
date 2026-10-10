@@ -12,6 +12,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
   francés, italiano, alemán, japonés y coreano); el catálogo de Piper pasa de 6 a 39 voces, con filtro por idioma;
   en Windows aparecen también las voces «OneCore» de los paquetes de idioma (p. ej. Microsoft Raúl).
 - **Voces personalizadas**: importar un modelo de Piper propio (`.onnx` + `.onnx.json`) y borrar voces instaladas.
+- **No hablar encima del streamer**: con el micrófono activado en *Voz (TTS)*, la lectura espera a que el streamer
+  calle y, si empieza a hablar a mitad, se pausa y al terminar repite la palabra cortada (o el mensaje entero, o lo
+  salta, según se elija). Sensibilidad ajustable con medidor en vivo; solo se mide el nivel, no se graba nada.
+- **Plantillas de reglas**: 13 reglas habituales (agradecimientos por voz, bienvenida, saludos, !discord, !redes,
+  !comandos, meta de likes, !di por puntos, !anuncio de moderador) que se añaden con un clic desde *Reglas → Plantillas*.
+- **Reglas**: el editor muestra el coste en puntos (la regla se vuelve una recompensa canjeable).
 
 ### Corregido
 - **TikTok**: el nivel de fan (Fans Club) y el de regalos se leen también de las insignias; en los mensajes de chat

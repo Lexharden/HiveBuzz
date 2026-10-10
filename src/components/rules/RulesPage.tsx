@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, errorMessage, onRuleFired } from "../../lib/api";
 import type { Goal, Media, QueueInfo, Rule, Sound, TimerView, VoiceInfo } from "../../lib/types";
 import { Btn, Card, ErrorText } from "../ui";
+import { PresetsPanel } from "./PresetsPanel";
 import { newRule, triggerSummary } from "./ruleDefaults";
 import { RuleEditor } from "./RuleEditor";
 
@@ -19,6 +20,7 @@ export function RulesPage() {
   const [queue, setQueue] = useState<QueueInfo>({ pending: 0, running: 0, jobs: 0 });
   const [flash, setFlash] = useState<Record<string, number>>({});
   const [note, setNote] = useState<string | null>(null);
+  const [showPresets, setShowPresets] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
 
@@ -93,12 +95,28 @@ export function RulesPage() {
 
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+      {(showPresets || rules.length === 0) && (
+        <PresetsPanel
+          rules={rules}
+          onClose={() => setShowPresets(false)}
+          onCustomize={(rule) => setEditing({ rule, isNew: true })}
+          onAdd={(list) =>
+            void act(async () => {
+              for (const rule of list) await api.saveRule(rule);
+              await reload();
+              setNote(t("presets.addedNote", { count: list.length }));
+              setTimeout(() => setNote(null), 3000);
+            })
+          }
+        />
+      )}
       <Card
         title={t("rules.title")}
         hint={t("rules.queueStats", { pending: queue.pending, running: queue.running })}
         actions={
           <div className="flex gap-2">
             <Btn onClick={() => void act(async () => { await api.clearQueue(); setQueue(await api.queueStats()); })}>{t("rules.clearQueue")}</Btn>
+            <Btn onClick={() => setShowPresets((v) => !v)}>📋 {t("presets.open")}</Btn>
             <Btn variant="primary" onClick={() => setEditing({ rule: newRule(), isNew: true })}>+ {t("rules.new")}</Btn>
           </div>
         }

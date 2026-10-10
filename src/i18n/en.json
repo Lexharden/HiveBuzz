@@ -185,7 +185,9 @@
     "ttl": "Expiry (s)",
     "ttlHint": "If it waits longer than this in the queue, it is dropped",
     "save": "Save",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "costPoints": "Point cost",
+    "costPointsHint": "Points paid by whoever triggers it (0 = free)"
   },
   "actionType": {
     "playSound": "Play sound",
@@ -380,7 +382,27 @@
     "importVoice": "Import voice model (.onnx)",
     "voiceModel": "Piper voice model",
     "customEmpty": "You haven't imported any voice yet.",
-    "customNeedsPiper": "Install Piper (above) to use custom voices."
+    "customNeedsPiper": "Install Piper (above) to use custom voices.",
+    "mic": {
+      "title": "Don't talk over me (microphone)",
+      "hint": "When you speak into the microphone, the voice goes quiet and waits for you to finish. Only the microphone level is measured: nothing is recorded.",
+      "enabled": "Quiet the voice while I talk",
+      "mode": "When I talk in the middle of a reading",
+      "repeatWord": "Pause and repeat the cut word",
+      "repeatMessage": "Pause and repeat the whole message",
+      "skip": "Skip that message",
+      "device": "Microphone",
+      "defaultDevice": "(system default)",
+      "sensitivity": "Sensitivity: {{db}} dB",
+      "sensitivityHint": "Left is more sensitive. Put the yellow line above the background noise and below your voice.",
+      "hold": "Silence before resuming (ms)",
+      "holdHint": "Pauses between words shorter than this don't count.",
+      "threshold": "Threshold",
+      "saveToTest": "Save so the microphone starts listening and see your level here.",
+      "talking": "🎙️ Talking: the voice waits",
+      "quiet": "Quiet ({{db}} dB)",
+      "headphones": "Use headphones: if the voice plays through speakers and the microphone hears it, it would silence itself."
+    }
   },
   "overlay": {
     "alerts": "Alerts",
@@ -1199,6 +1221,90 @@
         "q": "Do I lose my stuff if I update?",
         "a": "No: your data lives in a separate folder. Still, you can export a backup in Settings before updating."
       }
+    }
+  },
+  "presets": {
+    "open": "Templates",
+    "title": "Rule templates",
+    "hint": "Common rules for streamers. Add them with one click and edit them later like any other.",
+    "close": "Close",
+    "add": "Add",
+    "addAll": "Add all {{n}}",
+    "added": "Added",
+    "addedNote": "{{count}} rules added.",
+    "customize": "Customize",
+    "needsBot": "uses the chat bot",
+    "needsEdit": "add your link",
+    "category": {
+      "thanks": "Thank-yous",
+      "chat": "Chat bot",
+      "interaction": "Interaction"
+    },
+    "thanksGift": {
+      "name": "Thanks for the gift",
+      "desc": "The voice thanks every gift with its name and amount.",
+      "say": "Thanks {nickname} for {count} {gift}"
+    },
+    "bigGift": {
+      "name": "Big gift (100+ coins)",
+      "desc": "The bot celebrates gifts of 100 coins or more in chat.",
+      "say": "🔥 {nickname} sent {gift}! Thank you so much!"
+    },
+    "thanksFollow": {
+      "name": "Thanks for following",
+      "desc": "The voice thanks every follow (once every 6 h per person).",
+      "say": "Thanks for following, {nickname}"
+    },
+    "thanksShare": {
+      "name": "Thanks for sharing",
+      "desc": "The voice thanks people who share the LIVE.",
+      "say": "Thanks for sharing the stream, {nickname}"
+    },
+    "thanksSub": {
+      "name": "Thanks for subscribing",
+      "desc": "The voice and the bot thank every subscription.",
+      "say": "{nickname}, thanks for subscribing!",
+      "chat": "Welcome to the club, {nickname}! 💜"
+    },
+    "welcome": {
+      "name": "Welcome followers",
+      "desc": "The bot greets your followers when they join (once every 12 h).",
+      "say": "Welcome back, {nickname}! 👋"
+    },
+    "hello": {
+      "name": "Answer greetings",
+      "desc": "If someone writes “hi” or “hello”, the bot greets them.",
+      "say": "Hi {nickname}! 😊"
+    },
+    "cmdDiscord": {
+      "name": "!discord",
+      "desc": "The bot answers with your Discord link.",
+      "say": "Join my Discord: (put your link here)"
+    },
+    "cmdSocials": {
+      "name": "!redes",
+      "desc": "The bot answers with your social media.",
+      "say": "Follow me: (put your links here)"
+    },
+    "cmdCommands": {
+      "name": "!comandos",
+      "desc": "The bot lists the available commands.",
+      "say": "Commands: !discord !redes !puntos !top !di <message>"
+    },
+    "likes": {
+      "name": "Likes milestone",
+      "desc": "The voice celebrates every 1000 likes.",
+      "say": "We're at {likes} likes! Thank you all"
+    },
+    "sayForPoints": {
+      "name": "!di for points",
+      "desc": "For 100 points, the voice reads what the viewer writes after !di.",
+      "say": "{nickname} says: {args}"
+    },
+    "modSay": {
+      "name": "Moderator !anuncio",
+      "desc": "Moderators make the voice read an announcement.",
+      "say": "Announcement: {args}"
     }
   }
 }

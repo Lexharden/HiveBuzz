@@ -185,7 +185,9 @@
     "ttl": "Caducidad (s)",
     "ttlHint": "Si espera más que esto en la cola, se descarta",
     "save": "Guardar",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "costPoints": "Coste en puntos",
+    "costPointsHint": "Puntos que paga quien la dispara (0 = gratis)"
   },
   "actionType": {
     "playSound": "Reproducir sonido",
@@ -380,7 +382,27 @@
     "importVoice": "Importar modelo de voz (.onnx)",
     "voiceModel": "Modelo de voz de Piper",
     "customEmpty": "Todavía no has importado ninguna voz.",
-    "customNeedsPiper": "Instala Piper (arriba) para usar voces personalizadas."
+    "customNeedsPiper": "Instala Piper (arriba) para usar voces personalizadas.",
+    "mic": {
+      "title": "No hablar encima de ti (micrófono)",
+      "hint": "Cuando hablas por el micrófono, la voz se calla y espera a que termines. Solo se mide el nivel del micrófono: no se graba nada.",
+      "enabled": "Callar la voz mientras hablo",
+      "mode": "Cuando hablo a mitad de una lectura",
+      "repeatWord": "Pausar y repetir la palabra cortada",
+      "repeatMessage": "Pausar y repetir el mensaje entero",
+      "skip": "Saltar ese mensaje",
+      "device": "Micrófono",
+      "defaultDevice": "(el predeterminado del sistema)",
+      "sensitivity": "Sensibilidad: {{db}} dB",
+      "sensitivityHint": "A la izquierda, más sensible. Pon la línea amarilla por encima del ruido de fondo y por debajo de tu voz.",
+      "hold": "Silencio para retomar (ms)",
+      "holdHint": "Las pausas entre palabras más cortas que esto no cuentan.",
+      "threshold": "Umbral",
+      "saveToTest": "Guarda para que el micrófono empiece a escuchar y ver aquí tu nivel.",
+      "talking": "🎙️ Hablando: la voz espera",
+      "quiet": "Silencio ({{db}} dB)",
+      "headphones": "Usa audífonos: si la voz sale por altavoces y el micrófono la oye, se callaría a sí misma."
+    }
   },
   "overlay": {
     "alerts": "Alertas",
@@ -1199,6 +1221,90 @@
         "q": "¿Pierdo mis cosas si actualizo?",
         "a": "No: tus datos están en una carpeta aparte. Aun así, en Ajustes puedes exportar una copia de seguridad antes de actualizar."
       }
+    }
+  },
+  "presets": {
+    "open": "Plantillas",
+    "title": "Plantillas de reglas",
+    "hint": "Reglas habituales para streamers. Añádelas con un clic y edítalas después como cualquier otra.",
+    "close": "Cerrar",
+    "add": "Añadir",
+    "addAll": "Añadir las {{n}}",
+    "added": "Añadida",
+    "addedNote": "Se añadieron {{count}} reglas.",
+    "customize": "Personalizar",
+    "needsBot": "usa el bot de chat",
+    "needsEdit": "pon tu enlace",
+    "category": {
+      "thanks": "Agradecimientos",
+      "chat": "Bot de chat",
+      "interaction": "Interacción"
+    },
+    "thanksGift": {
+      "name": "Gracias por el regalo",
+      "desc": "La voz agradece cada regalo con su nombre y cantidad.",
+      "say": "Gracias {nickname} por {count} {gift}"
+    },
+    "bigGift": {
+      "name": "Regalo grande (100+ monedas)",
+      "desc": "El bot celebra en el chat los regalos de 100 monedas o más.",
+      "say": "🔥 ¡{nickname} envió {gift}! ¡Muchísimas gracias!"
+    },
+    "thanksFollow": {
+      "name": "Gracias por seguir",
+      "desc": "La voz agradece cada follow (una vez cada 6 h por persona).",
+      "say": "Gracias por seguirme, {nickname}"
+    },
+    "thanksShare": {
+      "name": "Gracias por compartir",
+      "desc": "La voz agradece cuando comparten el LIVE.",
+      "say": "Gracias por compartir el directo, {nickname}"
+    },
+    "thanksSub": {
+      "name": "Gracias por suscribirte",
+      "desc": "La voz y el bot agradecen cada suscripción.",
+      "say": "¡{nickname}, gracias por suscribirte!",
+      "chat": "¡Bienvenido al club, {nickname}! 💜"
+    },
+    "welcome": {
+      "name": "Bienvenida a seguidores",
+      "desc": "El bot saluda a tus seguidores al entrar (una vez cada 12 h).",
+      "say": "¡Bienvenido de vuelta, {nickname}! 👋"
+    },
+    "hello": {
+      "name": "Responder saludos",
+      "desc": "Si alguien escribe «hola» o «buenas», el bot le saluda.",
+      "say": "¡Hola {nickname}! 😊"
+    },
+    "cmdDiscord": {
+      "name": "!discord",
+      "desc": "El bot responde con el enlace a tu Discord.",
+      "say": "Únete a mi Discord: (pon aquí tu enlace)"
+    },
+    "cmdSocials": {
+      "name": "!redes",
+      "desc": "El bot responde con tus redes sociales.",
+      "say": "Sígueme en mis redes: (pon aquí tus enlaces)"
+    },
+    "cmdCommands": {
+      "name": "!comandos",
+      "desc": "El bot lista los comandos disponibles.",
+      "say": "Comandos: !discord !redes !puntos !top !di <mensaje>"
+    },
+    "likes": {
+      "name": "Meta de likes",
+      "desc": "La voz celebra cada 1000 likes.",
+      "say": "¡Llevamos {likes} likes! Gracias a todos"
+    },
+    "sayForPoints": {
+      "name": "!di por puntos",
+      "desc": "Por 100 puntos, la voz lee lo que el espectador escriba tras !di.",
+      "say": "{nickname} dice: {args}"
+    },
+    "modSay": {
+      "name": "!anuncio de moderador",
+      "desc": "Los moderadores hacen que la voz lea un anuncio.",
+      "say": "Anuncio: {args}"
     }
   }
 }
