@@ -29,12 +29,14 @@ export function TtsPage() {
   useEffect(() => {
     alive.current = true;
     let off: (() => void) | undefined;
+    let disposed = false;
     void run(async () => {
       setConfig(await api.getTtsConfig());
       await reloadVoices();
     });
-    void onInstallProgress((p) => alive.current && setProgress(p)).then((u) => (alive.current ? (off = u) : u()));
+    void onInstallProgress((p) => alive.current && setProgress(p)).then((u) => (disposed ? u() : (off = u)));
     return () => {
+      disposed = true;
       alive.current = false;
       off?.();
     };

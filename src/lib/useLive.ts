@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api, onEvents, onStatus } from "./api";
 import type { AppInfo, LiveEvent, Platform, StatusUpdate } from "./types";
 
@@ -29,7 +29,6 @@ export function useLive() {
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [info, setInfo] = useState<AppInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const cancelled = useRef(false);
 
   const refreshInfo = useCallback(async () => {
     try {
@@ -40,14 +39,16 @@ export function useLive() {
   }, []);
 
   useEffect(() => {
-    cancelled.current = false;
+    // Local a cada montaje: con StrictMode el efecto se monta dos veces y una marca compartida
+    // dejaría vivo el listener del primer montaje.
+    let cancelled = false;
     const unlisten: (() => void)[] = [];
 
     void (async () => {
       // Primero se escucha y después se consulta el estado, para no perder cambios entre ambos.
       const offStatus = await onStatus(({ platform, ...status }) => setStatuses((prev) => ({ ...prev, [platform]: status })));
       const offEvents = await onEvents((batch) => setEvents((prev) => appendEvents(prev, batch)));
-      if (cancelled.current) {
+      if (cancelled) {
         offStatus();
         offEvents();
         return;
@@ -70,7 +71,7 @@ export function useLive() {
     })();
 
     return () => {
-      cancelled.current = true;
+      cancelled = true;
       unlisten.forEach((f) => f());
     };
   }, [refreshInfo]);

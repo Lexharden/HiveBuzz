@@ -48,7 +48,8 @@ export function SpotifySection() {
               disabled={busy || !status?.clientIdSet}
               onClick={() =>
                 void run(async () => {
-                  await api.spotifySetConfig({ ...cfg, song: { ...song, enabled: true } });
+                  // Se guarda lo que devuelve el backend: si no, un «Guardar» posterior desactivaría las peticiones.
+                  setCfg(await api.spotifySetConfig({ ...cfg, song: { ...song, enabled: true } }));
                   await api.spotifyConnect();
                   setMsg(t("spotify.opened"));
                 })

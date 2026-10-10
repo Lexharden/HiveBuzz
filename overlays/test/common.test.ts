@@ -81,6 +81,18 @@ describe("núcleo común", () => {
     expect(cards[2]?.style.animation).toBe("");
   });
 
+  it("al reconectar, el historial repetido no duplica lo ya mostrado", () => {
+    const p = load("chat");
+    p.send(config("chat", { maxMessages: 10, hideCommands: true, showAvatar: false }));
+    const a = chat("uno");
+    const b = chat("dos");
+    p.send(historyMsg([a]));
+    p.send(eventMsg(b));
+    // Nueva conexión: el servidor vuelve a mandar el historial (que ya incluye «dos»).
+    p.send(historyMsg([a, b]));
+    expect(p.root.querySelectorAll(".hb-card")).toHaveLength(2);
+  });
+
   it("modo vista previa: añade la cuadrícula de fondo", () => {
     const p = load("feed", { query: "&preview=1" });
     expect(p.doc.body.classList.contains("hb-preview")).toBe(true);

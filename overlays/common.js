@@ -148,6 +148,19 @@ window.HB = (function () {
     var delay = 1000;
     var configChannel = "config:" + opts.id;
     var firstConfig = true;
+    // El servidor reenvía el historial en cada conexión: lo ya mostrado no se repite al reconectar.
+    var seen = {};
+    var seenOrder = [];
+    function deliver(ev, replay) {
+      if (!opts.onEvent || !ev) return;
+      if (typeof ev.id === "string" && ev.id) {
+        if (seen[ev.id]) return;
+        seen[ev.id] = true;
+        seenOrder.push(ev.id);
+        if (seenOrder.length > 1000) delete seen[seenOrder.shift()];
+      }
+      opts.onEvent(ev, replay);
+    }
 
     function connect() {
       var proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -166,9 +179,9 @@ window.HB = (function () {
               opts.onOverlay(msg.channel, msg.data);
             }
           } else if (msg.type === "history") {
-            if (opts.onEvent && Array.isArray(msg.events)) msg.events.forEach(function (e) { opts.onEvent(e, true); });
+            if (Array.isArray(msg.events)) msg.events.forEach(function (e) { deliver(e, true); });
           } else if (msg.type === "event") {
-            if (opts.onEvent) opts.onEvent(msg.event, false);
+            deliver(msg.event, false);
           }
         } catch (e) { /* un mensaje raro no debe tumbar el overlay */ }
       };

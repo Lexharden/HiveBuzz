@@ -51,11 +51,13 @@ export function RulesPage() {
     void reload();
     const poll = setInterval(() => void api.queueStats().then((q) => alive.current && setQueue(q)).catch(() => undefined), 1500);
     let off: (() => void) | undefined;
+    let disposed = false;
     void onRuleFired((r) => {
       setFlash((f) => ({ ...f, [r.ruleId]: Date.now() }));
       setTimeout(() => setFlash((f) => (f[r.ruleId] === undefined ? f : omitKey(f, r.ruleId))), 1500);
-    }).then((u) => (alive.current ? (off = u) : u()));
+    }).then((u) => (disposed ? u() : (off = u)));
     return () => {
+      disposed = true;
       alive.current = false;
       clearInterval(poll);
       off?.();
