@@ -79,7 +79,7 @@ Todo lo que cambia de una máquina a otra va en un archivo `.env` (ignorado por 
 
 | Variable | Para qué | Obligatoria |
 |---|---|---|
-| `HIVEBUZZ_SPOTIFY_CLIENT_ID` | Client ID de tu app de Spotify (botón «Conectar» para todos) | No (sin ella, Spotify queda desactivado) |
+| `HIVEBUZZ_SPOTIFY_CLIENT_ID` | Client ID de una app de Spotify integrada (solo útil para ti y las cuentas que añadas en su *User Management*) | No (sin ella, cada streamer configura su propia app desde la interfaz) |
 | `HIVEBUZZ_TWITCH_CLIENT_ID` | Client ID de tu app de Twitch (botón «Entrar con Twitch») | No (el chat de Twitch funciona sin él) |
 | `TAURI_SIGNING_PRIVATE_KEY_PATH` / `_PASSWORD` | Firma de las actualizaciones automáticas | Solo si publicas releases |
 
@@ -316,18 +316,23 @@ Todas son acciones (`ActionExecutor`) que se añaden a una regla; los textos adm
 ## Extras (Fase 6)
 
 ### Spotify: peticiones de canciones y «Sonando ahora»
-**Para el usuario final: un solo botón.** En *Integraciones → Spotify* pulsa **Conectar con Spotify**, inicia
-sesión en el navegador y listo; no hay Client ID ni nada que copiar.
+**Cada streamer usa su propia app de Spotify (gratis, una sola vez).** Spotify crea las apps en «modo
+desarrollo», que solo deja usar la API a las cuentas que el dueño añade a mano en *User Management*, y hoy solo
+concede la «extensión de cuota» a organizaciones. Por eso una app compartida no sirve para distribuir HiveBuzz:
+cualquier otra cuenta inicia sesión, pero recibe **403 Forbidden** en cada petición.
 
-**Para quien compila HiveBuzz (una sola vez):** el Client ID de PKCE es público, así que va dentro del programa.
-1. En <https://developer.spotify.com/dashboard> crea UNA app y añade el Redirect URI
-   `http://127.0.0.1:17890/spotify/callback` (el puerto por defecto del servidor local).
-2. Compila con la variable de entorno `HIVEBUZZ_SPOTIFY_CLIENT_ID=<tu client id>` (en CI: variable de repositorio
-   del mismo nombre, ya referenciada en `release.yml`).
-3. Limitación de Spotify: una app en «modo desarrollo» solo permite a **25 usuarios** que añadas a mano; para
-   público general hay que pedir la «extensión de cuota» en el panel de Spotify. Quien no quiera depender de esa
-   app puede usar la suya en *Opciones avanzadas* (Client ID + el Redirect URI que muestra la app).
+En *Integraciones → Spotify → Configurar mi app de Spotify* la interfaz guía los pasos:
+1. Crear una app en <https://developer.spotify.com/dashboard> (marcando «Web API»).
+2. Pegar como Redirect URI la dirección que muestra HiveBuzz (`http://127.0.0.1:<puerto>/spotify/callback`).
+3. Añadir su propia cuenta en *Settings → User Management*.
+4. Pegar el Client ID en HiveBuzz, guardar y pulsar **Conectar con Spotify**.
+
+Requisitos de Spotify: la cuenta dueña de una app en modo desarrollo necesita **Premium**, igual que para encolar.
+
+- `HIVEBUZZ_SPOTIFY_CLIENT_ID` (opcional) integra un Client ID en la compilación; solo funciona para las cuentas
+  añadidas en su *User Management*. Un Client ID puesto en la interfaz siempre tiene prioridad.
 - Si alguien cambia el puerto del servidor local, el Redirect URI deja de coincidir con el registrado.
+- Cambiar de Client ID cierra la sesión de Spotify (los tokens son de la app anterior).
 - OAuth **PKCE** sin secreto de cliente. El *refresh token* va al llavero del sistema; el *access token* solo
   vive en memoria. La ruta de retorno es la única que no pide el token de overlays: se protege con un
   `state` aleatorio de un solo uso que caduca a los 10 minutos.

@@ -1,7 +1,10 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { systemApi as api, type SpotifyConfig, type SpotifyStatus } from "../../lib/system";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
+
+const DASHBOARD_URL = "https://developer.spotify.com/dashboard";
 
 const lines = (v: string[]): string => v.join(", ");
 const parseList = (raw: string): string[] =>
@@ -35,6 +38,8 @@ export function SpotifySection() {
       refreshStatus();
     });
   const connected = status?.connected ?? false;
+  // Sin app propia (ni integrada) no se puede conectar: la guía se muestra abierta.
+  const needsSetup = status !== null && !status.clientIdSet;
 
   return (
     <Card title={t("spotify.title")} hint={t("spotify.hintEasy")}>
@@ -57,7 +62,8 @@ export function SpotifySection() {
             >
               🎵 {t("spotify.connect")}
             </Btn>
-            {status && !status.clientIdSet && <p className="text-xs text-amber-300">{t("spotify.unavailable")}</p>}
+            {needsSetup && <p className="text-xs text-amber-300">{t("spotify.needsSetup")}</p>}
+            {status?.usesBuiltinApp && <p className="text-xs text-zinc-400">{t("spotify.builtinNote")}</p>}
             {msg && <p className="text-xs text-zinc-400">{msg}</p>}
           </div>
         ) : (
@@ -153,11 +159,25 @@ export function SpotifySection() {
         {connected && msg && <p className="text-xs text-emerald-400">{msg}</p>}
         <ErrorText error={error} />
 
-        {/* Solo para quien quiera su propia app de Spotify */}
-        <details className="rounded-md border border-zinc-800 p-3">
-          <summary className="cursor-pointer text-xs text-zinc-500">{t("spotify.advanced")}</summary>
-          <div className="mt-3 space-y-2">
-            <p className="text-xs text-zinc-500">{t("spotify.advancedHint")}</p>
+        {/* La app de Spotify de cada streamer: Spotify solo deja usar una app en modo desarrollo a
+            las cuentas que su dueño añade a mano, así que lo fiable es que cada uno tenga la suya. */}
+        <details className="rounded-md border border-zinc-800 p-3" open={needsSetup}>
+          <summary className="cursor-pointer text-sm text-zinc-300">{t("spotify.setupTitle")}</summary>
+          <div className="mt-3 space-y-3">
+            <p className="text-xs text-zinc-400">{t("spotify.setupIntro")}</p>
+            <ol className="list-decimal space-y-1.5 pl-5 text-xs text-zinc-300">
+              <li>
+                {t("spotify.step1")}{" "}
+                <button type="button" className="text-amber-400 underline" onClick={() => void openUrl(DASHBOARD_URL)}>
+                  developer.spotify.com/dashboard
+                </button>
+              </li>
+              <li>{t("spotify.step2")}</li>
+              <li>{t("spotify.step3")}</li>
+              <li>{t("spotify.step4")}</li>
+              <li>{t("spotify.step5")}</li>
+            </ol>
+            <p className="text-xs text-zinc-500">{t("spotify.forbiddenHelp")}</p>
             <Field label={t("spotify.clientId")} hint={t("spotify.clientIdHint")}>
               <TextInput value={cfg.clientId} onChange={(clientId) => setCfg({ ...cfg, clientId })} autoComplete="off" spellCheck={false} />
             </Field>

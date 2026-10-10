@@ -29,7 +29,7 @@ Variables que puedes usar en los textos: `{user}` `{nickname}` `{gift}` `{count}
 
 1. Instala requisitos (Rust, Bun, Node) y en la carpeta del proyecto: `bun install`.
 2. Una vez: `bun run sidecar:build` (empaqueta el conector de TikTok).
-3. Copia `.env.example` a `.env` y rellénalo (sobre todo `HIVEBUZZ_SPOTIFY_CLIENT_ID`). Comprueba con `bun run app:check`.
+3. Copia `.env.example` a `.env` y rellénalo si lo necesitas (todo es opcional). Comprueba con `bun run app:check`.
 4. Desarrollo: `bun run app:dev`. Instalador final: `bun run app:build` (carga el `.env` solo).
 
 ---
@@ -155,15 +155,16 @@ Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; 
 3. También hay un WebSocket con todos los eventos en vivo. Todo solo escucha en `127.0.0.1` y exige el token.
 
 ### Spotify (peticiones de canciones)
-1. *Integraciones → Spotify → 🎵 Conectar con Spotify*. Se abre el navegador: inicia sesión en Spotify y acepta.
-   Vuelve a HiveBuzz: verás "✅ Conectado". No hay nada más que configurar.
+1. La primera vez, abre *Integraciones → Spotify → Configurar mi app de Spotify* y sigue los 5 pasos (crear una
+   app gratis en developer.spotify.com, pegar la Redirect URI, añadir tu cuenta en *User Management* y copiar el
+   Client ID). Después pulsa *🎵 Conectar con Spotify*, inicia sesión en el navegador y acepta: verás "✅ Conectado".
 2. Tus espectadores escriben `!sr nombre o enlace de la canción` y se agrega a tu cola; `!song` dice qué suena.
    (Quién puede pedir, coste en puntos, máximo por persona, etc. están en "Opciones de las peticiones", con
    valores razonables ya puestos.)
 3. Añade el overlay **Sonando ahora** a OBS.
 4. Requisitos de Spotify: tener Spotify abierto y reproduciendo, y cuenta **Premium** (sin Premium no se puede encolar).
-- Si el botón sale desactivado, esa versión de HiveBuzz se compiló sin la app de Spotify integrada: usa
-  "Opciones avanzadas" con tu propio Client ID (ver README).
+- Si aparece **"403 Forbidden"**, tu cuenta no está en *User Management* de la app de Spotify (o la cuenta dueña
+  de la app no tiene Premium). Añádela y vuelve a conectar.
 
 ---
 
@@ -200,6 +201,7 @@ TikTok, contraseña de OBS, Spotify) van al **llavero del sistema**, nunca a la 
 | Overlay vacío en OBS | URL completa con token; servidor local sin error en Ajustes; puerto libre |
 | El bot no escribe | ¿Está activado? ¿Hay sesión de TikTok? Reconecta al LIVE después de iniciar sesión |
 | Spotify no encola | Premium, dispositivo activo, Redirect URI exacta, "Conectado" en verde |
+| Spotify: 403 Forbidden | Añade tu cuenta en *Settings → User Management* de tu app de Spotify y reconecta |
 | Las teclas no se envían | La ventana activa debe estar en la lista blanca; si el juego es "administrador", abre HiveBuzz igual |
 | Voz no suena | Instala Piper y una voz en la pestaña Voz, o elige una voz de Windows |
 

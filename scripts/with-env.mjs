@@ -35,7 +35,7 @@ export function check(env, command) {
   const problems = [];
   const notes = [];
   const id = env.HIVEBUZZ_SPOTIFY_CLIENT_ID ?? "";
-  if (id === "") notes.push("HIVEBUZZ_SPOTIFY_CLIENT_ID vacío: el botón «Conectar con Spotify» saldrá desactivado.");
+  if (id === "") notes.push("HIVEBUZZ_SPOTIFY_CLIENT_ID vacío: cada streamer configurará su propia app de Spotify desde la interfaz.");
   else if (!/^[A-Za-z0-9]{16,64}$/.test(id)) problems.push("HIVEBUZZ_SPOTIFY_CLIENT_ID no parece un Client ID de Spotify (letras y números, sin espacios).");
 
   const twitch = env.HIVEBUZZ_TWITCH_CLIENT_ID ?? "";

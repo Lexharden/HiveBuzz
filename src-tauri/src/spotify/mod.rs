@@ -1,9 +1,11 @@
 //! Spotify: autenticación OAuth con PKCE (sin servidor propio ni secreto de cliente), peticiones de
 //! canciones por chat (`!sr`) y el overlay «Sonando ahora».
 //!
-//! El usuario crea su propia app en el panel de desarrolladores de Spotify, copia su Client ID en
-//! Ajustes y registra como redirect URI la dirección que HiveBuzz le muestra. El refresh token vive
-//! en el llavero del sistema; el access token solo en memoria.
+//! Cada streamer crea su propia app en el panel de desarrolladores de Spotify (una app en «modo
+//! desarrollo» solo admite las cuentas que su dueño añade a mano), copia su Client ID en la interfaz y
+//! registra como redirect URI la dirección que HiveBuzz le muestra. Opcionalmente, la compilación
+//! puede traer un Client ID integrado (`HIVEBUZZ_SPOTIFY_CLIENT_ID`). El refresh token vive en el
+//! llavero del sistema; el access token solo en memoria.
 
 pub mod api;
 pub mod auth;
