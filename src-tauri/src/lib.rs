@@ -25,6 +25,7 @@ pub mod interact;
 pub mod leaderboard;
 pub mod logs;
 pub mod media;
+pub mod mic;
 pub mod overlay;
 pub mod overlay_config;
 pub mod points;
@@ -160,6 +161,8 @@ pub fn run() {
             commands::install_piper_voice,
             commands::import_piper_voice,
             commands::delete_piper_voice,
+            commands::list_mic_devices,
+            commands::get_mic_status,
             commands::list_overlays,
             commands::get_overlay_config,
             commands::set_overlay_config,

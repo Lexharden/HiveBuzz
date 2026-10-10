@@ -84,6 +84,7 @@ async fn rig_with(piper: FakeEngine, audio_fail: bool) -> Rig {
         cache_dir: cache.path().join("tts"),
         piper_paths: paths.clone(),
         default_piper: PiperPaths { exe: "/app/piper".into(), voices_dir: "/app/voices".into() },
+        mic: None,
     })
     .expect("svc");
 
@@ -188,6 +189,7 @@ async fn no_voices_is_a_clear_error() {
         cache_dir: cache.path().into(),
         piper_paths: Arc::default(),
         default_piper: PiperPaths::default(),
+        mic: None,
     })
     .expect("svc");
     let e = svc.speak("hola", &Vars::new(), None, SpeakOptions::default()).await.expect_err("sin voces");
@@ -269,6 +271,7 @@ async fn stale_audio_from_a_previous_session_is_removed_on_startup() {
         cache_dir: dir.clone(),
         piper_paths: Arc::default(),
         default_piper: PiperPaths::default(),
+        mic: None,
     })
     .expect("svc");
     assert_eq!(std::fs::read_dir(dir).expect("dir").count(), 0);
@@ -313,4 +316,117 @@ async fn command_mode_reads_only_what_follows_the_command() {
     let calls = r.piper.calls.lock().expect("lock").clone();
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].text, "Ana dice: buenas noches");
+}
+
+// ---- No hablar encima del streamer (micrófono) ----
+
+mod mic_guard {
+    use super::*;
+    use crate::mic::testing::FakeMic;
+    use crate::tts::policy::{MicGuard, MicGuardMode};
+
+    struct MicRig {
+        svc: Arc<TtsService>,
+        audio: Arc<FakeAudio>,
+        mic: Arc<FakeMic>,
+        _cache: tempfile::TempDir,
+    }
+
+    async fn rig(mode: MicGuardMode, enabled: bool) -> MicRig {
+        let cache = tempfile::tempdir().expect("tmp");
+        let audio = Arc::new(FakeAudio { duration: Duration::from_millis(400), ..Default::default() });
+        let mic = FakeMic::new();
+        let svc = TtsService::new(TtsDeps {
+            engines: vec![Arc::new(FakeEngine::new("piper", &["a"]))],
+            audio: audio.clone(),
+            clock: Arc::new(AppClock::new()),
+            db: Db::open_memory().await.expect("db"),
+            cache_dir: cache.path().join("tts"),
+            piper_paths: Arc::new(RwLock::new(PiperPaths::default())),
+            default_piper: PiperPaths::default(),
+            mic: Some(mic.clone()),
+        })
+        .expect("svc");
+        let guard = MicGuard { enabled, mode, threshold_db: -35.0, ..MicGuard::default() };
+        svc.set_config(TtsConfig { mic_guard: guard, ..TtsConfig::default() }).await.expect("cfg");
+        MicRig { svc, audio, mic, _cache: cache }
+    }
+
+    fn speak(r: &MicRig) -> tokio::task::JoinHandle<Result<()>> {
+        let svc = r.svc.clone();
+        tokio::spawn(async move { svc.speak("hola", &Vars::new(), None, SpeakOptions::default()).await })
+    }
+
+    fn log(r: &MicRig) -> Vec<String> {
+        r.audio.stopped.lock().expect("lock").clone()
+    }
+
+    async fn ms(n: u64) {
+        tokio::time::sleep(Duration::from_millis(n)).await;
+    }
+
+    #[tokio::test]
+    async fn enabling_it_starts_the_microphone_with_the_configured_sensitivity() {
+        let r = rig(MicGuardMode::RepeatWord, true).await;
+        let last = r.mic.configured.lock().expect("lock").last().cloned().flatten().expect("escuchando");
+        assert_eq!((last.threshold_db, last.hold_ms, last.device), (-35.0, 800, None));
+        r.svc.set_config(TtsConfig::default()).await.expect("cfg");
+        assert_eq!(r.mic.configured.lock().expect("lock").last().cloned(), Some(None), "apagado deja de escuchar");
+    }
+
+    #[tokio::test]
+    async fn talking_pauses_the_reading_and_it_repeats_the_cut_word() {
+        let r = rig(MicGuardMode::RepeatWord, true).await;
+        let h = speak(&r);
+        ms(100).await;
+        r.mic.set_speaking(true);
+        ms(50).await;
+        r.mic.set_speaking(false);
+        h.await.expect("join").expect("lee");
+        assert_eq!(log(&r), ["pause:tts", "resume:tts:1200"]);
+    }
+
+    #[tokio::test]
+    async fn repeat_message_mode_starts_over() {
+        let r = rig(MicGuardMode::RepeatMessage, true).await;
+        let h = speak(&r);
+        ms(100).await;
+        r.mic.set_speaking(true);
+        ms(50).await;
+        r.mic.set_speaking(false);
+        h.await.expect("join").expect("lee");
+        assert_eq!(log(&r), ["pause:tts", "resume:tts:start"]);
+    }
+
+    #[tokio::test]
+    async fn skip_mode_cuts_the_message() {
+        let r = rig(MicGuardMode::Skip, true).await;
+        let h = speak(&r);
+        ms(100).await;
+        r.mic.set_speaking(true);
+        h.await.expect("join").expect("lee");
+        assert_eq!(log(&r), ["tts"]);
+    }
+
+    #[tokio::test]
+    async fn a_new_reading_waits_until_the_streamer_stops_talking() {
+        let r = rig(MicGuardMode::RepeatWord, true).await;
+        r.mic.set_speaking(true);
+        let h = speak(&r);
+        ms(150).await;
+        assert!(r.audio.played.lock().expect("lock").is_empty(), "no empieza encima");
+        r.mic.set_speaking(false);
+        h.await.expect("join").expect("lee");
+        assert_eq!(r.audio.played.lock().expect("lock").len(), 1);
+        assert!(log(&r).is_empty(), "no hizo falta pausar");
+    }
+
+    #[tokio::test]
+    async fn disabled_it_ignores_the_microphone() {
+        let r = rig(MicGuardMode::RepeatWord, false).await;
+        r.mic.set_speaking(true);
+        speak(&r).await.expect("join").expect("lee");
+        assert_eq!(r.audio.played.lock().expect("lock").len(), 1);
+        assert!(log(&r).is_empty());
+    }
 }

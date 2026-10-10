@@ -106,6 +106,8 @@ export interface Rule {
   plan: { mode: "sequence" | "parallel"; steps: Step[] };
   priority?: number;
   ttlMs: number;
+  /** Puntos que paga el espectador que la dispara (la regla se vuelve una recompensa canjeable). */
+  costPoints?: number;
 }
 
 export interface FiredReport {
@@ -174,6 +176,26 @@ export interface TtsConfig {
   volume: number;
   piperPath: string | null;
   piperVoicesDir: string | null;
+  micGuard: MicGuard;
+}
+
+/** Qué hace el TTS cuando el streamer habla: repetir la palabra cortada, repetir el mensaje o saltarlo. */
+export type MicGuardMode = "repeatWord" | "repeatMessage" | "skip";
+
+export interface MicGuard {
+  enabled: boolean;
+  mode: MicGuardMode;
+  /** null = micrófono predeterminado. */
+  device: string | null;
+  thresholdDb: number;
+  holdMs: number;
+}
+
+export interface MicStatus {
+  active: boolean;
+  speaking: boolean;
+  levelDb: number;
+  error: string | null;
 }
 
 export interface VoiceInfo {

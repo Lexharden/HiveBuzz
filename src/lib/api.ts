@@ -23,6 +23,7 @@ import type {
   TimerView,
   TtsConfig,
   TtsStatus,
+  MicStatus,
   VoiceInfo,
 } from "./types";
 
@@ -72,6 +73,8 @@ export const api = {
   installPiperVoice: (id: string) => invoke<void>("install_piper_voice", { id }),
   importPiperVoice: (path: string, name?: string) => invoke<string>("import_piper_voice", { path, name }),
   deletePiperVoice: (name: string) => invoke<void>("delete_piper_voice", { name }),
+  listMicDevices: () => invoke<string[]>("list_mic_devices"),
+  getMicStatus: () => invoke<MicStatus>("get_mic_status"),
 
   // Overlays
   listOverlays: () => invoke<OverlayDef[]>("list_overlays"),

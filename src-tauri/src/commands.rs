@@ -328,6 +328,18 @@ pub fn get_tts_status(state: State<'_, AppState>) -> TtsStatus {
     }
 }
 
+/// Micrófonos disponibles para «no hablar encima».
+#[tauri::command]
+pub async fn list_mic_devices() -> Vec<String> {
+    tokio::task::spawn_blocking(crate::mic::input_devices).await.unwrap_or_default()
+}
+
+/// Nivel actual del micrófono y si detecta voz (para calibrar la sensibilidad).
+#[tauri::command]
+pub fn get_mic_status(state: State<'_, AppState>) -> crate::mic::MicStatus {
+    state.mic.status()
+}
+
 /// Lee un texto con la configuración actual (sin pasar por la cola).
 #[tauri::command]
 pub async fn tts_preview(state: State<'_, AppState>, text: String, voice: Option<String>) -> Result<()> {

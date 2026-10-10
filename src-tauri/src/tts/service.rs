@@ -11,13 +11,14 @@ use tokio::sync::broadcast::error::RecvError;
 use super::engine::{split_voice_id, SynthRequest, TtsEngine};
 use super::filters::{clean, Cleaned};
 use super::piper::PiperPaths;
-use super::policy::{decide_chat, resolve_voice, ChatDecision, ChatMemory, TtsConfig, VoiceInfo};
+use super::policy::{decide_chat, resolve_voice, ChatDecision, ChatMemory, MicGuard, MicGuardMode, TtsConfig, VoiceInfo};
 use crate::actions::clock::Clock;
 use crate::actions::queue::{ActionQueue, NewJob, Outcome};
 use crate::audio::{AudioBackend, TAG_TTS};
 use crate::bus::EventBus;
 use crate::db::Db;
 use crate::error::{AppError, Result};
+use crate::mic::{MicSettings, SpeechDetector};
 use crate::rules::model::{ActionSpec, PlanMode, Step};
 use crate::rules::template::Vars;
 
@@ -28,6 +29,11 @@ const VOICES_TTL: Duration = Duration::from_secs(60);
 /// Cada cuántos eventos se purga la memoria del lector de chat.
 const PRUNE_EVERY: u64 = 3_000;
 const MEMORY_KEEP_MS: i64 = 6 * 60 * 60 * 1000;
+/// Lo máximo que una lectura espera a que el streamer calle (antes de empezar o en pausa). Pasado
+/// esto se descarta: el chat caduca, y la cola corta las acciones a los 120 s.
+const MIC_MAX_WAIT: Duration = Duration::from_secs(30);
+/// Cuánto se retrocede al reanudar para repetir la palabra cortada.
+const REPEAT_WORD_REWIND: Duration = Duration::from_millis(1_200);
 
 /// Lo que se puede ajustar por cada lectura.
 #[derive(Debug, Clone, Copy, Default)]
@@ -52,6 +58,7 @@ pub struct TtsService {
     piper_paths: Arc<RwLock<PiperPaths>>,
     default_piper: PiperPaths,
     handled: Mutex<u64>,
+    mic: Option<Arc<dyn SpeechDetector>>,
 }
 
 pub struct TtsDeps {
@@ -65,6 +72,8 @@ pub struct TtsDeps {
     pub piper_paths: Arc<RwLock<PiperPaths>>,
     /// Rutas de Piper cuando la configuración no indica otras (las que instala la app).
     pub default_piper: PiperPaths,
+    /// Micrófono para no hablar encima del streamer (`None` = sin esa función).
+    pub mic: Option<Arc<dyn SpeechDetector>>,
 }
 
 impl TtsService {
@@ -90,6 +99,7 @@ impl TtsService {
             piper_paths: deps.piper_paths,
             default_piper: deps.default_piper,
             handled: Mutex::new(0),
+            mic: deps.mic,
         }))
     }
 
@@ -142,6 +152,10 @@ impl TtsService {
                 .map_or_else(|| self.default_piper.voices_dir.clone(), PathBuf::from),
         };
         *self.piper_paths.write().unwrap_or_else(PoisonError::into_inner) = paths;
+        if let Some(mic) = &self.mic {
+            let g = &cfg.mic_guard;
+            mic.configure(g.enabled.then(|| MicSettings { device: g.device.clone(), threshold_db: g.threshold_db, hold_ms: g.hold_ms }));
+        }
         *self.config.write().unwrap_or_else(PoisonError::into_inner) = cfg;
         self.invalidate_voices();
     }
@@ -202,10 +216,70 @@ impl TtsService {
 
         #[allow(clippy::cast_possible_truncation)]
         let volume = (f64::from(cfg.volume) / 100.0 * opts.volume.unwrap_or(100.0).clamp(0.0, 100.0) / 100.0) as f32;
-        let played = self.audio.play(path.clone(), volume, TAG_TTS).await;
+        let played = self.play_guarded(path.clone(), volume, &cfg.mic_guard).await;
         // El audio temporal se borra siempre, haya salido bien o no.
         let _ = tokio::fs::remove_file(&path).await;
         played
+    }
+
+    /// Reproduce sin hablar encima del streamer: espera a que calle para empezar y, si empieza a
+    /// hablar a mitad, pausa (y repite la palabra o el mensaje) o salta, según la configuración.
+    async fn play_guarded(&self, path: PathBuf, volume: f32, guard: &MicGuard) -> Result<()> {
+        let Some(mic) = self.mic.as_ref().filter(|_| guard.enabled) else {
+            return self.audio.play(path, volume, TAG_TTS).await;
+        };
+        let mut rx = mic.subscribe();
+        if *rx.borrow_and_update() {
+            tracing::debug!("TTS: el streamer está hablando; la lectura espera");
+            match tokio::time::timeout(MIC_MAX_WAIT, rx.wait_for(|talking| !*talking)).await {
+                Ok(_) => {}
+                Err(_) => {
+                    tracing::debug!("TTS: el streamer no dejó de hablar; se descarta la lectura");
+                    return Ok(());
+                }
+            }
+        }
+
+        let play = self.audio.play(path, volume, TAG_TTS);
+        tokio::pin!(play);
+        let mut paused_until: Option<tokio::time::Instant> = None;
+        loop {
+            tokio::select! {
+                done = &mut play => return done,
+                changed = rx.changed() => {
+                    if changed.is_err() {
+                        // Sin detector: se termina de leer con normalidad.
+                        if paused_until.take().is_some() {
+                            self.audio.resume_tag(TAG_TTS, Duration::ZERO);
+                        }
+                        return play.await;
+                    }
+                    let talking = *rx.borrow_and_update();
+                    match (talking, guard.mode, paused_until.is_some()) {
+                        (true, MicGuardMode::Skip, _) => {
+                            tracing::debug!("TTS: el streamer habla; se salta el mensaje");
+                            self.audio.stop_tag(TAG_TTS);
+                        }
+                        (true, _, false) => {
+                            tracing::debug!("TTS: el streamer habla; lectura en pausa");
+                            self.audio.pause_tag(TAG_TTS);
+                            paused_until = Some(tokio::time::Instant::now() + MIC_MAX_WAIT);
+                        }
+                        (false, mode, true) => {
+                            let rewind = if mode == MicGuardMode::RepeatMessage { Duration::MAX } else { REPEAT_WORD_REWIND };
+                            self.audio.resume_tag(TAG_TTS, rewind);
+                            paused_until = None;
+                        }
+                        _ => {}
+                    }
+                }
+                () = tokio::time::sleep_until(paused_until.unwrap_or_else(tokio::time::Instant::now)), if paused_until.is_some() => {
+                    tracing::debug!("TTS: pausa demasiado larga; se descarta el mensaje");
+                    paused_until = None;
+                    self.audio.stop_tag(TAG_TTS);
+                }
+            }
+        }
     }
 
     /// Botón «saltar»: corta la voz que esté sonando (la cola sigue con la siguiente).

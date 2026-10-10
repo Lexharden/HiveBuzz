@@ -4,6 +4,7 @@ import { api, onInstallProgress, pickFile } from "../../lib/api";
 import type { InstallProgress, Role, TtsConfig, TtsStatus, VoiceInfo, VoiceMode } from "../../lib/types";
 import { voiceLabel } from "../../lib/voices";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
+import { MicGuardCard } from "./MicGuardCard";
 
 const ROLES: Role[] = ["moderator", "subscriber", "follower"];
 const CATALOG_LANGS = ["es", "en", "pt", "fr", "it", "de", "all"] as const;
@@ -12,6 +13,8 @@ type CatalogLang = (typeof CATALOG_LANGS)[number];
 export function TtsPage() {
   const { t } = useTranslation();
   const [config, setConfig] = useState<TtsConfig | null>(null);
+  /** Lo último guardado (el micrófono solo escucha con la configuración guardada). */
+  const [savedConfig, setSavedConfig] = useState<TtsConfig | null>(null);
   const [voices, setVoices] = useState<VoiceInfo[]>([]);
   const [status, setStatus] = useState<TtsStatus | null>(null);
   const [progress, setProgress] = useState<InstallProgress | null>(null);
@@ -35,7 +38,9 @@ export function TtsPage() {
     let off: (() => void) | undefined;
     let disposed = false;
     void run(async () => {
-      setConfig(await api.getTtsConfig());
+      const loaded = await api.getTtsConfig();
+      setConfig(loaded);
+      setSavedConfig(loaded);
       await reloadVoices();
     });
     void onInstallProgress((p) => alive.current && setProgress(p)).then((u) => (disposed ? u() : (off = u)));
@@ -293,6 +298,12 @@ export function TtsPage() {
         </div>
       </Card>
 
+      <MicGuardCard
+        value={config.micGuard}
+        saved={(savedConfig ?? config).micGuard}
+        onChange={(p) => patch({ micGuard: { ...config.micGuard, ...p } })}
+      />
+
       <Card title={t("tts.filtersTitle")} hint={t("tts.filtersHint")}>
         <div className="space-y-3">
           <div className="flex flex-wrap gap-5">
@@ -339,7 +350,9 @@ export function TtsPage() {
           disabled={busy}
           onClick={() =>
             void run(async () => {
-              setConfig(await api.setTtsConfig(config));
+              const stored = await api.setTtsConfig(config);
+              setConfig(stored);
+              setSavedConfig(stored);
               setSaved(true);
               await reloadVoices();
             })

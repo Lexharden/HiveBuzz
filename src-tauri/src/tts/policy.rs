@@ -22,6 +22,60 @@ pub enum VoiceMode {
     RandomPerUser,
 }
 
+/// Qué hacer con la lectura en curso cuando el streamer habla.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MicGuardMode {
+    /// Pausa y, al callar, retrocede un poco para repetir la palabra que se cortó.
+    #[default]
+    RepeatWord,
+    /// Pausa y, al callar, vuelve a leer el mensaje desde el principio.
+    RepeatMessage,
+    /// Corta el mensaje y pasa al siguiente (que espera a que el streamer calle).
+    Skip,
+}
+
+/// No hablar encima del streamer: el micrófono pausa o salta la lectura mientras habla.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicGuard {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub mode: MicGuardMode,
+    /// Nombre del micrófono; vacío = el predeterminado del sistema.
+    #[serde(default)]
+    pub device: Option<String>,
+    /// Sensibilidad: nivel (dBFS) a partir del cual se considera que hablas. Más bajo = más sensible.
+    #[serde(default = "default_mic_threshold")]
+    pub threshold_db: f32,
+    /// Silencio necesario para retomar la lectura.
+    #[serde(default = "default_mic_hold")]
+    pub hold_ms: u64,
+}
+
+fn default_mic_threshold() -> f32 {
+    -40.0
+}
+fn default_mic_hold() -> u64 {
+    800
+}
+
+impl Default for MicGuard {
+    fn default() -> Self {
+        serde_json::from_str("{}").unwrap_or_else(|_| unreachable!("todos los campos tienen valor por defecto"))
+    }
+}
+
+impl MicGuard {
+    fn sanitized(mut self) -> Self {
+        self.threshold_db = if self.threshold_db.is_finite() { self.threshold_db.clamp(-80.0, -5.0) } else { default_mic_threshold() };
+        self.hold_ms = self.hold_ms.clamp(200, 5_000);
+        self.device = self.device.map(|d| d.trim().to_string()).filter(|d| !d.is_empty());
+        self
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoleVoices {
@@ -89,6 +143,8 @@ pub struct TtsConfig {
     /// Carpeta de voces `.onnx` de Piper; vacío = la de la app.
     #[serde(default)]
     pub piper_voices_dir: Option<String>,
+    #[serde(default)]
+    pub mic_guard: MicGuard,
 }
 
 fn yes() -> bool {
@@ -136,6 +192,7 @@ impl TtsConfig {
             self.template = default_template();
         }
         self.max_wait_ms = self.max_wait_ms.clamp(1_000, 600_000);
+        self.mic_guard = self.mic_guard.sanitized();
         self
     }
 }

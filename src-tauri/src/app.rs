@@ -58,6 +58,7 @@ use crate::source::sidecar::{RestartConfig, SidecarSource};
 use crate::source::tauri_spawner::TauriSpawner;
 use crate::source::LiveSource;
 use crate::timers::service::{TimerService, TimerTiming};
+use crate::mic::MicMonitor;
 use crate::tts::edge::EdgeEngine;
 use crate::tts::engine::TtsEngine;
 use crate::tts::piper::{PiperEngine, PiperPaths};
@@ -96,6 +97,8 @@ pub struct AppState {
     pub sounds: Arc<SoundLibrary>,
     pub media: Arc<MediaLibrary>,
     pub tts: Arc<TtsService>,
+    /// Micrófono que pausa el TTS mientras el streamer habla.
+    pub mic: Arc<MicMonitor>,
     pub tts_dir: PathBuf,
     pub queue: Arc<ActionQueue>,
     pub registry: ExecutorRegistry,
@@ -198,6 +201,7 @@ impl AppState {
             Arc::new(SapiEngine),
             Arc::new(EdgeEngine),
         ];
+        let mic = Arc::new(MicMonitor::new());
         let tts = TtsService::new(TtsDeps {
             engines,
             audio: Arc::clone(&audio),
@@ -206,6 +210,7 @@ impl AppState {
             cache_dir: tts_dir.join("cache"),
             piper_paths,
             default_piper,
+            mic: Some(Arc::clone(&mic) as Arc<dyn crate::mic::SpeechDetector>),
         })?;
         tts.load_config().await?;
 
@@ -391,6 +396,7 @@ impl AppState {
             sounds,
             media,
             tts,
+            mic,
             tts_dir,
             queue,
             registry,
