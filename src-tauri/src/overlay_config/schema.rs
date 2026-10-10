@@ -207,6 +207,14 @@ pub fn registry() -> Vec<OverlayDef> {
                 f.push(num("textSize", "field.textSize", Group::Style, 30.0, 10.0, 120.0, 1.0));
                 f.push(num("mediaMaxWidth", "field.mediaMaxWidth", Group::Style, 60.0, 10.0, 100.0, 1.0));
                 f.push(select("animation", "field.animation", B, "pop", &[("pop", "animation.pop"), ("slide", "animation.slide"), ("fade", "animation.fade")]));
+                // Alertas sin reglas: el overlay reacciona solo a estos eventos. Las reglas con la
+                // acción «Mostrar alerta» siguen funcionando aparte.
+                f.push(boolean("autoGift", "field.autoGift", B, true));
+                f.push(num("minCoins", "field.autoMinCoins", B, 1.0, 0.0, 100_000.0, 1.0));
+                f.push(boolean("autoFollow", "field.autoFollow", B, true));
+                f.push(boolean("autoSubscribe", "field.autoSubscribe", B, true));
+                f.push(boolean("autoShare", "field.autoShare", B, false));
+                f.push(num("autoDurationSec", "field.autoDurationSec", B, 5.0, 1.0, 60.0, 1.0));
                 f
             },
         },

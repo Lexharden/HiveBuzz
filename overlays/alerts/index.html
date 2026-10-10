@@ -30,9 +30,14 @@
 <script>
 (function () {
   "use strict";
-  var cfg = { titleSize: 40, textSize: 30, mediaMaxWidth: 60, animation: "pop" };
+  var cfg = {
+    titleSize: 40, textSize: 30, mediaMaxWidth: 60, animation: "pop",
+    autoGift: true, minCoins: 1, autoFollow: true, autoSubscribe: true, autoShare: false, autoDurationSec: 5
+  };
   var root = document.getElementById("hb-root");
   var queue = [], showing = false, MAX_QUEUE = 50;
+  // Eventos que muestran una alerta por sí solos (sin reglas), con el interruptor que los controla.
+  var AUTO = { gift: "autoGift", follow: "autoFollow", subscribe: "autoSubscribe", share: "autoShare" };
 
   function build(a) {
     var el = HB.el("div", "alert " + (cfg.animation || "pop"));
@@ -78,13 +83,40 @@
     }, ms);
   }
 
+  function enqueue(a) {
+    if (queue.length < MAX_QUEUE) queue.push(a);
+    next();
+  }
+
+  /** Alerta automática de un evento. El historial que llega al abrir el overlay no dispara nada. */
+  function autoAlert(ev, replay) {
+    var flag = AUTO[ev.type];
+    if (replay || !flag || !cfg[flag]) return;
+    var u = ev.user || {};
+    var text;
+    if (ev.type === "gift") {
+      var g = ev.gift || {};
+      if ((Number(g.coins) || 0) < (Number(cfg.minCoins) || 0)) return;
+      text = HB.t("ev.gift", { count: g.count, name: g.name });
+    } else {
+      text = HB.t("ev." + ev.type, {});
+    }
+    enqueue({
+      title: u.nickname || u.uniqueId || "",
+      text: text,
+      avatar: u.avatar,
+      imageUrl: ev.gift && ev.gift.image,
+      durationMs: (Number(cfg.autoDurationSec) || 5) * 1000
+    });
+  }
+
   HB.start({
     id: "alerts",
     onConfig: function (c) { cfg = c; },
+    onEvent: autoAlert,
     onOverlay: function (channel, data) {
       if (channel !== "alerts" || !data) return;
-      if (queue.length < MAX_QUEUE) queue.push(data);
-      next();
+      enqueue(data);
     }
   });
 })();

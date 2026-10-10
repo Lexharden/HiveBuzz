@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { config, load, overlayMsg } from "./harness";
+import { chat, config, eventMsg, gift, historyMsg, load, overlayMsg, simple } from "./harness";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const alerts = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>(".alert")];
@@ -78,6 +78,61 @@ describe("alertas", () => {
     expect(p.root.querySelector("script")).toBeNull();
     expect((p.win as unknown as { __a?: number }).__a).toBeUndefined();
     p.win.close();
+  });
+
+  describe("alertas automáticas (sin reglas)", () => {
+    const auto = { ...cfg, autoGift: true, minCoins: 10, autoFollow: true, autoSubscribe: true, autoShare: false, autoDurationSec: 5 };
+
+    it("un regalo muestra quién lo envió, qué envió y su imagen", () => {
+      const p = load("alerts");
+      p.send(config("alerts", auto));
+      p.send(eventMsg(gift("Rosa", 50, 5, "https://cdn.example/rosa.png", { nickname: "Luna" })));
+      const [a] = alerts(p.root);
+      expect(a?.querySelector(".title")?.textContent).toBe("Luna");
+      expect(a?.querySelector(".text")?.textContent).toBe("envió 5× Rosa");
+      expect(a?.querySelector("img.media")?.getAttribute("src")).toBe("https://cdn.example/rosa.png");
+      p.win.close();
+    });
+
+    it("follows y suscripciones también; shares, chat y regalos bajo el mínimo no", () => {
+      const p = load("alerts");
+      p.send(config("alerts", auto));
+      p.send(eventMsg(gift("Rosa", 5))); // menos de 10 monedas
+      p.send(eventMsg(simple("share")));
+      p.send(eventMsg(chat("hola")));
+      expect(alerts(p.root)).toHaveLength(0);
+      p.send(eventMsg(simple("follow", { nickname: "Beto" })));
+      expect(p.root.textContent).toContain("empezó a seguirte");
+      p.win.close();
+    });
+
+    it("el historial que llega al abrir el overlay no dispara alertas", () => {
+      const p = load("alerts");
+      p.send(config("alerts", auto));
+      p.send(historyMsg([gift("Rosa", 500), simple("follow")]));
+      expect(alerts(p.root)).toHaveLength(0);
+      p.win.close();
+    });
+
+    it("se pueden apagar por tipo", () => {
+      const p = load("alerts");
+      p.send(config("alerts", { ...auto, autoGift: false, autoFollow: false }));
+      p.send(eventMsg(gift("Rosa", 500)));
+      p.send(eventMsg(simple("follow")));
+      expect(alerts(p.root)).toHaveLength(0);
+      p.send(eventMsg(simple("subscribe")));
+      expect(alerts(p.root)).toHaveLength(1);
+      p.win.close();
+    });
+
+    it("SEGURIDAD: el nombre del usuario nunca es HTML", () => {
+      const p = load("alerts");
+      p.send(config("alerts", auto));
+      p.send(eventMsg(simple("follow", { nickname: "<img src=x onerror=1>" })));
+      expect(p.root.querySelector("img")).toBeNull();
+      expect(p.root.textContent).toContain("<img src=x onerror=1>");
+      p.win.close();
+    });
   });
 
   it("la duración se acota entre 0,5 s y 60 s", async () => {
