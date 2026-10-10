@@ -60,6 +60,7 @@ Cada pantalla trae una frase que explica para qué sirve.
 1. Pestaña **Overlays**: elige uno (Alertas, Feed, Chat, Regalos recientes, Top donadores, Metas, Timer,
    Contadores, Ruleta, Encuesta, Sonando ahora).
 2. Cambia colores, fuente, posición, tamaño… la **vista previa** se actualiza al instante. Botón ▶ *Probar* manda ejemplos.
+   **Alertas** funciona sin reglas: regalos, follows y suscripciones salen solos (ajústalo en *Comportamiento*).
 3. En **Ajustes → Overlays** copia la URL del overlay.
 4. En OBS (o TikTok LIVE Studio): *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080.
 5. ⚠️ La URL lleva tu token: **no la compartas**.
@@ -100,7 +101,8 @@ Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; 
 
 - **Biblioteca**: importa sonidos (mp3, wav, ogg, flac) e imágenes/GIF/video (png, jpg, gif, webp, mp4, webm). Ponles
   nombre y volumen; el botón *Escuchar* los previsualiza.
-- **Voz (TTS)**: instala **Piper** (offline, un clic) y una voz, o usa las voces de Windows / Edge-TTS.
+- **Voz (TTS)**: instala **Piper** (offline, un clic) y una voz, o usa las voces de Windows / Edge-TTS. También puedes
+  importar tu propio modelo de Piper (`.onnx` + `.onnx.json`) en *Voces personalizadas*.
   - *Lectura del chat*: lee comentarios con filtros (solo `!tts`, roles, donadores recientes, usuarios ignorados).
   - Filtros de groserías, enlaces, emojis, letras repetidas y límite de caracteres. Voz única, por rol o aleatoria por usuario.
   - Botón **Saltar** para cortar lo que está sonando.

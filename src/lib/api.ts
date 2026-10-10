@@ -70,6 +70,8 @@ export const api = {
   ttsSkip: () => invoke<void>("tts_skip"),
   installPiper: () => invoke<void>("install_piper"),
   installPiperVoice: (id: string) => invoke<void>("install_piper_voice", { id }),
+  importPiperVoice: (path: string, name?: string) => invoke<string>("import_piper_voice", { path, name }),
+  deletePiperVoice: (name: string) => invoke<void>("delete_piper_voice", { name }),
 
   // Overlays
   listOverlays: () => invoke<OverlayDef[]>("list_overlays"),

@@ -30,14 +30,60 @@ pub struct VoiceSpec {
     pub approx_mb: u32,
 }
 
+/// Ids y tamaños comprobados contra `voices.json` del repositorio oficial (octubre de 2026).
 pub const VOICE_CATALOG: &[VoiceSpec] = &[
-    VoiceSpec { id: "es_MX-claude-high", label: "Claude · español (México) · alta calidad", approx_mb: 63 },
-    VoiceSpec { id: "es_MX-ald-medium", label: "Ald · español (México)", approx_mb: 63 },
-    VoiceSpec { id: "es_ES-davefx-medium", label: "Davefx · español (España)", approx_mb: 63 },
-    VoiceSpec { id: "es_AR-daniela-high", label: "Daniela · español (Argentina) · alta calidad", approx_mb: 114 },
-    VoiceSpec { id: "en_US-lessac-medium", label: "Lessac · inglés (EE. UU.)", approx_mb: 63 },
-    VoiceSpec { id: "en_US-amy-medium", label: "Amy · inglés (EE. UU.)", approx_mb: 63 },
+    // Español
+    VoiceSpec { id: "es_MX-claude-high", label: "Claude · español (México) · alta calidad", approx_mb: 60 },
+    VoiceSpec { id: "es_MX-ald-medium", label: "Ald · español (México)", approx_mb: 60 },
+    VoiceSpec { id: "es_MX-ald-x_low", label: "Ald · español (México) · ligera", approx_mb: 20 },
+    VoiceSpec { id: "es_AR-daniela-high", label: "Daniela · español (Argentina) · alta calidad", approx_mb: 109 },
+    VoiceSpec { id: "es_ES-davefx-medium", label: "Davefx · español (España)", approx_mb: 60 },
+    VoiceSpec { id: "es_ES-sharvard-medium", label: "Sharvard · español (España)", approx_mb: 73 },
+    VoiceSpec { id: "es_ES-mls_10246-low", label: "MLS 10246 · español (España)", approx_mb: 60 },
+    VoiceSpec { id: "es_ES-mls_9972-low", label: "MLS 9972 · español (España)", approx_mb: 60 },
+    VoiceSpec { id: "es_ES-carlfm-x_low", label: "Carlfm · español (España) · ligera", approx_mb: 27 },
+    // Inglés
+    VoiceSpec { id: "en_US-lessac-medium", label: "Lessac · inglés (EE. UU.)", approx_mb: 60 },
+    VoiceSpec { id: "en_US-lessac-high", label: "Lessac · inglés (EE. UU.) · alta calidad", approx_mb: 109 },
+    VoiceSpec { id: "en_US-amy-medium", label: "Amy · inglés (EE. UU.)", approx_mb: 60 },
+    VoiceSpec { id: "en_US-ryan-high", label: "Ryan · inglés (EE. UU.) · alta calidad", approx_mb: 115 },
+    VoiceSpec { id: "en_US-joe-medium", label: "Joe · inglés (EE. UU.)", approx_mb: 60 },
+    VoiceSpec { id: "en_US-john-medium", label: "John · inglés (EE. UU.)", approx_mb: 61 },
+    VoiceSpec { id: "en_US-kristin-medium", label: "Kristin · inglés (EE. UU.)", approx_mb: 61 },
+    VoiceSpec { id: "en_US-hfc_female-medium", label: "HFC mujer · inglés (EE. UU.)", approx_mb: 60 },
+    VoiceSpec { id: "en_US-hfc_male-medium", label: "HFC hombre · inglés (EE. UU.)", approx_mb: 60 },
+    VoiceSpec { id: "en_US-norman-medium", label: "Norman · inglés (EE. UU.)", approx_mb: 61 },
+    VoiceSpec { id: "en_US-bryce-medium", label: "Bryce · inglés (EE. UU.)", approx_mb: 61 },
+    VoiceSpec { id: "en_US-ljspeech-high", label: "LJSpeech · inglés (EE. UU.) · alta calidad", approx_mb: 109 },
+    VoiceSpec { id: "en_GB-alan-medium", label: "Alan · inglés (Reino Unido)", approx_mb: 60 },
+    VoiceSpec { id: "en_GB-alba-medium", label: "Alba · inglés (Reino Unido)", approx_mb: 60 },
+    VoiceSpec { id: "en_GB-cori-high", label: "Cori · inglés (Reino Unido) · alta calidad", approx_mb: 109 },
+    VoiceSpec { id: "en_GB-jenny_dioco-medium", label: "Jenny · inglés (Reino Unido)", approx_mb: 60 },
+    VoiceSpec { id: "en_GB-northern_english_male-medium", label: "Hombre del norte · inglés (Reino Unido)", approx_mb: 60 },
+    // Portugués
+    VoiceSpec { id: "pt_BR-faber-medium", label: "Faber · portugués (Brasil)", approx_mb: 60 },
+    VoiceSpec { id: "pt_BR-cadu-medium", label: "Cadu · portugués (Brasil)", approx_mb: 60 },
+    VoiceSpec { id: "pt_BR-jeff-medium", label: "Jeff · portugués (Brasil)", approx_mb: 60 },
+    // Francés
+    VoiceSpec { id: "fr_FR-siwis-medium", label: "Siwis · francés (Francia)", approx_mb: 60 },
+    VoiceSpec { id: "fr_FR-tom-medium", label: "Tom · francés (Francia)", approx_mb: 61 },
+    VoiceSpec { id: "fr_FR-gilles-low", label: "Gilles · francés (Francia)", approx_mb: 60 },
+    // Italiano
+    VoiceSpec { id: "it_IT-paola-medium", label: "Paola · italiano", approx_mb: 61 },
+    VoiceSpec { id: "it_IT-serena-high", label: "Serena · italiano · alta calidad", approx_mb: 109 },
+    VoiceSpec { id: "it_IT-riccardo-x_low", label: "Riccardo · italiano · ligera", approx_mb: 27 },
+    // Alemán
+    VoiceSpec { id: "de_DE-thorsten-high", label: "Thorsten · alemán · alta calidad", approx_mb: 109 },
+    VoiceSpec { id: "de_DE-thorsten-medium", label: "Thorsten · alemán", approx_mb: 60 },
+    VoiceSpec { id: "de_DE-kerstin-low", label: "Kerstin · alemán", approx_mb: 60 },
+    VoiceSpec { id: "de_DE-ramona-low", label: "Ramona · alemán", approx_mb: 60 },
 ];
+
+/// Tamaño máximo de un modelo de voz importado por el usuario.
+const MAX_CUSTOM_MODEL_BYTES: u64 = 1024 * 1024 * 1024;
+/// Un `.onnx` de Piper real pesa decenas de MB; algo diminuto no es un modelo.
+const MIN_CUSTOM_MODEL_BYTES: u64 = 64 * 1024;
+const MAX_VOICE_CONFIG_BYTES: u64 = 2 * 1024 * 1024;
 
 /// URLs del modelo y su configuración. Solo para voces del catálogo.
 pub fn voice_urls(id: &str) -> Option<(String, String)> {
@@ -235,6 +281,107 @@ pub async fn install_voice(voices_dir: &Path, id: &str, on: OnProgress<'_>) -> R
         let _ = tokio::fs::remove_file(&json_path).await;
         return Err(e);
     }
+    Ok(())
+}
+
+// ---- Voces personalizadas ----------------------------------------------------------------------------
+
+/// Nombre de archivo seguro a partir de lo que diga el usuario: letras, dígitos, `_` y `-`.
+pub fn custom_voice_name(raw: &str) -> String {
+    let mut out = String::new();
+    for c in raw.trim().chars() {
+        let c = if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' };
+        if !(c == '_' && out.ends_with('_')) {
+            out.push(c);
+        }
+    }
+    let out: String = out.trim_matches(['_', '-']).chars().take(64).collect();
+    if out.is_empty() {
+        "voz".into()
+    } else {
+        out
+    }
+}
+
+/// Configuración que acompaña a un modelo: `voz.onnx.json` o, si no, `voz.json`.
+fn sibling_config(onnx: &Path) -> Option<PathBuf> {
+    let with_json = PathBuf::from(format!("{}.json", onnx.display()));
+    if with_json.is_file() {
+        return Some(with_json);
+    }
+    let plain = onnx.with_extension("json");
+    plain.is_file().then_some(plain)
+}
+
+/// Importa un modelo de Piper propio (`.onnx` + su `.onnx.json`) a la carpeta de voces y devuelve
+/// el nombre con el que quedó (sin pisar ninguna voz existente).
+pub async fn import_custom_voice(voices_dir: &Path, onnx: &Path, name: Option<&str>) -> Result<String> {
+    let bad = |m: &str| AppError::Invalid(m.into());
+    let is_onnx = onnx.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("onnx"));
+    if !is_onnx || !onnx.is_file() {
+        return Err(bad("elige el archivo .onnx del modelo de voz"));
+    }
+    let size = tokio::fs::metadata(onnx).await?.len();
+    if size < MIN_CUSTOM_MODEL_BYTES {
+        return Err(bad("el archivo .onnx es demasiado pequeño para ser un modelo de voz"));
+    }
+    if size > MAX_CUSTOM_MODEL_BYTES {
+        return Err(bad("el modelo pesa más de 1 GB; no se importa"));
+    }
+    let config = sibling_config(onnx).ok_or_else(|| {
+        let file = onnx.file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
+        AppError::Invalid(format!("falta la configuración «{file}.json» junto al modelo (Piper la necesita)"))
+    })?;
+    if tokio::fs::metadata(&config).await?.len() > MAX_VOICE_CONFIG_BYTES {
+        return Err(bad("el archivo de configuración de la voz es demasiado grande"));
+    }
+    let text = tokio::fs::read_to_string(&config).await.map_err(|_| bad("la configuración de la voz no es texto válido"))?;
+    let json: serde_json::Value = serde_json::from_str(&text).map_err(|_| bad("la configuración de la voz no es JSON válido"))?;
+    if json.pointer("/audio/sample_rate").and_then(serde_json::Value::as_u64).is_none() {
+        return Err(bad("la configuración no es de una voz de Piper (falta audio.sample_rate)"));
+    }
+
+    tokio::fs::create_dir_all(voices_dir).await?;
+    let stem = onnx.file_stem().and_then(|s| s.to_str()).unwrap_or("voz");
+    let base = custom_voice_name(name.filter(|n| !n.trim().is_empty()).unwrap_or(stem));
+    let mut voice = base.clone();
+    let mut n = 2;
+    while voices_dir.join(format!("{voice}.onnx")).exists() || voices_dir.join(format!("{voice}.onnx.json")).exists() {
+        voice = format!("{base}-{n}");
+        n += 1;
+    }
+    let model_dst = voices_dir.join(format!("{voice}.onnx"));
+    let config_dst = voices_dir.join(format!("{voice}.onnx.json"));
+    let part = voices_dir.join(format!("{voice}.onnx.part"));
+
+    // El modelo se copia a `.part` y solo se renombra con la configuración ya escrita: una voz a
+    // medias nunca aparece en la lista.
+    let copied = async {
+        tokio::fs::copy(onnx, &part).await?;
+        tokio::fs::write(&config_dst, text.as_bytes()).await?;
+        tokio::fs::rename(&part, &model_dst).await?;
+        Ok::<(), std::io::Error>(())
+    }
+    .await;
+    if let Err(e) = copied {
+        let _ = tokio::fs::remove_file(&part).await;
+        let _ = tokio::fs::remove_file(&config_dst).await;
+        return Err(AppError::Invalid(format!("no se pudo copiar la voz: {e}")));
+    }
+    Ok(voice)
+}
+
+/// Borra una voz de Piper instalada (modelo y configuración).
+pub async fn remove_voice(voices_dir: &Path, name: &str) -> Result<()> {
+    if !super::piper::safe_voice_name(name) {
+        return Err(AppError::Invalid("nombre de voz no válido".into()));
+    }
+    let model = voices_dir.join(format!("{name}.onnx"));
+    if !model.is_file() {
+        return Err(AppError::Invalid(format!("la voz «{name}» no está instalada")));
+    }
+    tokio::fs::remove_file(&model).await?;
+    let _ = tokio::fs::remove_file(voices_dir.join(format!("{name}.onnx.json"))).await;
     Ok(())
 }
 

@@ -309,7 +309,7 @@
   },
   "tts": {
     "engines": "Motores de voz",
-    "enginesHint": "Piper es offline y de buena calidad; en Windows también están las voces del sistema (SAPI) y, opcionalmente, Edge-TTS.",
+    "enginesHint": "Piper es offline y de buena calidad; en Windows también están las voces del sistema (incluidas las de los paquetes de idioma) y, opcionalmente, Edge-TTS con decenas de voces en línea.",
     "installed": "instalado",
     "notInstalled": "no instalado",
     "installPiper": "Instalar Piper (≈22 MB)",
@@ -363,7 +363,24 @@
     "profanityWords": "Lista de palabras",
     "profanityWordsHint": "Separadas por comas. Ignora mayúsculas, acentos y letras repetidas.",
     "save": "Guardar",
-    "saved": "Guardado"
+    "saved": "Guardado",
+    "lang": {
+      "es": "Español",
+      "en": "Inglés",
+      "pt": "Portugués",
+      "fr": "Francés",
+      "it": "Italiano",
+      "de": "Alemán",
+      "all": "Todas"
+    },
+    "deleteVoice": "Borrar esta voz",
+    "confirmDeleteVoice": "¿Borrar la voz «{{name}}» de este equipo?",
+    "customTitle": "Voces personalizadas (Piper)",
+    "customHint": "Importa un modelo de voz de Piper (.onnx) que hayas entrenado o descargado. Su archivo de configuración (.onnx.json) debe estar en la misma carpeta.",
+    "importVoice": "Importar modelo de voz (.onnx)",
+    "voiceModel": "Modelo de voz de Piper",
+    "customEmpty": "Todavía no has importado ninguna voz.",
+    "customNeedsPiper": "Instala Piper (arriba) para usar voces personalizadas."
   },
   "overlay": {
     "alerts": "Alertas",
@@ -457,7 +474,13 @@
     "showProgress": "Mostrar barra de progreso",
     "showRequester": "Mostrar quién la pidió",
     "hideWhenPaused": "Ocultar en pausa",
-    "showPlatform": "Mostrar de qué plataforma viene (TikTok / Twitch)"
+    "showPlatform": "Mostrar de qué plataforma viene (TikTok / Twitch)",
+    "autoGift": "Alerta automática de regalos",
+    "autoMinCoins": "Monedas mínimas del regalo para alertar",
+    "autoFollow": "Alerta automática de follows",
+    "autoSubscribe": "Alerta automática de suscripciones",
+    "autoShare": "Alerta automática de shares",
+    "autoDurationSec": "Duración de las alertas automáticas (s)"
   },
   "font": {
     "segoe": "Segoe UI",

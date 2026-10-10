@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Alertas automáticas**: el overlay de Alertas muestra solo los regalos (desde un mínimo de monedas), follows y
+  suscripciones (y, si se activa, shares), sin crear reglas. Se configuran en *Overlays → Alertas*; las reglas con
+  «Mostrar alerta» siguen funcionando aparte (si ya las usas para lo mismo, apaga la automática para no verla doble).
+- **Más voces**: Edge-TTS pasa de 14 a 92 voces (todas las variantes del español y voces en inglés, portugués,
+  francés, italiano, alemán, japonés y coreano); el catálogo de Piper pasa de 6 a 39 voces, con filtro por idioma;
+  en Windows aparecen también las voces «OneCore» de los paquetes de idioma (p. ej. Microsoft Raúl).
+- **Voces personalizadas**: importar un modelo de Piper propio (`.onnx` + `.onnx.json`) y borrar voces instaladas.
+
 ### Corregido
 - **TikTok**: el nivel de fan (Fans Club) y el de regalos se leen también de las insignias; en los mensajes de chat
   TikTok no manda `fansClub`/`payGrade`, así que el filtro «Nivel de equipo mínimo» del TTS y de las reglas descartaba a todos.

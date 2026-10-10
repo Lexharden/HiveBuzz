@@ -73,7 +73,7 @@ fn voice_language(config: &Path) -> Option<String> {
 }
 
 /// Nombre de voz seguro: sin separadores de ruta (impide salir de la carpeta de voces).
-fn safe_voice_name(name: &str) -> bool {
+pub(crate) fn safe_voice_name(name: &str) -> bool {
     !name.is_empty() && !name.contains(['/', '\\', ':']) && !name.contains("..")
 }
 

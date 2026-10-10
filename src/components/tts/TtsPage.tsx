@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, onInstallProgress } from "../../lib/api";
+import { api, onInstallProgress, pickFile } from "../../lib/api";
 import type { InstallProgress, Role, TtsConfig, TtsStatus, VoiceInfo, VoiceMode } from "../../lib/types";
+import { voiceLabel } from "../../lib/voices";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
 
 const ROLES: Role[] = ["moderator", "subscriber", "follower"];
+const CATALOG_LANGS = ["es", "en", "pt", "fr", "it", "de", "all"] as const;
+type CatalogLang = (typeof CATALOG_LANGS)[number];
 
 export function TtsPage() {
   const { t } = useTranslation();
@@ -15,6 +18,7 @@ export function TtsPage() {
   const [saved, setSaved] = useState(false);
   const [testText, setTestText] = useState("Hola, esta es una prueba de voz.");
   const [testVoice, setTestVoice] = useState("");
+  const [catalogLang, setCatalogLang] = useState<CatalogLang>("es");
   const { run, error, busy } = useAction();
   const alive = useRef(true);
 
@@ -50,7 +54,7 @@ export function TtsPage() {
   };
   const patchFilters = (p: Partial<TtsConfig["filters"]>) => patch({ filters: { ...config.filters, ...p } });
   const toggleRole = (r: Role, on: boolean) => patch({ rolesAny: on ? [...config.rolesAny, r] : config.rolesAny.filter((x) => x !== r) });
-  const voiceOptions = [{ value: "", label: t("tts.noVoice") }, ...voices.map((v) => ({ value: v.id, label: `${v.name} (${v.engine}${v.lang ? ` · ${v.lang}` : ""})` }))];
+  const voiceOptions = [{ value: "", label: t("tts.noVoice") }, ...voices.map((v) => ({ value: v.id, label: voiceLabel(v) }))];
   const pct = progress?.total ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : null;
 
   const install = (fn: () => Promise<void>) =>
@@ -63,6 +67,23 @@ export function TtsPage() {
         setProgress(null);
       }
     });
+
+  const importVoice = () =>
+    void run(async () => {
+      const path = await pickFile(t("tts.voiceModel"), ["onnx"]);
+      if (!path) return;
+      setTestVoice(await api.importPiperVoice(path));
+      await reloadVoices();
+    });
+
+  const removeVoice = (name: string) => {
+    if (!window.confirm(t("tts.confirmDeleteVoice", { name }))) return;
+    void run(async () => {
+      await api.deletePiperVoice(name);
+      if (testVoice === `piper:${name}`) setTestVoice("");
+      await reloadVoices();
+    });
+  };
 
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
@@ -91,20 +112,69 @@ export function TtsPage() {
           </div>
         )}
         {status?.piperInstalled && (
-          <ul className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-            {status.catalog.map((v) => (
-              <li key={v.id} className="flex items-center justify-between gap-2 rounded-md border border-zinc-800 px-3 py-2 text-xs">
-                <span className="min-w-0 truncate" title={v.label}>
-                  {v.label} <span className="text-zinc-500">· {v.approxMb} MB</span>
-                </span>
-                {v.installed ? (
-                  <span className="text-emerald-400">{t("tts.installed")}</span>
-                ) : (
-                  <Btn disabled={busy} onClick={() => install(() => api.installPiperVoice(v.id))}>{t("tts.download")}</Btn>
-                )}
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="mt-3 flex flex-wrap gap-1">
+              {CATALOG_LANGS.map((l) => (
+                <button
+                  key={l}
+                  onClick={() => setCatalogLang(l)}
+                  className={`rounded-full px-2.5 py-0.5 text-xs ${catalogLang === l ? "bg-amber-400 text-brand-900" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"}`}
+                >
+                  {t(`tts.lang.${l}`)}
+                </button>
+              ))}
+            </div>
+            <ul className="mt-2 grid max-h-72 grid-cols-1 gap-2 overflow-y-auto md:grid-cols-2">
+              {status.catalog
+                .filter((v) => catalogLang === "all" || v.id.startsWith(`${catalogLang}_`))
+                .map((v) => (
+                  <li key={v.id} className="flex items-center justify-between gap-2 rounded-md border border-zinc-800 px-3 py-2 text-xs">
+                    <span className="min-w-0 truncate" title={v.label}>
+                      {v.label} <span className="text-zinc-500">· {v.approxMb} MB</span>
+                    </span>
+                    {v.installed ? (
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="text-emerald-400">{t("tts.installed")}</span>
+                        <button title={t("tts.deleteVoice")} disabled={busy} onClick={() => removeVoice(v.id)} className="text-zinc-500 hover:text-red-400">
+                          ✕
+                        </button>
+                      </span>
+                    ) : (
+                      <Btn disabled={busy} onClick={() => install(() => api.installPiperVoice(v.id))}>{t("tts.download")}</Btn>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          </>
+        )}
+      </Card>
+
+      <Card title={t("tts.customTitle")} hint={t("tts.customHint")}>
+        {status?.piperInstalled ? (
+          <div className="space-y-3">
+            <Btn disabled={busy} onClick={importVoice}>
+              {t("tts.importVoice")}
+            </Btn>
+            {status.custom.length > 0 ? (
+              <ul className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                {status.custom.map((v) => (
+                  <li key={v.id} className="flex items-center justify-between gap-2 rounded-md border border-zinc-800 px-3 py-2 text-xs">
+                    <span className="min-w-0 truncate">
+                      {v.name}
+                      {v.lang && <span className="text-zinc-500"> · {v.lang}</span>}
+                    </span>
+                    <button title={t("tts.deleteVoice")} disabled={busy} onClick={() => removeVoice(v.name)} className="text-zinc-500 hover:text-red-400">
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-zinc-500">{t("tts.customEmpty")}</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-zinc-500">{t("tts.customNeedsPiper")}</p>
         )}
       </Card>
 
@@ -214,7 +284,7 @@ export function TtsPage() {
                     key={v.id}
                     checked={config.randomVoices.includes(v.id)}
                     onChange={(on) => patch({ randomVoices: on ? [...config.randomVoices, v.id] : config.randomVoices.filter((x) => x !== v.id) })}
-                    label={`${v.name} (${v.engine})`}
+                    label={voiceLabel(v)}
                   />
                 ))}
               </div>

@@ -287,6 +287,8 @@ pub struct TtsStatus {
     /// La instalación automática de Piper solo existe en Windows.
     pub can_install_piper: bool,
     pub catalog: Vec<CatalogEntry>,
+    /// Voces de Piper instaladas que no son del catálogo (modelos importados por el usuario).
+    pub custom: Vec<VoiceInfo>,
 }
 
 #[tauri::command]
@@ -318,6 +320,10 @@ pub fn get_tts_status(state: State<'_, AppState>) -> TtsStatus {
                 approx_mb: v.approx_mb,
                 installed: paths.voices_dir.join(format!("{}.onnx", v.id)).is_file(),
             })
+            .collect(),
+        custom: crate::tts::piper::scan_voices(&paths.voices_dir)
+            .into_iter()
+            .filter(|v| !VOICE_CATALOG.iter().any(|c| c.id == v.name))
             .collect(),
     }
 }
@@ -351,6 +357,21 @@ pub async fn install_piper_voice(app: AppHandle, state: State<'_, AppState>, id:
         let _ = app.emit(EVT_TTS_INSTALL, p);
     };
     provision::install_voice(&state.tts.piper_paths().voices_dir, &id, &on).await?;
+    state.tts.invalidate_voices();
+    Ok(())
+}
+
+/// Importa un modelo de Piper propio (`.onnx` con su `.onnx.json` al lado). Devuelve el id de la voz.
+#[tauri::command]
+pub async fn import_piper_voice(state: State<'_, AppState>, path: String, name: Option<String>) -> Result<String> {
+    let voice = provision::import_custom_voice(&state.tts.piper_paths().voices_dir, &PathBuf::from(path), name.as_deref()).await?;
+    state.tts.invalidate_voices();
+    Ok(format!("piper:{voice}"))
+}
+
+#[tauri::command]
+pub async fn delete_piper_voice(state: State<'_, AppState>, name: String) -> Result<()> {
+    provision::remove_voice(&state.tts.piper_paths().voices_dir, &name).await?;
     state.tts.invalidate_voices();
     Ok(())
 }

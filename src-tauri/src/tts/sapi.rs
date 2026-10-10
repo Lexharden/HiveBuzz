@@ -1,5 +1,9 @@
 //! Motor SAPI de Windows (voces del sistema, sin descargas). En otras plataformas no hay voces.
 //!
+//! Además de las voces SAPI clásicas (`System.Speech`), lista las voces «OneCore» de Windows 10/11
+//! (las que se añaden con los paquetes de idioma, p. ej. Microsoft Raúl), que `System.Speech` no ve;
+//! esas se sintetizan con `Windows.Media.SpeechSynthesis`.
+//!
 //! El texto y la voz viajan por variables de entorno, nunca interpolados en el script, para que
 //! un mensaje de chat no pueda inyectar comandos de PowerShell.
 
@@ -18,18 +22,48 @@ const SYNTH_SCRIPT: &str = "\
 Add-Type -AssemblyName System.Speech
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
 try {
-  if ($env:HB_VOICE) { $s.SelectVoice($env:HB_VOICE) }
-  $s.Rate = [int]$env:HB_RATE
-  $s.SetOutputToWaveFile($env:HB_OUT)
-  $s.Speak($env:HB_TEXT)
-} finally { $s.Dispose() }";
+  $classic = (-not $env:HB_VOICE) -or (@($s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Name -eq $env:HB_VOICE }).Count -gt 0)
+  if ($classic) {
+    if ($env:HB_VOICE) { $s.SelectVoice($env:HB_VOICE) }
+    $s.Rate = [int]$env:HB_RATE
+    $s.SetOutputToWaveFile($env:HB_OUT)
+    $s.Speak($env:HB_TEXT)
+  }
+} finally { $s.Dispose() }
+if (-not $classic) {
+  $null = [Windows.Media.SpeechSynthesis.SpeechSynthesizer, Windows.Media.SpeechSynthesis, ContentType = WindowsRuntime]
+  Add-Type -AssemblyName System.Runtime.WindowsRuntime
+  $asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.IsGenericMethod -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' } | Select-Object -First 1
+  $voice = [Windows.Media.SpeechSynthesis.SpeechSynthesizer]::AllVoices | Where-Object { $_.DisplayName -eq $env:HB_VOICE } | Select-Object -First 1
+  if (-not $voice) { throw \"voz no encontrada: $env:HB_VOICE\" }
+  $w = New-Object Windows.Media.SpeechSynthesis.SpeechSynthesizer
+  try {
+    $w.Voice = $voice
+    $w.Options.SpeakingRate = [double]::Parse($env:HB_WRATE, [Globalization.CultureInfo]::InvariantCulture)
+    $task = $asTask.MakeGenericMethod([Windows.Media.SpeechSynthesis.SpeechSynthesisStream]).Invoke($null, @($w.SynthesizeTextToStreamAsync($env:HB_TEXT)))
+    if (-not $task.Wait(25000)) { throw 'tiempo agotado' }
+    $in = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($task.Result)
+    $fs = [System.IO.File]::Create($env:HB_OUT)
+    try { $in.CopyTo($fs) } finally { $fs.Dispose(); $in.Dispose() }
+  } finally { $w.Dispose() }
+}";
 
+/// Voces clásicas y, después, las OneCore que no estén ya como clásicas (`Microsoft Sabina` es la misma
+/// voz que `Microsoft Sabina Desktop`). Si la API de OneCore no existe (Windows antiguo) se omite.
 #[cfg(windows)]
 const LIST_SCRIPT: &str = "\
 Add-Type -AssemblyName System.Speech
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$s.GetInstalledVoices() | Where-Object { $_.Enabled } | ForEach-Object { $_.VoiceInfo.Name + '|' + $_.VoiceInfo.Culture.Name }
-$s.Dispose()";
+$classic = @($s.GetInstalledVoices() | Where-Object { $_.Enabled } | ForEach-Object { $_.VoiceInfo })
+$s.Dispose()
+$classic | ForEach-Object { $_.Name + '|' + $_.Culture.Name }
+try {
+  $null = [Windows.Media.SpeechSynthesis.SpeechSynthesizer, Windows.Media.SpeechSynthesis, ContentType = WindowsRuntime]
+  $names = @($classic | ForEach-Object { $_.Name })
+  [Windows.Media.SpeechSynthesis.SpeechSynthesizer]::AllVoices |
+    Where-Object { ($names -notcontains $_.DisplayName) -and ($names -notcontains ($_.DisplayName + ' Desktop')) } |
+    ForEach-Object { $_.DisplayName + '|' + $_.Language }
+} catch {}";
 
 #[cfg(windows)]
 const TIMEOUT: Duration = Duration::from_secs(30);
@@ -101,6 +135,8 @@ impl TtsEngine for SapiEngine {
             .env("HB_TEXT", &req.text)
             .env("HB_VOICE", &req.voice)
             .env("HB_RATE", rate_to_sapi(req.rate).to_string())
+            // OneCore usa un multiplicador (1.0 = normal), con punto decimal siempre.
+            .env("HB_WRATE", format!("{:.2}", req.rate.clamp(0.5, 2.0)))
             .env("HB_OUT", &out)
             .output();
         let output = tokio::time::timeout(TIMEOUT, run)
@@ -170,6 +206,33 @@ mod tests {
         assert!(bytes.len() > 1000, "el WAV debe tener audio");
         assert_eq!(&bytes[..4], b"RIFF");
         // El texto no se interpreta como código: no debe fallar por las comillas ni el `$()`.
+        assert!(rodio::Decoder::try_from(std::fs::File::open(&path).expect("abre")).is_ok());
+    }
+
+    /// Las voces OneCore (las que no son «Desktop») también generan un WAV real.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn synthesizes_with_a_onecore_voice_too() {
+        let engine = SapiEngine;
+        let voices = engine.voices().await;
+        let names: Vec<_> = voices.iter().map(|v| v.name.as_str()).collect();
+        let Some(voice) = voices.iter().find(|v| !v.name.ends_with(" Desktop")) else {
+            eprintln!("sin voces OneCore instaladas: se omite la prueba");
+            return;
+        };
+        assert!(!names.contains(&format!("{} Desktop", voice.name).as_str()), "no se duplica una voz clásica");
+        let dir = tempfile::tempdir().expect("tmp");
+        let path = engine
+            .synthesize(&SynthRequest {
+                text: "Hola, prueba con una voz de Windows. $(Get-Date) \"comillas\"".into(),
+                voice: voice.name.clone(),
+                rate: 1.3,
+                out_dir: dir.path().to_path_buf(),
+            })
+            .await
+            .expect("sintetiza con OneCore");
+        let bytes = std::fs::read(&path).expect("lee");
+        assert!(bytes.len() > 1000 && &bytes[..4] == b"RIFF", "WAV con audio");
         assert!(rodio::Decoder::try_from(std::fs::File::open(&path).expect("abre")).is_ok());
     }
 }

@@ -158,6 +158,8 @@ pub fn run() {
             commands::tts_skip,
             commands::install_piper,
             commands::install_piper_voice,
+            commands::import_piper_voice,
+            commands::delete_piper_voice,
             commands::list_overlays,
             commands::get_overlay_config,
             commands::set_overlay_config,

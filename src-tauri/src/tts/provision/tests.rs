@@ -72,6 +72,105 @@ fn every_catalog_voice_resolves() {
     }
 }
 
+#[test]
+fn catalog_ids_are_unique_and_well_formed() {
+    let mut seen = std::collections::HashSet::new();
+    for v in VOICE_CATALOG {
+        assert!(seen.insert(v.id), "repetida: {}", v.id);
+        assert_eq!(v.id.split('-').count(), 3, "{}", v.id);
+        assert!(v.id.is_ascii(), "{}", v.id);
+    }
+}
+
+// ---- Voces personalizadas ----
+
+const PIPER_CONFIG: &str = r#"{"audio": {"sample_rate": 22050}, "language": {"code": "es_MX"}}"#;
+
+/// Un `.onnx` falso del tamaño mínimo aceptado, con su configuración al lado.
+fn custom_model(dir: &Path, file: &str, config: Option<(&str, &str)>) -> PathBuf {
+    let p = dir.join(file);
+    std::fs::write(&p, vec![0u8; usize::try_from(MIN_CUSTOM_MODEL_BYTES).expect("cabe")]).expect("write");
+    if let Some((name, text)) = config {
+        std::fs::write(dir.join(name), text).expect("write");
+    }
+    p
+}
+
+#[test]
+fn custom_voice_names_are_safe_file_names() {
+    assert_eq!(custom_voice_name("Mi Voz (v2).final"), "Mi_Voz_v2_final");
+    assert_eq!(custom_voice_name("../../etc/passwd"), "etc_passwd");
+    assert_eq!(custom_voice_name("  __--  "), "voz");
+    assert_eq!(custom_voice_name("ñandú"), "and");
+    assert_eq!(custom_voice_name(&"x".repeat(200)).len(), 64);
+    for raw in ["a/b", "a\\b", "C:x", "..", "con espacios"] {
+        assert!(crate::tts::piper::safe_voice_name(&custom_voice_name(raw)), "{raw:?}");
+    }
+}
+
+#[tokio::test]
+async fn imports_a_custom_piper_voice_and_it_shows_up_in_the_scan() {
+    let src = tempfile::tempdir().expect("tmp");
+    let voices = tempfile::tempdir().expect("tmp");
+    let onnx = custom_model(src.path(), "Mi voz.onnx", Some(("Mi voz.onnx.json", PIPER_CONFIG)));
+    let name = import_custom_voice(voices.path(), &onnx, None).await.expect("importa");
+    assert_eq!(name, "Mi_voz");
+    let listed = crate::tts::piper::scan_voices(voices.path());
+    assert_eq!(listed.iter().map(|v| v.id.as_str()).collect::<Vec<_>>(), ["piper:Mi_voz"]);
+    assert_eq!(listed[0].lang.as_deref(), Some("es-MX"));
+
+    // Importarla otra vez no pisa la primera; con nombre propio se usa ese nombre.
+    assert_eq!(import_custom_voice(voices.path(), &onnx, None).await.expect("otra"), "Mi_voz-2");
+    assert_eq!(import_custom_voice(voices.path(), &onnx, Some("Locutor")).await.expect("nombre"), "Locutor");
+    let leftovers = std::fs::read_dir(voices.path()).expect("dir").flatten().filter(|e| e.path().extension().is_some_and(|x| x == "part")).count();
+    assert_eq!(leftovers, 0);
+}
+
+#[tokio::test]
+async fn the_config_may_also_be_named_like_the_model_with_json() {
+    let src = tempfile::tempdir().expect("tmp");
+    let voices = tempfile::tempdir().expect("tmp");
+    let onnx = custom_model(src.path(), "narrador.onnx", Some(("narrador.json", PIPER_CONFIG)));
+    assert_eq!(import_custom_voice(voices.path(), &onnx, None).await.expect("importa"), "narrador");
+    assert!(voices.path().join("narrador.onnx.json").is_file());
+}
+
+#[tokio::test]
+async fn bad_custom_voices_are_rejected_without_leaving_files() {
+    let src = tempfile::tempdir().expect("tmp");
+    let voices = tempfile::tempdir().expect("tmp");
+    let no_config = custom_model(src.path(), "a.onnx", None);
+    let bad_json = custom_model(src.path(), "b.onnx", Some(("b.onnx.json", "no es json")));
+    let not_piper = custom_model(src.path(), "c.onnx", Some(("c.onnx.json", r#"{"otra": "cosa"}"#)));
+    let wrong_ext = custom_model(src.path(), "d.bin", Some(("d.bin.json", PIPER_CONFIG)));
+    let tiny = src.path().join("e.onnx");
+    std::fs::write(&tiny, b"x").expect("write");
+    std::fs::write(src.path().join("e.onnx.json"), PIPER_CONFIG).expect("write");
+    for (path, needle) in [
+        (no_config, "falta la configuración"),
+        (bad_json, "JSON"),
+        (not_piper, "sample_rate"),
+        (wrong_ext, ".onnx"),
+        (tiny, "pequeño"),
+        (src.path().join("no-existe.onnx"), ".onnx"),
+    ] {
+        let e = import_custom_voice(voices.path(), &path, None).await.expect_err(needle);
+        assert!(e.to_string().contains(needle), "{}: {e}", path.display());
+    }
+    assert_eq!(std::fs::read_dir(voices.path()).expect("dir").count(), 0, "no debe quedar nada");
+}
+
+#[tokio::test]
+async fn removes_installed_voices_and_refuses_paths() {
+    let voices = tempfile::tempdir().expect("tmp");
+    std::fs::write(voices.path().join("v.onnx"), b"x").expect("write");
+    std::fs::write(voices.path().join("v.onnx.json"), PIPER_CONFIG).expect("write");
+    remove_voice(voices.path(), "v").await.expect("borra");
+    assert_eq!(std::fs::read_dir(voices.path()).expect("dir").count(), 0);
+    assert!(remove_voice(voices.path(), "v").await.expect_err("ya no está").to_string().contains("no está instalada"));
+    assert!(remove_voice(voices.path(), "../v").await.expect_err("ruta").to_string().contains("no válido"));
+}
+
 #[tokio::test]
 async fn downloads_verifies_the_hash_and_reports_progress() {
     let data = vec![7u8; 600_000];

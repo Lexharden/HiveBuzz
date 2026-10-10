@@ -194,6 +194,8 @@ export interface TtsStatus {
   piperInstalled: boolean;
   canInstallPiper: boolean;
   catalog: CatalogEntry[];
+  /** Voces de Piper importadas por el usuario (no son del catálogo). */
+  custom: VoiceInfo[];
 }
 
 export interface InstallProgress {

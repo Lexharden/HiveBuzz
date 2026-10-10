@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ActionSpec, Goal, Media, Sound, TimerView, VoiceInfo } from "../../lib/types";
+import { voiceLabel } from "../../lib/voices";
 import { Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
 import { amountValue, bool, num, set, str, toAmount } from "./paramHelpers";
 import { BotMessageParams, ObsParams, PointsAdjustParams, PressKeysParams, StartPollParams, TcpSendParams, WebhookParams, WsSendParams } from "./IntegrationParams";
@@ -197,7 +198,7 @@ function TtsParams({ action, onChange, voices }: Pick<Props, "action" | "onChang
           <Select
             value={str(action, "voice")}
             onChange={(v) => onChange(set(action, "voice", v))}
-            options={[{ value: "", label: t("action.autoVoice") }, ...voices.map((v) => ({ value: v.id, label: `${v.name} (${v.engine})` }))]}
+            options={[{ value: "", label: t("action.autoVoice") }, ...voices.map((v) => ({ value: v.id, label: voiceLabel(v) }))]}
           />
         </Field>
         <Field label={t("action.rate")}>

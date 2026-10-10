@@ -26,22 +26,101 @@ const ENDPOINT: &str = "wss://speech.platform.bing.com/consumer/speech/synthesiz
 const OUTPUT_FORMAT: &str = "audio-24khz-48kbitrate-mono-mp3";
 const TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Voces habituales (la lista completa de Microsoft es larga y cambia).
+/// Voces del servicio de lectura de Edge en español, inglés, portugués, francés, italiano, alemán, japonés y
+/// coreano (comprobadas contra su `voices/list` en octubre de 2026). Las «Multilingual» leen varios idiomas.
 const VOICES: &[(&str, &str)] = &[
-    ("es-MX-DaliaNeural", "es-MX"),
-    ("es-MX-JorgeNeural", "es-MX"),
-    ("es-ES-ElviraNeural", "es-ES"),
-    ("es-ES-AlvaroNeural", "es-ES"),
     ("es-AR-ElenaNeural", "es-AR"),
     ("es-AR-TomasNeural", "es-AR"),
-    ("es-CO-SalomeNeural", "es-CO"),
-    ("es-CO-GonzaloNeural", "es-CO"),
+    ("es-BO-MarceloNeural", "es-BO"),
+    ("es-BO-SofiaNeural", "es-BO"),
     ("es-CL-CatalinaNeural", "es-CL"),
+    ("es-CL-LorenzoNeural", "es-CL"),
+    ("es-CO-GonzaloNeural", "es-CO"),
+    ("es-CO-SalomeNeural", "es-CO"),
+    ("es-CR-JuanNeural", "es-CR"),
+    ("es-CR-MariaNeural", "es-CR"),
+    ("es-CU-BelkysNeural", "es-CU"),
+    ("es-CU-ManuelNeural", "es-CU"),
+    ("es-DO-EmilioNeural", "es-DO"),
+    ("es-DO-RamonaNeural", "es-DO"),
+    ("es-EC-AndreaNeural", "es-EC"),
+    ("es-EC-LuisNeural", "es-EC"),
+    ("es-ES-AlvaroNeural", "es-ES"),
+    ("es-ES-ElviraNeural", "es-ES"),
+    ("es-ES-XimenaNeural", "es-ES"),
+    ("es-GQ-JavierNeural", "es-GQ"),
+    ("es-GQ-TeresaNeural", "es-GQ"),
+    ("es-GT-AndresNeural", "es-GT"),
+    ("es-GT-MartaNeural", "es-GT"),
+    ("es-HN-CarlosNeural", "es-HN"),
+    ("es-HN-KarlaNeural", "es-HN"),
+    ("es-MX-DaliaNeural", "es-MX"),
+    ("es-MX-JorgeNeural", "es-MX"),
+    ("es-NI-FedericoNeural", "es-NI"),
+    ("es-NI-YolandaNeural", "es-NI"),
+    ("es-PA-MargaritaNeural", "es-PA"),
+    ("es-PA-RobertoNeural", "es-PA"),
+    ("es-PE-AlexNeural", "es-PE"),
+    ("es-PE-CamilaNeural", "es-PE"),
+    ("es-PR-KarinaNeural", "es-PR"),
+    ("es-PR-VictorNeural", "es-PR"),
+    ("es-PY-MarioNeural", "es-PY"),
+    ("es-PY-TaniaNeural", "es-PY"),
+    ("es-SV-LorenaNeural", "es-SV"),
+    ("es-SV-RodrigoNeural", "es-SV"),
+    ("es-US-AlonsoNeural", "es-US"),
     ("es-US-PalomaNeural", "es-US"),
-    ("en-US-JennyNeural", "en-US"),
-    ("en-US-GuyNeural", "en-US"),
+    ("es-UY-MateoNeural", "es-UY"),
+    ("es-UY-ValentinaNeural", "es-UY"),
+    ("es-VE-PaolaNeural", "es-VE"),
+    ("es-VE-SebastianNeural", "es-VE"),
+    ("en-GB-LibbyNeural", "en-GB"),
+    ("en-GB-MaisieNeural", "en-GB"),
+    ("en-GB-RyanNeural", "en-GB"),
     ("en-GB-SoniaNeural", "en-GB"),
+    ("en-GB-ThomasNeural", "en-GB"),
+    ("en-US-AnaNeural", "en-US"),
+    ("en-US-AndrewMultilingualNeural", "en-US"),
+    ("en-US-AndrewNeural", "en-US"),
+    ("en-US-AriaNeural", "en-US"),
+    ("en-US-AvaMultilingualNeural", "en-US"),
+    ("en-US-AvaNeural", "en-US"),
+    ("en-US-BrianMultilingualNeural", "en-US"),
+    ("en-US-BrianNeural", "en-US"),
+    ("en-US-ChristopherNeural", "en-US"),
+    ("en-US-EmmaMultilingualNeural", "en-US"),
+    ("en-US-EmmaNeural", "en-US"),
+    ("en-US-EricNeural", "en-US"),
+    ("en-US-GuyNeural", "en-US"),
+    ("en-US-JennyNeural", "en-US"),
+    ("en-US-MichelleNeural", "en-US"),
+    ("en-US-RogerNeural", "en-US"),
+    ("en-US-SteffanNeural", "en-US"),
+    ("pt-BR-AntonioNeural", "pt-BR"),
     ("pt-BR-FranciscaNeural", "pt-BR"),
+    ("pt-BR-ThalitaMultilingualNeural", "pt-BR"),
+    ("pt-PT-DuarteNeural", "pt-PT"),
+    ("pt-PT-RaquelNeural", "pt-PT"),
+    ("fr-FR-DeniseNeural", "fr-FR"),
+    ("fr-FR-EloiseNeural", "fr-FR"),
+    ("fr-FR-HenriNeural", "fr-FR"),
+    ("fr-FR-RemyMultilingualNeural", "fr-FR"),
+    ("fr-FR-VivienneMultilingualNeural", "fr-FR"),
+    ("it-IT-DiegoNeural", "it-IT"),
+    ("it-IT-ElsaNeural", "it-IT"),
+    ("it-IT-GiuseppeMultilingualNeural", "it-IT"),
+    ("it-IT-IsabellaNeural", "it-IT"),
+    ("de-DE-AmalaNeural", "de-DE"),
+    ("de-DE-ConradNeural", "de-DE"),
+    ("de-DE-FlorianMultilingualNeural", "de-DE"),
+    ("de-DE-KatjaNeural", "de-DE"),
+    ("de-DE-KillianNeural", "de-DE"),
+    ("de-DE-SeraphinaMultilingualNeural", "de-DE"),
+    ("ja-JP-KeitaNeural", "ja-JP"),
+    ("ja-JP-NanamiNeural", "ja-JP"),
+    ("ko-KR-HyunsuMultilingualNeural", "ko-KR"),
+    ("ko-KR-InJoonNeural", "ko-KR"),
+    ("ko-KR-SunHiNeural", "ko-KR"),
 ];
 
 pub struct EdgeEngine;
@@ -346,6 +425,16 @@ mod tests {
         let len = std::fs::metadata(&path).expect("meta").len();
         assert!(len > 2000, "audio demasiado corto: {len} bytes");
         assert!(rodio::Decoder::try_from(std::fs::File::open(&path).expect("abre")).is_ok(), "no decodifica como MP3");
+    }
+
+    #[test]
+    fn the_voice_list_has_no_duplicates_and_each_language_matches_its_name() {
+        let mut seen = std::collections::HashSet::new();
+        for (name, lang) in VOICES {
+            assert!(seen.insert(*name), "repetida: {name}");
+            assert!(name.starts_with(&format!("{lang}-")) && name.ends_with("Neural"), "{name} / {lang}");
+        }
+        assert!(VOICES.iter().filter(|(_, l)| l.starts_with("es-")).count() >= 40, "todas las variantes del español");
     }
 
     #[tokio::test]

@@ -309,7 +309,7 @@
   },
   "tts": {
     "engines": "Voice engines",
-    "enginesHint": "Piper is offline and good quality; on Windows the system voices (SAPI) and, optionally, Edge-TTS are also available.",
+    "enginesHint": "Piper is offline and sounds good; on Windows you also get the system voices (including language-pack voices) and, optionally, Edge-TTS with dozens of online voices.",
     "installed": "installed",
     "notInstalled": "not installed",
     "installPiper": "Install Piper (≈22 MB)",
@@ -363,7 +363,24 @@
     "profanityWords": "Word list",
     "profanityWordsHint": "Comma-separated. Ignores case, accents and repeated letters.",
     "save": "Save",
-    "saved": "Saved"
+    "saved": "Saved",
+    "lang": {
+      "es": "Spanish",
+      "en": "English",
+      "pt": "Portuguese",
+      "fr": "French",
+      "it": "Italian",
+      "de": "German",
+      "all": "All"
+    },
+    "deleteVoice": "Delete this voice",
+    "confirmDeleteVoice": "Delete the voice “{{name}}” from this computer?",
+    "customTitle": "Custom voices (Piper)",
+    "customHint": "Import a Piper voice model (.onnx) you trained or downloaded. Its config file (.onnx.json) must be in the same folder.",
+    "importVoice": "Import voice model (.onnx)",
+    "voiceModel": "Piper voice model",
+    "customEmpty": "You haven't imported any voice yet.",
+    "customNeedsPiper": "Install Piper (above) to use custom voices."
   },
   "overlay": {
     "alerts": "Alerts",
@@ -457,7 +474,13 @@
     "showProgress": "Show progress bar",
     "showRequester": "Show who requested it",
     "hideWhenPaused": "Hide when paused",
-    "showPlatform": "Show which platform it comes from (TikTok / Twitch)"
+    "showPlatform": "Show which platform it comes from (TikTok / Twitch)",
+    "autoGift": "Automatic gift alerts",
+    "autoMinCoins": "Minimum gift coins to alert",
+    "autoFollow": "Automatic follow alerts",
+    "autoSubscribe": "Automatic subscription alerts",
+    "autoShare": "Automatic share alerts",
+    "autoDurationSec": "Automatic alert duration (s)"
   },
   "font": {
     "segoe": "Segoe UI",

@@ -260,13 +260,19 @@ pestaña *Reglas* (con botón **Probar**). Ejemplo:
 
 *Biblioteca* importa sonidos (mp3/wav/ogg/flac) e imágenes/GIF/videos. Para mostrar las alertas
 añade `…/overlay/alerts?token=…` como Browser Source (`&pos=top|center|bottom` cambia la posición).
+Sin crear reglas, el overlay ya muestra regalos (desde un mínimo de monedas), follows y suscripciones; se ajusta o
+apaga en *Overlays → Alertas*. Las reglas con «Mostrar alerta» añaden alertas propias (imagen, video, textos).
 
 ### Voz (TTS)
 
 - **Piper** (offline): *Voz (TTS) → Instalar Piper* descarga el motor (≈22 MB, verificado por SHA-256)
-  y permite bajar voces (≈63 MB). En macOS/Linux instala Piper a mano y configura su ruta.
-- **SAPI**: voces del sistema en Windows, sin descargas.
-- **Edge-TTS** (opcional): servicio no oficial de Microsoft; si deja de responder, se actualiza la
+  y permite bajar voces de un catálogo de 39 (español, inglés, portugués, francés, italiano, alemán; 20–115 MB).
+  En macOS/Linux instala Piper a mano y configura su ruta.
+- **Voces personalizadas**: *Voz (TTS) → Importar modelo de voz* copia un modelo de Piper propio (`voz.onnx` con
+  su `voz.onnx.json` al lado) a la carpeta de voces; las voces instaladas se pueden borrar.
+- **SAPI**: voces del sistema en Windows, sin descargas, incluidas las «OneCore» de los paquetes de idioma
+  (*Configuración → Hora e idioma → Voz*), que se sintetizan con `Windows.Media.SpeechSynthesis`.
+- **Edge-TTS** (opcional): 92 voces en línea; servicio no oficial de Microsoft; si deja de responder, se actualiza la
   constante `CHROMIUM_VERSION` en `src-tauri/src/tts/edge.rs`.
 - Todo texto leído (del chat o de una regla) pasa por los filtros de groserías, enlaces, emojis,
   repeticiones y longitud.
