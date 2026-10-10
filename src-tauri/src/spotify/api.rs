@@ -141,6 +141,8 @@ impl HttpSpotify {
             StatusCode::TOO_MANY_REQUESTS => ApiError::RateLimited(retry.unwrap_or(5).clamp(1, 3600)),
             StatusCode::NOT_FOUND if reason == "NO_ACTIVE_DEVICE" || msg.to_lowercase().contains("no active device") => ApiError::NoDevice,
             StatusCode::FORBIDDEN if reason == "PREMIUM_REQUIRED" || msg.to_lowercase().contains("premium") => ApiError::PremiumRequired,
+            // Sin motivo de Premium, un 403 es que la app (modo desarrollo) no tiene registrada esta cuenta.
+            StatusCode::FORBIDDEN => ApiError::Forbidden,
             StatusCode::UNAUTHORIZED => ApiError::NotConnected,
             s => ApiError::Other(if msg.is_empty() { s.to_string() } else { format!("{s}: {msg}") }),
         }

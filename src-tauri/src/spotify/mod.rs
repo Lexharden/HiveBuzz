@@ -33,6 +33,8 @@ pub enum ApiError {
     NoDevice,
     #[error("añadir a la cola requiere una cuenta Spotify Premium")]
     PremiumRequired,
+    #[error("Spotify rechazó el acceso (403): la cuenta no está autorizada en la app de Spotify. Si la app está en modo desarrollo, el dueño debe añadir este correo en developer.spotify.com → tu app → User Management (y, en modo desarrollo, el dueño necesita Premium)")]
+    Forbidden,
     #[error("Spotify: {0}")]
     Other(String),
 }

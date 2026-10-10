@@ -293,7 +293,7 @@ impl SongService {
             ApiError::PremiumRequired => "la cuenta del streamer necesita Spotify Premium para la cola.".into(),
             ApiError::NotConnected => "las canciones no están disponibles por ahora.".into(),
             ApiError::RateLimited(_) => "Spotify está saturado, inténtalo en un momento.".into(),
-            ApiError::Other(_) => "no se pudo añadir la canción.".into(),
+            ApiError::Forbidden | ApiError::Other(_) => "no se pudo añadir la canción.".into(),
         }
     }
 
