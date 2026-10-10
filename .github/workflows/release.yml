@@ -62,11 +62,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --draft --title "HiveBuzz $GITHUB_REF_NAME" --notes "Consulta CHANGELOG.md para ver los cambios."
+          # Si ya hay un release (borrador o no) de esta etiqueta, se reutiliza; si no, se crea y se usa el id que devuelve
+          # la API (buscarlo después en la lista falla: los borradores tardan en aparecer).
+          existing="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | "\(.id) \(.tag_name)"' || true)"
+          echo "Releases existentes:"; echo "${existing:-(ninguno)}"
+          id="$(echo "$existing" | awk -v t="$GITHUB_REF_NAME" '$2 == t { print $1; exit }')"
+          if [ -z "$id" ]; then
+            id="$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
+              -f tag_name="$GITHUB_REF_NAME" -f name="HiveBuzz $GITHUB_REF_NAME" \
+              -f body="Consulta CHANGELOG.md para ver los cambios." -F draft=true --jq .id)"
           fi
-          id="$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id" | head -n1)"
-          [ -n "$id" ] || { echo "::error::No se encontró el release de $GITHUB_REF_NAME"; exit 1; }
+          [ -n "$id" ] || { echo "::error::No se pudo crear ni encontrar el release de $GITHUB_REF_NAME"; exit 1; }
+          echo "Release $id"
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
   build:
