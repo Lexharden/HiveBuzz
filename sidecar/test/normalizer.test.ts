@@ -238,6 +238,19 @@ describe("otros eventos", () => {
     expect(out[0]?.chat?.emotes).toEqual([{ id: "9", image: "img" }]);
   });
 
+  it("el nivel de fan y de regalos se lee de las insignias si faltan fansClub/payGrade", () => {
+    const user = {
+      ...ana,
+      badgeList: [
+        { sceneType: 8, privilegeLogExtra: { level: "7" } },
+        { sceneType: 10, privilegeLogExtra: { level: "3" } },
+        { sceneType: 4, privilegeLogExtra: { level: "9" } },
+      ],
+    };
+    const out = n.chat({ common: { msgId: "b1" }, user, content: "hola" }, 0);
+    expect(out[0]?.user).toMatchObject({ gifterLevel: 7, teamLevel: 3 });
+  });
+
   it("createTime en segundos se convierte a ms; si falta, usa now", () => {
     const sec = n.chat({ common: { msgId: "a", createTime: "1700000000" }, user: ana, content: "x" }, 5);
     const ms = n.chat({ common: { msgId: "b", createTime: "1700000000123" }, user: ana, content: "x" }, 5);

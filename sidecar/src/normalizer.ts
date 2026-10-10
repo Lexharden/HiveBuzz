@@ -298,8 +298,8 @@ export class Normalizer {
     const id = u.id ?? "";
     const uniqueId = u.displayId ?? "";
     if (!id && !uniqueId) return null;
-    const gifterLevel = u.payGrade?.level;
-    const teamLevel = u.fansClub?.data?.level;
+    const gifterLevel = u.payGrade?.level || badgeLevel(u, BADGE_USER_GRADE);
+    const teamLevel = u.fansClub?.data?.level || badgeLevel(u, BADGE_FANS);
     return {
       id: id || uniqueId,
       uniqueId,
@@ -358,4 +358,20 @@ function describe(v: unknown): string {
   } catch {
     return String(v);
   }
+}
+
+const BADGE_USER_GRADE = 8;
+const BADGE_FANS = 10;
+
+/**
+ * Nivel que TikTok pone en la insignia de cierta escena. En los mensajes de chat suele faltar
+ * `fansClub`/`payGrade`, pero la insignia (`badgeList`) sí lleva el nivel.
+ */
+function badgeLevel(u: RawUser, scene: number): number | undefined {
+  for (const b of u.badgeList ?? []) {
+    if ((b.sceneType ?? b.badgeSceneType) !== scene) continue;
+    const level = Number(b.privilegeLogExtra?.level);
+    if (Number.isFinite(level) && level > 0) return level;
+  }
+  return undefined;
 }

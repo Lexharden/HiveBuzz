@@ -30,6 +30,16 @@ export interface RawUser {
   userAttr?: { isAdmin?: boolean };
   payGrade?: { level?: number };
   fansClub?: { data?: { level?: number } };
+  /** Insignias del usuario; el nivel de fan y el de regalos también viajan aquí. */
+  badgeList?: RawBadge[];
+}
+
+export interface RawBadge {
+  /** 8 = nivel de regalos, 10 = Fans Club. */
+  sceneType?: number;
+  /** Nombre que usa la capa «legacy» de la librería para el mismo campo. */
+  badgeSceneType?: number;
+  privilegeLogExtra?: { level?: string | number };
 }
 
 export interface RawGiftInfo {
