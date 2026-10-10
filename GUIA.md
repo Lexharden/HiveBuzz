@@ -187,7 +187,7 @@ Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; 
 
 - Idioma **Español / English** (UI y overlays), cerrar a la **bandeja**, iniciar con Windows (minimizado opcional).
 - **Registro (logs)**: ver, filtrar por nivel y guardar en archivo; útil para reportar problemas.
-- **Actualizaciones**: indica `usuario/repo` de GitHub. Para publicar versiones necesitas generar una clave
+- **Actualizaciones**: por defecto se buscan en el repositorio oficial `Lexharden/HiveBuzz` (puedes cambiarlo). Para publicar versiones necesitas generar una clave
   (`bunx tauri signer generate`), poner la pública en `src-tauri/tauri.conf.json → plugins.updater.pubkey` y los
   secretos de GitHub (detalle en el README). Sin clave pública no se actualiza nada.
 

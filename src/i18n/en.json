@@ -398,10 +398,14 @@
       "hold": "Silence before resuming (ms)",
       "holdHint": "Pauses between words shorter than this don't count.",
       "threshold": "Threshold",
-      "saveToTest": "Save so the microphone starts listening and see your level here.",
       "talking": "🎙️ Talking: the voice waits",
       "quiet": "Quiet ({{db}} dB)",
-      "headphones": "Use headphones: if the voice plays through speakers and the microphone hears it, it would silence itself."
+      "headphones": "Use headphones: if the voice plays through speakers and the microphone hears it, it would silence itself.",
+      "defaultNamed": "Windows default: {{name}}",
+      "refresh": "Search microphones again (if you just plugged in a headset with a mic)",
+      "starting": "Opening the microphone…",
+      "mutedHint": "The microphone is almost silent. Say something: if the bar doesn't move, check it isn't muted (button on the mic or headset) and its volume in Windows → Settings → Sound → Input. If your headset has a mic, pick it above.",
+      "unsaved": "You're testing without saving: press Save so the voice uses it."
     }
   },
   "overlay": {
@@ -851,7 +855,7 @@
     "update": {
       "title": "Updates",
       "repo": "GitHub repository",
-      "repoHint": "user/repo with HiveBuzz's releases. Without this nothing is checked.",
+      "repoHint": "user/repo with the releases. Defaults to the official one (Lexharden/HiveBuzz); empty = official.",
       "auto": "Check on startup",
       "check": "Check for updates",
       "latest": "You're up to date (v{{version}}).",

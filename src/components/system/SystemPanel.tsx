@@ -72,7 +72,7 @@ function PrefsCard({ onChanged }: { onChanged: () => Promise<void> }) {
           <h3 className="mb-2 text-xs font-semibold text-zinc-300">{t("system.update.title")}</h3>
           <div className="grid grid-cols-[1fr_auto] items-end gap-3">
             <Field label={t("system.update.repo")} hint={t("system.update.repoHint")}>
-              <TextInput value={prefs.updateRepo} onChange={(updateRepo) => setPrefs({ ...prefs, updateRepo })} placeholder="usuario/hive-buzz" />
+              <TextInput value={prefs.updateRepo} onChange={(updateRepo) => setPrefs({ ...prefs, updateRepo })} placeholder="Lexharden/HiveBuzz" />
             </Field>
             <Btn disabled={busy} onClick={() => save(prefs)}>
               {t("system.save")}

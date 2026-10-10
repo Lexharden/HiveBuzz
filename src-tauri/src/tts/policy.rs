@@ -68,7 +68,7 @@ impl Default for MicGuard {
 }
 
 impl MicGuard {
-    fn sanitized(mut self) -> Self {
+    pub fn sanitized(mut self) -> Self {
         self.threshold_db = if self.threshold_db.is_finite() { self.threshold_db.clamp(-80.0, -5.0) } else { default_mic_threshold() };
         self.hold_ms = self.hold_ms.clamp(200, 5_000);
         self.device = self.device.map(|d| d.trim().to_string()).filter(|d| !d.is_empty());

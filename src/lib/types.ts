@@ -191,6 +191,11 @@ export interface MicGuard {
   holdMs: number;
 }
 
+export interface MicDevice {
+  name: string;
+  isDefault: boolean;
+}
+
 export interface MicStatus {
   active: boolean;
   speaking: boolean;

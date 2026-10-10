@@ -398,10 +398,14 @@
       "hold": "Silencio para retomar (ms)",
       "holdHint": "Las pausas entre palabras más cortas que esto no cuentan.",
       "threshold": "Umbral",
-      "saveToTest": "Guarda para que el micrófono empiece a escuchar y ver aquí tu nivel.",
       "talking": "🎙️ Hablando: la voz espera",
       "quiet": "Silencio ({{db}} dB)",
-      "headphones": "Usa audífonos: si la voz sale por altavoces y el micrófono la oye, se callaría a sí misma."
+      "headphones": "Usa audífonos: si la voz sale por altavoces y el micrófono la oye, se callaría a sí misma.",
+      "defaultNamed": "Predeterminado de Windows: {{name}}",
+      "refresh": "Volver a buscar micrófonos (si acabas de conectar unos audífonos con micrófono)",
+      "starting": "Abriendo el micrófono…",
+      "mutedHint": "El micrófono llega casi en silencio. Habla un poco: si la barra no se mueve, revisa que no esté silenciado (botón del propio micrófono o de los audífonos) y su volumen en Windows → Configuración → Sonido → Entrada. Si tus audífonos tienen micrófono, elígelo arriba.",
+      "unsaved": "Estás probando sin guardar: pulsa Guardar para que la voz lo use."
     }
   },
   "overlay": {
@@ -851,7 +855,7 @@
     "update": {
       "title": "Actualizaciones",
       "repo": "Repositorio de GitHub",
-      "repoHint": "usuario/repo con los releases de HiveBuzz. Sin esto no se busca nada.",
+      "repoHint": "usuario/repo con los releases. Por defecto, el oficial (Lexharden/HiveBuzz); vacío = el oficial.",
       "auto": "Comprobar al abrir",
       "check": "Buscar actualización",
       "latest": "Estás al día (v{{version}}).",

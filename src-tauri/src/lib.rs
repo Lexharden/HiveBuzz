@@ -163,6 +163,7 @@ pub fn run() {
             commands::delete_piper_voice,
             commands::list_mic_devices,
             commands::get_mic_status,
+            commands::mic_preview,
             commands::list_overlays,
             commands::get_overlay_config,
             commands::set_overlay_config,

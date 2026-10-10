@@ -1,43 +1,72 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../../lib/api";
-import type { MicGuard, MicGuardMode, MicStatus } from "../../lib/types";
-import { Card, Checkbox, Field, NumberInput, Select } from "../ui";
+import type { MicDevice, MicGuard, MicGuardMode, MicStatus } from "../../lib/types";
+import { Btn, Card, Checkbox, Field, NumberInput, Select } from "../ui";
 
 const MIN_DB = -80;
 const MAX_DB = 0;
+/** Por debajo de esto, durante unos segundos, el micrófono llega prácticamente mudo. */
+const MUTED_DB = -70;
+const MUTED_AFTER_MS = 4000;
 const pct = (db: number) => Math.min(100, Math.max(0, ((db - MIN_DB) / (MAX_DB - MIN_DB)) * 100));
 
 /** «No hablar encima»: el micrófono pausa o salta la lectura mientras el streamer habla. */
 export function MicGuardCard({ value, onChange, saved }: { value: MicGuard; onChange: (p: Partial<MicGuard>) => void; saved: MicGuard }) {
   const { t } = useTranslation();
-  const [devices, setDevices] = useState<string[]>([]);
+  const [devices, setDevices] = useState<MicDevice[]>([]);
   const [status, setStatus] = useState<MicStatus | null>(null);
+  const [muted, setMuted] = useState(false);
+  const loudAt = useRef(0);
 
-  useEffect(() => {
-    let alive = true;
-    void api.listMicDevices().then((d) => alive && setDevices(d)).catch(() => undefined);
-    return () => {
-      alive = false;
-    };
+  const loadDevices = useCallback(() => {
+    void api.listMicDevices().then(setDevices).catch(() => undefined);
   }, []);
+  useEffect(loadDevices, [loadDevices]);
 
-  // El medidor solo tiene sentido con el micrófono escuchando (configuración guardada y activa).
+  // Mientras la tarjeta está abierta, el micrófono escucha con lo que se ve (aunque no esté guardado)
+  // para poder calibrar; al salir vuelve a lo guardado.
+  const { enabled, device, thresholdDb, holdMs } = value;
   useEffect(() => {
-    if (!saved.enabled) {
+    if (!enabled) {
+      void api.micPreview(null).catch(() => undefined);
+      return;
+    }
+    const id = setTimeout(() => void api.micPreview({ ...value }).catch(() => undefined), 150);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, device, thresholdDb, holdMs]);
+  useEffect(() => () => void api.micPreview(null).catch(() => undefined), []);
+
+  useEffect(() => {
+    if (!enabled) {
       setStatus(null);
+      setMuted(false);
       return;
     }
     let alive = true;
-    const tick = () => void api.getMicStatus().then((s) => alive && setStatus(s)).catch(() => undefined);
+    loudAt.current = Date.now();
+    setMuted(false);
+    const tick = () =>
+      void api
+        .getMicStatus()
+        .then((s) => {
+          if (!alive) return;
+          setStatus(s);
+          const now = Date.now();
+          if (!s.active || s.levelDb > MUTED_DB) loudAt.current = now;
+          setMuted(now - loudAt.current > MUTED_AFTER_MS);
+        })
+        .catch(() => undefined);
     tick();
     const id = setInterval(tick, 120);
     return () => {
       alive = false;
       clearInterval(id);
     };
-  }, [saved.enabled, saved.device, saved.thresholdDb, saved.holdMs]);
+  }, [enabled, device]);
 
+  const def = devices.find((d) => d.isDefault);
   const unsaved = JSON.stringify(value) !== JSON.stringify(saved);
 
   return (
@@ -59,11 +88,21 @@ export function MicGuardCard({ value, onChange, saved }: { value: MicGuard; onCh
                 />
               </Field>
               <Field label={t("tts.mic.device")}>
-                <Select
-                  value={value.device ?? ""}
-                  onChange={(d) => onChange({ device: d || null })}
-                  options={[{ value: "", label: t("tts.mic.defaultDevice") }, ...devices.map((d) => ({ value: d, label: d }))]}
-                />
+                <div className="flex gap-2">
+                  <Select
+                    value={value.device ?? ""}
+                    onChange={(d) => onChange({ device: d || null })}
+                    options={[
+                      { value: "", label: def ? t("tts.mic.defaultNamed", { name: def.name }) : t("tts.mic.defaultDevice") },
+                      ...devices.map((d) => ({ value: d.name, label: d.name })),
+                      // Uno guardado que ya no está conectado sigue visible para que se entienda el error.
+                      ...(value.device && !devices.some((d) => d.name === value.device) ? [{ value: value.device, label: value.device }] : []),
+                    ]}
+                  />
+                  <Btn onClick={loadDevices} title={t("tts.mic.refresh")}>
+                    ↻
+                  </Btn>
+                </div>
               </Field>
             </div>
             <div className="grid grid-cols-3 gap-3">
@@ -93,12 +132,14 @@ export function MicGuardCard({ value, onChange, saved }: { value: MicGuard; onCh
               <p className="mt-1 text-xs text-zinc-500">
                 {status?.error
                   ? <span className="text-red-400">{status.error}</span>
-                  : unsaved || !status
-                    ? t("tts.mic.saveToTest")
+                  : !status?.active
+                    ? t("tts.mic.starting")
                     : status.speaking
                       ? <span className="text-emerald-400">{t("tts.mic.talking")}</span>
                       : t("tts.mic.quiet", { db: Math.round(status.levelDb) })}
               </p>
+              {muted && !status?.error && <p className="mt-1 text-xs text-red-300">{t("tts.mic.mutedHint")}</p>}
+              {unsaved && <p className="mt-1 text-xs text-amber-300/80">{t("tts.mic.unsaved")}</p>}
             </div>
             <p className="text-xs text-amber-300/80">{t("tts.mic.headphones")}</p>
           </>

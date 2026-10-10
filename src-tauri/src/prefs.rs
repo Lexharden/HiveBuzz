@@ -9,6 +9,8 @@ use crate::error::{AppError, Result};
 
 pub const KEY_APP_PREFS: &str = "app_prefs";
 pub const LANGUAGES: [&str; 2] = ["es", "en"];
+/// Repositorio oficial de HiveBuzz: de aquí salen las actualizaciones si no se elige otro.
+pub const DEFAULT_UPDATE_REPO: &str = "Lexharden/HiveBuzz";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -19,7 +21,7 @@ pub struct AppPrefs {
     pub start_minimized: bool,
     /// Idioma de la interfaz y de los overlays: `es` o `en`.
     pub language: String,
-    /// Repositorio de GitHub (`usuario/repo`) del que se descargan las actualizaciones. Vacío = ninguno.
+    /// Repositorio de GitHub (`usuario/repo`) del que se descargan las actualizaciones. Vacío = el oficial.
     pub update_repo: String,
     /// Comprobar si hay actualización al abrir la app (solo si hay repositorio).
     pub auto_update_check: bool,
@@ -27,11 +29,20 @@ pub struct AppPrefs {
 
 impl Default for AppPrefs {
     fn default() -> Self {
-        Self { close_to_tray: false, start_minimized: true, language: "es".into(), update_repo: String::new(), auto_update_check: true }
+        Self { close_to_tray: false, start_minimized: true, language: "es".into(), update_repo: DEFAULT_UPDATE_REPO.into(), auto_update_check: true }
     }
 }
 
 impl AppPrefs {
+    /// Las versiones anteriores guardaban el repositorio vacío: ahora eso es el oficial.
+    fn normalized(mut self) -> Self {
+        self.update_repo = self.update_repo.trim().to_string();
+        if self.update_repo.is_empty() {
+            self.update_repo = DEFAULT_UPDATE_REPO.into();
+        }
+        self
+    }
+
     pub fn validate(&self) -> Result<()> {
         if !LANGUAGES.contains(&self.language.as_str()) {
             return Err(AppError::Invalid(format!("idioma no admitido: «{}»", self.language)));
@@ -55,7 +66,7 @@ impl PrefsService {
 
     pub async fn load(&self) -> Result<()> {
         let prefs = match self.db.get_setting(KEY_APP_PREFS).await? {
-            Some(json) => serde_json::from_str::<AppPrefs>(&json).ok().filter(|p| p.validate().is_ok()).unwrap_or_default(),
+            Some(json) => serde_json::from_str::<AppPrefs>(&json).ok().map(AppPrefs::normalized).filter(|p| p.validate().is_ok()).unwrap_or_default(),
             None => AppPrefs::default(),
         };
         *self.cur.write().unwrap_or_else(PoisonError::into_inner) = prefs;
@@ -67,6 +78,7 @@ impl PrefsService {
     }
 
     pub async fn set(&self, prefs: AppPrefs) -> Result<AppPrefs> {
+        let prefs = prefs.normalized();
         prefs.validate()?;
         self.db.set_setting(KEY_APP_PREFS, &serde_json::to_string(&prefs)?).await?;
         *self.cur.write().unwrap_or_else(PoisonError::into_inner) = prefs.clone();
@@ -103,5 +115,18 @@ mod tests {
         db.set_setting(KEY_APP_PREFS, r#"{"language":"zz"}"#).await.unwrap();
         svc.load().await.unwrap();
         assert_eq!(svc.get().language, "es");
+    }
+
+    #[tokio::test]
+    async fn an_empty_update_repo_means_the_official_one() {
+        let db = Db::open_memory().await.unwrap();
+        db.set_setting(KEY_APP_PREFS, r#"{"updateRepo":"","language":"en"}"#).await.unwrap();
+        let svc = PrefsService::new(db.clone());
+        svc.load().await.unwrap();
+        assert_eq!(svc.get().update_repo, DEFAULT_UPDATE_REPO, "las preferencias de versiones anteriores pasan al oficial");
+        assert_eq!(svc.get().language, "en");
+        let saved = svc.set(AppPrefs { update_repo: "  ".into(), ..AppPrefs::default() }).await.unwrap();
+        assert_eq!(saved.update_repo, DEFAULT_UPDATE_REPO);
+        assert!(crate::updater::valid_repo(DEFAULT_UPDATE_REPO));
     }
 }

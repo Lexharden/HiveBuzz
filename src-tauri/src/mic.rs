@@ -4,7 +4,7 @@
 //! cada bloque de audio. Un detector por energía decide si el streamer está hablando y publica
 //! el cambio por un canal `watch`. No se guarda ni se envía audio: solo se calcula el nivel.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
@@ -43,6 +43,12 @@ pub struct Vad {
 impl Vad {
     pub fn new(threshold_db: f32, hold_ms: u64) -> Self {
         Self { threshold_db, hold_ms, above_since: None, last_voice: None, speaking: false }
+    }
+
+    /// Cambia sensibilidad y silencio sin perder el estado (al mover el control mientras se habla).
+    pub fn set_params(&mut self, threshold_db: f32, hold_ms: u64) {
+        self.threshold_db = threshold_db;
+        self.hold_ms = hold_ms;
     }
 
     /// Procesa el nivel de un bloque (`now_ms` crece) y dice si el streamer está hablando.
@@ -97,16 +103,56 @@ pub struct MicStatus {
     pub error: Option<String>,
 }
 
+/// Un micrófono para elegir en la interfaz.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MicDevice {
+    /// Nombre completo de Windows, p. ej. «Micrófono (Yeti Nano)»; es lo que se guarda.
+    pub name: String,
+    pub is_default: bool,
+}
+
+/// Sensibilidad y silencio que lee el hilo de captura en cada bloque: se cambian sin reabrir el micrófono.
+struct LiveParams {
+    threshold_db: AtomicU32,
+    hold_ms: AtomicU64,
+}
+
+impl LiveParams {
+    fn new(s: &MicSettings) -> Self {
+        Self { threshold_db: AtomicU32::new(s.threshold_db.to_bits()), hold_ms: AtomicU64::new(s.hold_ms) }
+    }
+
+    fn store(&self, s: &MicSettings) {
+        self.threshold_db.store(s.threshold_db.to_bits(), Ordering::Relaxed);
+        self.hold_ms.store(s.hold_ms, Ordering::Relaxed);
+    }
+
+    fn load(&self) -> (f32, u64) {
+        (f32::from_bits(self.threshold_db.load(Ordering::Relaxed)), self.hold_ms.load(Ordering::Relaxed))
+    }
+}
+
 struct Running {
-    settings: MicSettings,
+    device: Option<String>,
+    params: Arc<LiveParams>,
     /// Al soltarlo, el hilo de captura termina.
     _stop: mpsc::Sender<()>,
+}
+
+#[derive(Default)]
+struct Wanted {
+    /// Lo que pide la configuración guardada del TTS.
+    tts: Option<MicSettings>,
+    /// Lo que se está probando en la interfaz (manda mientras la tarjeta está abierta).
+    preview: Option<MicSettings>,
 }
 
 pub struct MicMonitor {
     speaking: Arc<watch::Sender<bool>>,
     level: Arc<AtomicU32>,
     error: Arc<Mutex<Option<String>>>,
+    wanted: Mutex<Wanted>,
     running: Mutex<Option<Running>>,
 }
 
@@ -122,6 +168,7 @@ impl MicMonitor {
             speaking: Arc::new(watch::Sender::new(false)),
             level: Arc::new(AtomicU32::new(SILENCE_DB.to_bits())),
             error: Arc::new(Mutex::new(None)),
+            wanted: Mutex::new(Wanted::default()),
             running: Mutex::new(None),
         }
     }
@@ -138,11 +185,28 @@ impl MicMonitor {
     }
 }
 
-impl SpeechDetector for MicMonitor {
-    fn configure(&self, settings: Option<MicSettings>) {
+impl MicMonitor {
+    /// Escucha con estos ajustes mientras se calibra en la interfaz, aunque no estén guardados
+    /// (`None` = volver a lo guardado).
+    pub fn preview(&self, settings: Option<MicSettings>) {
+        self.wanted.lock().unwrap_or_else(PoisonError::into_inner).preview = settings;
+        self.apply();
+    }
+
+    fn apply(&self) {
+        let settings = {
+            let w = self.wanted.lock().unwrap_or_else(PoisonError::into_inner);
+            w.preview.clone().or_else(|| w.tts.clone())
+        };
         let mut running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
-        if running.as_ref().map(|r| &r.settings) == settings.as_ref() {
-            return;
+        match (running.as_ref(), &settings) {
+            (None, None) => return,
+            // Mismo micrófono: solo cambian sensibilidad o silencio, sin reabrirlo.
+            (Some(r), Some(s)) if r.device == s.device => {
+                r.params.store(s);
+                return;
+            }
+            _ => {}
         }
         // Soltar el `Running` anterior detiene su hilo.
         *running = None;
@@ -153,10 +217,11 @@ impl SpeechDetector for MicMonitor {
             return;
         };
         let (stop_tx, stop_rx) = mpsc::channel();
-        let (speaking, level, error) = (Arc::clone(&self.speaking), Arc::clone(&self.level), Arc::clone(&self.error));
-        let s = settings.clone();
+        let params = Arc::new(LiveParams::new(&settings));
+        let (speaking, level, error, p) = (Arc::clone(&self.speaking), Arc::clone(&self.level), Arc::clone(&self.error), Arc::clone(&params));
+        let device = settings.device.clone();
         let spawned = std::thread::Builder::new().name("hivebuzz-mic".into()).spawn(move || {
-            if let Err(e) = capture(&s, &speaking, &level, &stop_rx) {
+            if let Err(e) = capture(device.as_deref(), &p, &speaking, &level, &stop_rx) {
                 tracing::warn!(error = %e, "micrófono: no se pudo escuchar");
                 *error.lock().unwrap_or_else(PoisonError::into_inner) = Some(e);
             }
@@ -167,7 +232,14 @@ impl SpeechDetector for MicMonitor {
             *self.error.lock().unwrap_or_else(PoisonError::into_inner) = Some(format!("no se pudo iniciar el hilo del micrófono: {e}"));
             return;
         }
-        *running = Some(Running { settings, _stop: stop_tx });
+        *running = Some(Running { device: settings.device, params, _stop: stop_tx });
+    }
+}
+
+impl SpeechDetector for MicMonitor {
+    fn configure(&self, settings: Option<MicSettings>) {
+        self.wanted.lock().unwrap_or_else(PoisonError::into_inner).tts = settings;
+        self.apply();
     }
 
     fn subscribe(&self) -> watch::Receiver<bool> {
@@ -175,49 +247,74 @@ impl SpeechDetector for MicMonitor {
     }
 }
 
+/// Nombre con el que Windows muestra el micrófono: «Micrófono (Yeti Nano)». La descripción corta
+/// de cpal suele ser solo «Micrófono», igual para todos, y no sirve para distinguirlos.
 fn device_name(d: &cpal::Device) -> Option<String> {
-    d.description().ok().map(|desc| desc.name().to_string())
+    let desc = d.description().ok()?;
+    Some(full_name(desc.name(), desc.extended().first().map(String::as_str), desc.driver()))
 }
 
-/// Micrófonos disponibles (por nombre).
-pub fn input_devices() -> Vec<String> {
+fn full_name(short: &str, friendly: Option<&str>, driver: Option<&str>) -> String {
+    match (friendly, driver) {
+        (Some(f), _) if !f.trim().is_empty() => f.to_string(),
+        (_, Some(d)) if !d.trim().is_empty() && !short.contains(d) => format!("{short} ({d})"),
+        _ => short.to_string(),
+    }
+}
+
+/// ¿Es el micrófono guardado? También acepta el nombre corto que guardaban versiones anteriores.
+fn matches_device(d: &cpal::Device, wanted: &str) -> bool {
+    device_name(d).as_deref() == Some(wanted) || d.description().is_ok_and(|desc| desc.name() == wanted)
+}
+
+/// Micrófonos disponibles, primero el predeterminado del sistema.
+pub fn input_devices() -> Vec<MicDevice> {
     let host = cpal::default_host();
+    let default = host.default_input_device().and_then(|d| device_name(&d));
     let Ok(devices) = host.input_devices() else {
         return Vec::new();
     };
-    let mut names: Vec<String> = devices.filter_map(|d| device_name(&d)).collect();
-    names.sort();
-    names.dedup();
-    names
+    let mut list: Vec<MicDevice> = devices
+        .filter_map(|d| device_name(&d))
+        .map(|name| MicDevice { is_default: default.as_deref() == Some(name.as_str()), name })
+        .collect();
+    list.sort_by(|a, b| b.is_default.cmp(&a.is_default).then_with(|| a.name.cmp(&b.name)));
+    list.dedup_by(|a, b| a.name == b.name);
+    list
 }
 
 /// Captura hasta que se suelte el emisor de `stop`. Solo devuelve error si no pudo empezar.
 fn capture(
-    settings: &MicSettings,
+    device_wanted: Option<&str>,
+    params: &Arc<LiveParams>,
     speaking: &Arc<watch::Sender<bool>>,
     level: &Arc<AtomicU32>,
     stop: &mpsc::Receiver<()>,
 ) -> Result<(), String> {
     let host = cpal::default_host();
-    let device = match &settings.device {
+    let device = match device_wanted {
         Some(name) => host
             .input_devices()
             .map_err(|e| format!("no se pudieron listar los micrófonos: {e}"))?
-            .find(|d| device_name(d).as_deref() == Some(name.as_str()))
-            .ok_or_else(|| format!("no se encontró el micrófono «{name}»"))?,
+            .find(|d| matches_device(d, name))
+            .ok_or_else(|| format!("no se encontró el micrófono «{name}»: ¿está conectado?"))?,
         None => host.default_input_device().ok_or("no hay ningún micrófono disponible")?,
     };
     let supported = device.default_input_config().map_err(|e| format!("el micrófono no da su formato: {e}"))?;
     let format = supported.sample_format();
     let config: cpal::StreamConfig = supported.into();
 
-    let mut vad = Vad::new(settings.threshold_db, settings.hold_ms);
+    let opened = device_name(&device).unwrap_or_default();
+    let (threshold_db, hold_ms) = params.load();
+    let mut vad = Vad::new(threshold_db, hold_ms);
     let started = Instant::now();
-    let (speaking, level) = (Arc::clone(speaking), Arc::clone(level));
+    let (speaking, level, params) = (Arc::clone(speaking), Arc::clone(level), Arc::clone(params));
     let mut buf: Vec<f32> = Vec::new();
     let mut on_block = move |samples: &mut dyn Iterator<Item = f32>| {
         buf.clear();
         buf.extend(samples);
+        let (threshold_db, hold_ms) = params.load();
+        vad.set_params(threshold_db, hold_ms);
         let db = rms_db(&buf);
         level.store(db.to_bits(), Ordering::Relaxed);
         let now = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
@@ -249,7 +346,7 @@ fn capture(
     }
     .map_err(|e| format!("no se pudo abrir el micrófono: {e}"))?;
     stream.play().map_err(|e| format!("no se pudo iniciar el micrófono: {e}"))?;
-    tracing::info!(device = settings.device.as_deref().unwrap_or("(predeterminado)"), "micrófono: escuchando");
+    tracing::info!(device = %opened, channels = config.channels, "micrófono: escuchando");
 
     // Hasta que `configure` suelte el emisor.
     let _ = stop.recv();
@@ -346,6 +443,24 @@ mod tests {
     }
 
     #[test]
+    fn device_names_include_the_hardware() {
+        assert_eq!(full_name("Micrófono", Some("Micrófono (Yeti Nano)"), Some("Yeti Nano")), "Micrófono (Yeti Nano)");
+        assert_eq!(full_name("Micrófono", None, Some("Yeti Nano")), "Micrófono (Yeti Nano)");
+        assert_eq!(full_name("Headset (Arctis)", None, Some("Arctis")), "Headset (Arctis)");
+        assert_eq!(full_name("Micrófono", Some(" "), None), "Micrófono");
+    }
+
+    #[test]
+    fn vad_params_change_without_losing_state() {
+        let mut v = Vad::new(-40.0, 500);
+        assert!(!v.feed(-30.0, 0));
+        assert!(v.feed(-30.0, 130));
+        v.set_params(-20.0, 200);
+        assert!(v.feed(-30.0, 200), "-30 ya no llega al umbral, pero el silencio aún no dura 200 ms");
+        assert!(!v.feed(-30.0, 330));
+    }
+
+    #[test]
     fn configure_is_idempotent_and_none_stops_listening() {
         let m = MicMonitor::new();
         m.configure(None);
@@ -354,4 +469,5 @@ mod tests {
         assert_eq!(s.level_db, SILENCE_DB);
     }
 }
+
 

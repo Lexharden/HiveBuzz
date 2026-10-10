@@ -3,7 +3,7 @@
 //! La clave pública con la que se verifican las actualizaciones va en `tauri.conf.json`
 //! (`plugins.updater.pubkey`) y la genera el dueño del repositorio con `tauri signer generate`;
 //! sin ella no se actualiza nada (una actualización sin verificar no se instala jamás). El
-//! repositorio (`usuario/repo`) se elige en Ajustes: no hay nada fijo en el código.
+//! repositorio (`usuario/repo`) es el oficial (`prefs::DEFAULT_UPDATE_REPO`) salvo que se cambie en Ajustes.
 
 use std::sync::Mutex;
 

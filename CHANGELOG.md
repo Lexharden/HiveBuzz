@@ -18,8 +18,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - **Plantillas de reglas**: 13 reglas habituales (agradecimientos por voz, bienvenida, saludos, !discord, !redes,
   !comandos, meta de likes, !di por puntos, !anuncio de moderador) que se añaden con un clic desde *Reglas → Plantillas*.
 - **Reglas**: el editor muestra el coste en puntos (la regla se vuelve una recompensa canjeable).
+- **Actualizaciones**: el repositorio oficial `Lexharden/HiveBuzz` viene configurado por defecto (antes había que escribirlo).
 
 ### Corregido
+- **Micrófono («no hablar encima»)**: los micrófonos se muestran con su nombre completo de Windows
+  («Micrófono (Yeti Nano)», no solo «Micrófono», que era igual para todos y podía abrir otro); el medidor funciona en
+  cuanto se elige el micrófono, sin guardar; la sensibilidad cambia sin reabrirlo; botón para volver a buscar
+  micrófonos y aviso si llega casi en silencio (silenciado o sin volumen de entrada).
 - **TikTok**: el nivel de fan (Fans Club) y el de regalos se leen también de las insignias; en los mensajes de chat
   TikTok no manda `fansClub`/`payGrade`, así que el filtro «Nivel de equipo mínimo» del TTS y de las reglas descartaba a todos.
 - **TikTok**: moderador, suscriptor y seguidor se deducen también de insignias y `followInfo` (likes, follows y entradas
