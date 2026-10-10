@@ -243,11 +243,18 @@ impl TtsService {
             decide_chat(&cfg, ev, &mut mem, now)
         };
         let ChatDecision::Speak { vars, .. } = decision else {
+            if let ChatDecision::Skip(reason) = decision {
+                if ev.kind == crate::events::EventType::Chat {
+                    tracing::debug!(user = %ev.user.unique_id, reason, "TTS: chat no leído");
+                }
+            }
             return;
         };
         let Some(queue) = self.queue.get() else {
+            tracing::warn!("TTS: la cola de acciones no está conectada; el chat no se lee");
             return;
         };
+        let job_user = ev.user.unique_id.clone();
         let job = NewJob {
             rule_id: "tts:chat".into(),
             mode: PlanMode::Sequence,
@@ -258,7 +265,7 @@ impl TtsService {
         };
         match queue.enqueue(job).await {
             Ok(Outcome::Dropped) => tracing::debug!("TTS: cola llena, se descartó un mensaje de chat"),
-            Ok(_) => {}
+            Ok(_) => tracing::debug!(user = %job_user, "TTS: chat encolado"),
             Err(e) => tracing::warn!(error = %e, "TTS: no se pudo encolar un mensaje"),
         }
     }
