@@ -371,7 +371,9 @@ Requisitos de Spotify: la cuenta dueña de una app en modo desarrollo necesita *
    `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; al subir una etiqueta `v*`, `.github/workflows/release.yml`
    construye, firma y publica el release con su `latest.json`
    (`src-tauri/tauri.release.conf.json` activa los artefactos del updater solo en ese flujo).
-4. Por defecto la app busca actualizaciones en `Lexharden/HiveBuzz` (`…/releases/latest/download/latest.json`); en un fork, cambia `usuario/repo` en *Ajustes → Actualizaciones*.
+4. La app busca las versiones en `Lexharden/HiveBuzz` (constante `REPO` en `src-tauri/src/updater.rs`; en un fork,
+   cámbiala). *Ajustes → Actualizaciones* lista los releases y permite instalar cualquiera: cada release lleva su
+   propio `latest.json` firmado. Un release en **borrador** no aparece: hay que publicarlo.
 - Una actualización con firma inválida no se instala jamás. El flujo de CI **no se ha ejecutado** todavía.
 
 ### Bandeja, inicio con Windows y logs

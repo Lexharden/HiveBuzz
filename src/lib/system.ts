@@ -6,7 +6,6 @@ export interface AppPrefs {
   closeToTray: boolean;
   startMinimized: boolean;
   language: "es" | "en";
-  updateRepo: string;
   autoUpdateCheck: boolean;
 }
 
@@ -59,6 +58,19 @@ export interface UpdateInfo {
   version: string | null;
   current: string;
   notes: string | null;
+}
+
+export interface ReleaseInfo {
+  tag: string;
+  version: string;
+  name: string;
+  notes: string;
+  publishedAt: string | null;
+  prerelease: boolean;
+  /** Trae `latest.json` firmado: se instala desde la app. */
+  installable: boolean;
+  url: string;
+  relation: "newer" | "current" | "older" | "unknown";
 }
 
 export interface UpdateProgress {
@@ -145,6 +157,8 @@ export const systemApi = {
 
   checkUpdate: () => invoke<UpdateInfo>("check_update"),
   installUpdate: () => invoke<void>("install_update"),
+  listReleases: () => invoke<ReleaseInfo[]>("list_releases"),
+  prepareRelease: (tag: string) => invoke<UpdateInfo>("prepare_release", { tag }),
 
   spotifyGetConfig: () => invoke<SpotifyConfig>("spotify_get_config"),
   spotifySetConfig: (config: SpotifyConfig) => invoke<SpotifyConfig>("spotify_set_config", { config }),

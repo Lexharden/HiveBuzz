@@ -94,9 +94,9 @@ describe("primeros pasos", () => {
 });
 
 describe("menú", () => {
-  it("las once pantallas aparecen una sola vez, con icono, nombre y explicación en ambos idiomas", () => {
-    expect(ALL_PAGES).toHaveLength(11);
-    expect(new Set(ALL_PAGES).size).toBe(11);
+  it("las doce pantallas aparecen una sola vez, con icono, nombre y explicación en ambos idiomas", () => {
+    expect(ALL_PAGES).toHaveLength(12);
+    expect(new Set(ALL_PAGES).size).toBe(12);
     for (const p of ALL_PAGES) {
       expect(ICONS[p]).toBeTruthy();
       both(`tabs.${p}`);
@@ -114,6 +114,7 @@ describe("ayuda", () => {
   it("cada pantalla documentada tiene explicación y cuatro puntos en ambos idiomas", () => {
     expect(DOCUMENTED).toHaveLength(10);
     expect(DOCUMENTED).not.toContain("help");
+    expect(DOCUMENTED).not.toContain("about");
     for (const p of DOCUMENTED) {
       both(`help.sections.${p}.what`);
       for (const n of [1, 2, 3, 4]) both(`help.sections.${p}.i${n}`);
@@ -158,9 +159,9 @@ describe("recorrido interactivo", () => {
     expect(TOUR.at(-1)?.id).toBe("finish");
   });
 
-  it("recorre todas las partes del menú (menos Inicio, que ya se vio)", () => {
+  it("recorre todas las partes del menú (menos Inicio, que ya se vio, y «Acerca de»)", () => {
     const visited = new Set(TOUR.flatMap((s) => (s.explains ? [s.explains] : s.id === "help" ? ["help"] : [])));
-    for (const p of ALL_PAGES.filter((x) => x !== "dashboard")) expect(visited, p).toContain(p);
+    for (const p of ALL_PAGES.filter((x) => x !== "dashboard" && x !== "about")) expect(visited, p).toContain(p);
   });
 
   it("un paso con condición espera a que se cumpla; sin condición siempre está listo", () => {

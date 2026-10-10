@@ -18,7 +18,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - **Plantillas de reglas**: 13 reglas habituales (agradecimientos por voz, bienvenida, saludos, !discord, !redes,
   !comandos, meta de likes, !di por puntos, !anuncio de moderador) que se añaden con un clic desde *Reglas → Plantillas*.
 - **Reglas**: el editor muestra el coste en puntos (la regla se vuelve una recompensa canjeable).
-- **Actualizaciones**: el repositorio oficial `Lexharden/HiveBuzz` viene configurado por defecto (antes había que escribirlo).
+- **Actualizaciones**: ya no hay que escribir ningún repositorio: las versiones salen siempre del oficial
+  (`Lexharden/HiveBuzz`). *Ajustes → Actualizaciones* lista los releases publicados (nueva / instalada / anterior / beta,
+  con sus notas) y permite instalar cualquiera, también volver a una anterior.
+- **Acerca de**: nueva pantalla con la versión, la comunidad (Discord, YouTube), el desarrollador (web, Instagram,
+  GitHub), el equipo y Ko-fi para apoyar el proyecto.
 
 ### Corregido
 - **Micrófono («no hablar encima»)**: los micrófonos se muestran con su nombre completo de Windows

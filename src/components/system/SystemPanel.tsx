@@ -1,22 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
-import {
-  onUpdateProgress,
-  systemApi as api,
-  type AppPrefs,
-  type BackupSummary,
-  type LogEntry,
-  type ProfileInfo,
-  type UpdateInfo,
-  type UpdateProgress,
-} from "../../lib/system";
+import { systemApi as api, type AppPrefs, type BackupSummary, type LogEntry, type ProfileInfo } from "../../lib/system";
+import { UpdatesCard } from "./UpdatesCard";
 import { Btn, Card, Checkbox, ErrorText, Field, Select, TextInput, useAction } from "../ui";
 
 export function SystemPanel({ onChanged }: { onChanged: () => Promise<void> }) {
   return (
     <div className="space-y-4">
       <PrefsCard onChanged={onChanged} />
+      <UpdatesCard />
       <ProfilesCard />
       <BackupCard />
       <LogsCard />
@@ -28,16 +21,12 @@ function PrefsCard({ onChanged }: { onChanged: () => Promise<void> }) {
   const { t } = useTranslation();
   const [prefs, setPrefs] = useState<AppPrefs | null>(null);
   const [autostart, setAutostart] = useState(false);
-  const [update, setUpdate] = useState<UpdateInfo | null>(null);
-  const [progress, setProgress] = useState<UpdateProgress | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const { run, error, busy } = useAction();
+  const { run, error } = useAction();
 
   useEffect(() => {
     void api.getPrefs().then(setPrefs);
     void api.getAutostart().then(setAutostart).catch(() => undefined);
-    const un = onUpdateProgress(setProgress);
-    return () => void un.then((f) => f());
   }, []);
 
   if (!prefs) return null;
@@ -66,44 +55,9 @@ function PrefsCard({ onChanged }: { onChanged: () => Promise<void> }) {
             onChange={(v) => void run(async () => setAutostart(await api.setAutostart(v)))}
             label={t("system.prefs.autostart")}
           />
+          <Checkbox checked={prefs.autoUpdateCheck} onChange={(autoUpdateCheck) => save({ ...prefs, autoUpdateCheck })} label={t("system.update.auto")} />
         </div>
 
-        <div className="border-t border-zinc-800 pt-3">
-          <h3 className="mb-2 text-xs font-semibold text-zinc-300">{t("system.update.title")}</h3>
-          <div className="grid grid-cols-[1fr_auto] items-end gap-3">
-            <Field label={t("system.update.repo")} hint={t("system.update.repoHint")}>
-              <TextInput value={prefs.updateRepo} onChange={(updateRepo) => setPrefs({ ...prefs, updateRepo })} placeholder="Lexharden/HiveBuzz" />
-            </Field>
-            <Btn disabled={busy} onClick={() => save(prefs)}>
-              {t("system.save")}
-            </Btn>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <Checkbox checked={prefs.autoUpdateCheck} onChange={(autoUpdateCheck) => save({ ...prefs, autoUpdateCheck })} label={t("system.update.auto")} />
-            <Btn
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  setUpdate(await api.checkUpdate());
-                })
-              }
-            >
-              {t("system.update.check")}
-            </Btn>
-            {update && !update.available && <span className="text-xs text-emerald-400">{t("system.update.latest", { version: update.current })}</span>}
-            {update?.available && (
-              <Btn
-                variant="primary"
-                disabled={busy}
-                onClick={() => void run(async () => api.installUpdate())}
-              >
-                {t("system.update.install", { version: update.version })}
-              </Btn>
-            )}
-          </div>
-          {update?.available && update.notes && <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-zinc-950 p-2 text-xs text-zinc-400">{update.notes}</pre>}
-          {progress && <p className="mt-1 text-xs text-zinc-400">{t("system.update.progress", { done: Math.round(progress.downloaded / 1024), total: progress.total ? Math.round(progress.total / 1024) : "?" })}</p>}
-        </div>
         {msg && <p className="text-xs text-emerald-400">{msg}</p>}
         <ErrorText error={error} />
       </div>

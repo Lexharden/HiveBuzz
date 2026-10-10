@@ -1,3 +1,4 @@
+import { AboutPage } from "./components/about/AboutPage";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -39,7 +40,7 @@ function App() {
       .getPrefs()
       .then((p) => {
         if (p.language !== i18n.language) void i18n.changeLanguage(p.language);
-        if (p.autoUpdateCheck && p.updateRepo) {
+        if (p.autoUpdateCheck) {
           void systemApi
             .checkUpdate()
             .then((u) => u.available && setUpdate(u))
@@ -84,6 +85,7 @@ function App() {
         {page === "stats" && <StatsPage />}
         {page === "library" && <LibraryPage info={info} />}
         {page === "tts" && <TtsPage />}
+        {page === "about" && <AboutPage />}
         {page === "help" && <HelpPage onNavigate={setPage} onStartTour={() => setTouring(true)} />}
         {page === "settings" && (
           <div className="min-h-0 flex-1 overflow-y-auto">

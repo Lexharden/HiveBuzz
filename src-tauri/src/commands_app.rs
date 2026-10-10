@@ -142,12 +142,24 @@ pub fn restart_app(app: AppHandle) {
 
 // ---- Actualizaciones ----
 
-use crate::updater::{self, UpdateInfo};
+use crate::updater::{self, ReleaseInfo, UpdateInfo};
 
+/// Busca la última versión publicada.
 #[tauri::command]
 pub async fn check_update(app: AppHandle, state: State<'_, AppState>) -> Result<UpdateInfo> {
-    let repo = state.prefs.get().update_repo;
-    updater::check(&app, &repo, &state.pending_update).await
+    updater::check(&app, None, &state.pending_update).await
+}
+
+/// Versiones publicadas, de la más nueva a la más antigua.
+#[tauri::command]
+pub async fn list_releases(app: AppHandle) -> Result<Vec<ReleaseInfo>> {
+    updater::list_releases(&app.package_info().version.to_string()).await
+}
+
+/// Prepara una versión concreta (también anterior) para instalarla con `install_update`.
+#[tauri::command]
+pub async fn prepare_release(app: AppHandle, state: State<'_, AppState>, tag: String) -> Result<UpdateInfo> {
+    updater::check(&app, Some(&tag), &state.pending_update).await
 }
 
 #[tauri::command]

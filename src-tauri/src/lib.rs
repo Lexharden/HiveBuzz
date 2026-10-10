@@ -236,6 +236,8 @@ pub fn run() {
             commands_app::take_import_notice,
             commands_app::restart_app,
             commands_app::check_update,
+            commands_app::list_releases,
+            commands_app::prepare_release,
             commands_app::install_update,
             commands_twitch::twitch_status,
             commands_twitch::twitch_get_config,

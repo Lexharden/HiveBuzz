@@ -15,7 +15,8 @@
     "interact": "Bot & points",
     "integrations": "Integrations",
     "stats": "Statistics",
-    "help": "Help"
+    "help": "Help",
+    "about": "About"
   },
   "status": {
     "disconnected": "Disconnected",
@@ -854,11 +855,26 @@
     },
     "update": {
       "title": "Updates",
-      "repo": "GitHub repository",
-      "repoHint": "user/repo with the releases. Defaults to the official one (Lexharden/HiveBuzz); empty = official.",
-      "auto": "Check on startup",
-      "check": "Check for updates",
-      "latest": "You're up to date (v{{version}}).",
+      "hint": "Published HiveBuzz versions. Install the newest one or pick any other (including going back to an older one).",
+      "auto": "Check for updates on startup",
+      "check": "Check",
+      "openGithub": "View on GitHub",
+      "newer": "A new version is available: v{{version}}.",
+      "upToDate": "You have the latest version.",
+      "none": "No versions have been published yet.",
+      "rel": {
+        "newer": "new",
+        "current": "installed",
+        "older": "older"
+      },
+      "prerelease": "beta",
+      "manualOnly": "manual download only",
+      "notes": "Notes",
+      "hideNotes": "Hide",
+      "installThis": "Install",
+      "installing": "Installing…",
+      "download": "Download",
+      "confirmOlder": "Install v{{version}}, older than yours? Settings for newer features that didn't exist in that version may be ignored.",
       "install": "Install v{{version}} and restart",
       "banner": "A new version of HiveBuzz is available: v{{version}}.",
       "progress": "Downloading… {{done}} / {{total}} KB"
@@ -926,7 +942,8 @@
     "tts": "Have HiveBuzz read chat messages out loud.",
     "integrations": "Connect OBS, Spotify and other programs.",
     "settings": "Language, start with Windows, backups and updates.",
-    "help": "The interactive tour, what's in each part of the menu and quick answers."
+    "help": "The interactive tour, what's in each part of the menu and quick answers.",
+    "about": "Who makes HiveBuzz, which version you have and where to find the community."
   },
   "platform": {
     "tiktok": "TikTok",
@@ -1310,5 +1327,38 @@
       "desc": "Moderators make the voice read an announcement.",
       "say": "Announcement: {args}"
     }
+  },
+  "about": {
+    "version": "Version {{version}}",
+    "what": "HiveBuzz connects your TikTok and Twitch lives with your stream: gifts, chat and follows become alerts, voice, sounds, overlays and bot replies.",
+    "community": {
+      "title": "Community",
+      "body": "Join the Discord to get help, share your rules and overlays and hear about new features first. YouTube has tutorials and demos.",
+      "discord": "Join the Discord",
+      "youtube": "YouTube channel"
+    },
+    "dev": {
+      "title": "Who makes it",
+      "body": "Hi, I'm Yafel. I design and code HiveBuzz. For news or more projects, visit the website or follow me on Instagram.",
+      "website": "Open the website",
+      "github": "Code on GitHub"
+    },
+    "team": {
+      "title": "Team and thanks",
+      "body": "People who make HiveBuzz possible by testing it, helping in the community and moderating. Thank you!",
+      "openTiktok": "Open their TikTok",
+      "cat": {
+        "dev": "Development and administration",
+        "admins": "Administrators",
+        "support": "Support",
+        "testers": "Testers"
+      }
+    },
+    "support": {
+      "title": "Support the project",
+      "body": "If HiveBuzz helps your stream, a coffee on Ko-fi helps keep improving it. It's optional: the app works the same.",
+      "kofi": "Buy me a coffee"
+    },
+    "footer": "Windows, macOS and Linux · your live → alerts, voice and overlays."
   }
 }

@@ -15,7 +15,8 @@
     "interact": "Bot y puntos",
     "integrations": "Integraciones",
     "stats": "Estadísticas",
-    "help": "Ayuda"
+    "help": "Ayuda",
+    "about": "Acerca de"
   },
   "status": {
     "disconnected": "Desconectado",
@@ -854,11 +855,26 @@
     },
     "update": {
       "title": "Actualizaciones",
-      "repo": "Repositorio de GitHub",
-      "repoHint": "usuario/repo con los releases. Por defecto, el oficial (Lexharden/HiveBuzz); vacío = el oficial.",
-      "auto": "Comprobar al abrir",
-      "check": "Buscar actualización",
-      "latest": "Estás al día (v{{version}}).",
+      "hint": "Versiones publicadas de HiveBuzz. Instala la más nueva o elige cualquier otra (también volver a una anterior).",
+      "auto": "Buscar actualizaciones al abrir",
+      "check": "Buscar",
+      "openGithub": "Ver en GitHub",
+      "newer": "Hay una versión nueva: v{{version}}.",
+      "upToDate": "Tienes la versión más reciente.",
+      "none": "Todavía no hay versiones publicadas.",
+      "rel": {
+        "newer": "nueva",
+        "current": "instalada",
+        "older": "anterior"
+      },
+      "prerelease": "beta",
+      "manualOnly": "solo descarga manual",
+      "notes": "Notas",
+      "hideNotes": "Ocultar",
+      "installThis": "Instalar",
+      "installing": "Instalando…",
+      "download": "Descargar",
+      "confirmOlder": "¿Instalar la v{{version}}, anterior a la tuya? Los ajustes de funciones nuevas que no existían en esa versión pueden ignorarse.",
       "install": "Instalar v{{version}} y reiniciar",
       "banner": "Hay una versión nueva de HiveBuzz: v{{version}}.",
       "progress": "Descargando… {{done}} / {{total}} KB"
@@ -926,7 +942,8 @@
     "tts": "Que HiveBuzz lea en voz alta los mensajes del chat.",
     "integrations": "Conecta OBS, Spotify y otros programas.",
     "settings": "Idioma, inicio con Windows, copias de seguridad y actualizaciones.",
-    "help": "El recorrido interactivo, qué hay en cada parte del menú y respuestas rápidas."
+    "help": "El recorrido interactivo, qué hay en cada parte del menú y respuestas rápidas.",
+    "about": "Quién hace HiveBuzz, qué versión tienes y dónde encontrar la comunidad."
   },
   "platform": {
     "tiktok": "TikTok",
@@ -1310,5 +1327,38 @@
       "desc": "Los moderadores hacen que la voz lea un anuncio.",
       "say": "Anuncio: {args}"
     }
+  },
+  "about": {
+    "version": "Versión {{version}}",
+    "what": "HiveBuzz conecta tus directos de TikTok y Twitch con tu stream: regalos, chat y follows se convierten en alertas, voz, sonidos, overlays y respuestas del bot.",
+    "community": {
+      "title": "Comunidad",
+      "body": "Únete al Discord para pedir ayuda, compartir tus reglas y overlays y enterarte antes de las novedades. En YouTube hay tutoriales y demostraciones.",
+      "discord": "Unirme al Discord",
+      "youtube": "Canal de YouTube"
+    },
+    "dev": {
+      "title": "Quién lo hace",
+      "body": "Hola, soy Yafel. Diseño y programo HiveBuzz. Si quieres novedades o más proyectos, pásate por la web o sígueme en Instagram.",
+      "website": "Abrir la web",
+      "github": "Código en GitHub"
+    },
+    "team": {
+      "title": "Equipo y agradecimientos",
+      "body": "Gente que hace posible HiveBuzz probándolo, ayudando en la comunidad y moderando. ¡Gracias!",
+      "openTiktok": "Abrir su TikTok",
+      "cat": {
+        "dev": "Desarrollo y administración",
+        "admins": "Administradores",
+        "support": "Soporte",
+        "testers": "Testers"
+      }
+    },
+    "support": {
+      "title": "Apoyar el proyecto",
+      "body": "Si HiveBuzz te sirve en el stream, un café en Ko-fi ayuda a seguir mejorándolo. No es obligatorio: el programa se usa igual.",
+      "kofi": "Invitar un café"
+    },
+    "footer": "Windows, macOS y Linux · tu live → alertas, voz y overlays."
   }
 }
