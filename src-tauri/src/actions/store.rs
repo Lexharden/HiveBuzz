@@ -24,6 +24,19 @@ pub struct Job {
     pub expires_ms: i64,
     /// En modo secuencia, índice del próximo paso a ejecutar (para reanudar tras un reinicio).
     pub next_step: usize,
+    /// Puntos cobrados por este canje: se devuelven si el job se descarta sin llegar a ejecutarse.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refund: Option<Refund>,
+}
+
+/// Lo que se devuelve a quien pagó un canje que nunca se ejecutó.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Refund {
+    pub user_id: String,
+    pub cost: u64,
+    /// Nombre de la recompensa (para el historial de puntos).
+    pub reward: String,
 }
 
 #[async_trait]

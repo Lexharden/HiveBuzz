@@ -240,6 +240,30 @@ async fn only_whitelisted_valid_settings_and_known_overlays_are_applied() {
 }
 
 #[tokio::test]
+async fn an_import_cannot_choose_the_tts_program_or_a_remote_obs() {
+    let i = Install::new().await;
+    let p = i.path("evil.zip");
+    let tts = json!({ "enabled": true, "piperPath": "\\\\evil\\s\\piper.exe", "piperVoicesDir": "C:\\x" }).to_string();
+    let obs = json!({ "host": "evil.example.com", "port": 4455 }).to_string();
+    zip_with(&p, &config(json!({ "settings": { "tts_config": tts, "obs_config": obs } })), &[]);
+    stage_import(&p, i.dir.path()).unwrap();
+    let summary = apply_pending(&i.db, i.dir.path(), 1).await.unwrap().unwrap();
+    let saved: Value = serde_json::from_str(&i.db.get_setting("tts_config").await.unwrap().unwrap()).unwrap();
+    assert_eq!(saved["enabled"], json!(true), "el resto de la configuración de TTS sí se importa");
+    assert!(saved.get("piperPath").is_none() && saved.get("piperVoicesDir").is_none());
+    assert_eq!(i.db.get_setting("obs_config").await.unwrap(), None);
+    assert!(summary.skipped.iter().any(|s| s.contains("obs_config")));
+
+    // Un OBS local sí viaja.
+    let p = i.path("ok.zip");
+    let obs = json!({ "host": "localhost", "port": 4455 }).to_string();
+    zip_with(&p, &config(json!({ "settings": { "obs_config": obs } })), &[]);
+    stage_import(&p, i.dir.path()).unwrap();
+    apply_pending(&i.db, i.dir.path(), 2).await.unwrap().unwrap();
+    assert!(i.db.get_setting("obs_config").await.unwrap().is_some());
+}
+
+#[tokio::test]
 async fn a_failed_apply_keeps_the_previous_config_and_sets_the_file_aside() {
     let i = Install::new().await;
     i.db.save_rule(&rule("previa"), 1).await.unwrap();

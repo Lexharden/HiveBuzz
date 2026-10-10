@@ -132,7 +132,9 @@ pub async fn export(db: &Db, data_dir: &Path, dest: &Path, version: &str, now_ms
     let mut settings = BTreeMap::new();
     for key in SETTINGS_KEYS {
         if let Some(v) = db.get_setting(key).await? {
-            settings.insert(key.to_string(), v);
+            if let Some(v) = portable_setting(key, &v) {
+                settings.insert(key.to_string(), v);
+            }
         }
     }
     let mut overlays = Map::new();
@@ -263,6 +265,29 @@ pub fn inspect(path: &Path) -> Result<(Bundle, Vec<String>)> {
     Ok((bundle, skipped))
 }
 
+/// Campos de un ajuste que dependen de este equipo y no deben viajar en un archivo:
+/// las rutas de Piper (son el programa que se ejecuta para el TTS) y un OBS que no sea local
+/// (la contraseña del llavero se usaría contra ese equipo). `None` = descartar el ajuste entero.
+fn portable_setting(key: &str, json: &str) -> Option<String> {
+    let mut v: Value = serde_json::from_str(json).ok()?;
+    match key {
+        "tts_config" => {
+            if let Some(o) = v.as_object_mut() {
+                o.remove("piperPath");
+                o.remove("piperVoicesDir");
+            }
+        }
+        "obs_config" => {
+            let host = v.get("host").and_then(Value::as_str).unwrap_or("127.0.0.1").trim().to_ascii_lowercase();
+            if !matches!(host.as_str(), "127.0.0.1" | "localhost" | "::1" | "[::1]") {
+                return None;
+            }
+        }
+        _ => return Some(json.to_string()),
+    }
+    serde_json::to_string(&v).ok()
+}
+
 fn sanitize(b: &mut Bundle, archive: &mut zip::ZipArchive<File>, skipped: &mut Vec<String>) -> Result<()> {
     // Ajustes: lista blanca, JSON válido y tamaño razonable.
     b.settings.retain(|k, v| {
@@ -272,6 +297,20 @@ fn sanitize(b: &mut Bundle, archive: &mut zip::ZipArchive<File>, skipped: &mut V
         }
         ok
     });
+    // Nada del archivo puede elegir qué programa se ejecuta ni a qué equipo se conecta OBS.
+    let keys: Vec<String> = b.settings.keys().cloned().collect();
+    for k in keys {
+        let portable = b.settings.get(&k).and_then(|v| portable_setting(&k, v));
+        match portable {
+            Some(v) => {
+                b.settings.insert(k, v);
+            }
+            None => {
+                b.settings.remove(&k);
+                skipped.push(format!("ajuste «{k}» descartado (apunta fuera de este equipo)"));
+            }
+        }
+    }
 
     let mut seen = HashSet::new();
     for r in &b.rules {

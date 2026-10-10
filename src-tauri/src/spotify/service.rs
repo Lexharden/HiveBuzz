@@ -374,6 +374,12 @@ impl SongService {
                 self.apply_playing(None);
                 POLL_DISCONNECTED
             }
+            // No se arregla solo (cuenta no registrada en la app): que el overlay no se quede con la última canción.
+            Err(e @ ApiError::Forbidden) => {
+                tracing::warn!(error = %e, "Spotify rechaza las consultas");
+                self.apply_playing(None);
+                POLL_ERROR
+            }
             Err(e) => {
                 tracing::debug!(error = %e, "no se pudo consultar Spotify");
                 POLL_ERROR

@@ -88,7 +88,8 @@ pub async fn check<R: Runtime>(app: &AppHandle<R>, repo: &str, pending: &Pending
 }
 
 /// Descarga e instala la actualización encontrada con `check` y reinicia la app.
-pub async fn install<R: Runtime>(app: &AppHandle<R>, pending: &PendingUpdate) -> Result<()> {
+/// `before_install` se espera tras la descarga y justo antes de instalar (guardar el estado).
+pub async fn install<R: Runtime>(app: &AppHandle<R>, pending: &PendingUpdate, before_install: impl std::future::Future<Output = ()>) -> Result<()> {
     let update = pending
         .0
         .lock()
@@ -97,8 +98,8 @@ pub async fn install<R: Runtime>(app: &AppHandle<R>, pending: &PendingUpdate) ->
         .ok_or_else(|| AppError::Invalid("no hay ninguna actualización pendiente: comprueba primero".into()))?;
     let mut downloaded = 0u64;
     let handle = app.clone();
-    update
-        .download_and_install(
+    let bytes = update
+        .download(
             move |chunk, total| {
                 downloaded += chunk as u64;
                 let _ = handle.emit(EVT_UPDATE_PROGRESS, UpdateProgress { downloaded, total });
@@ -106,7 +107,9 @@ pub async fn install<R: Runtime>(app: &AppHandle<R>, pending: &PendingUpdate) ->
             || {},
         )
         .await
-        .map_err(|e| AppError::Invalid(format!("no se pudo instalar la actualización: {e}")))?;
+        .map_err(|e| AppError::Invalid(format!("no se pudo descargar la actualización: {e}")))?;
+    before_install.await;
+    update.install(bytes).map_err(|e| AppError::Invalid(format!("no se pudo instalar la actualización: {e}")))?;
     app.restart();
 }
 

@@ -14,7 +14,7 @@ use serde_json::{Map, Value};
 use tokio::sync::Notify;
 
 use super::clock::Clock;
-use super::store::{Job, JobStore};
+use super::store::{Job, JobStore, Refund};
 use super::{ActionContext, Concurrency, ExecutorRegistry};
 use crate::error::Result;
 use crate::rules::model::{PlanMode, Step};
@@ -49,6 +49,8 @@ pub struct NewJob {
     pub vars: Vars,
     pub priority: i32,
     pub ttl_ms: u64,
+    /// Puntos cobrados por el canje (se devuelven si se descarta sin ejecutarse).
+    pub refund: Option<Refund>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +85,8 @@ struct JobRt {
     job: Job,
     /// Pasos aún sin terminar (modo paralelo).
     remaining: usize,
+    /// Algún paso llegó a ejecutarse (entonces ya no se devuelven los puntos).
+    started: bool,
 }
 
 #[derive(Default)]
@@ -110,7 +114,10 @@ struct RunItem {
 struct StoreOps {
     delete: Vec<String>,
     progress: Vec<(String, usize)>,
+    refunds: Vec<Refund>,
 }
+
+pub type DiscardHook = Arc<dyn Fn(Refund) + Send + Sync>;
 
 struct Shared {
     state: Mutex<State>,
@@ -119,6 +126,7 @@ struct Shared {
     store: Arc<dyn JobStore>,
     clock: Arc<dyn Clock>,
     cfg: QueueConfig,
+    on_discard: std::sync::OnceLock<DiscardHook>,
 }
 
 pub struct ActionQueue {
@@ -140,9 +148,18 @@ impl ActionQueue {
             store,
             clock,
             cfg,
+            on_discard: std::sync::OnceLock::new(),
         });
         tokio::spawn(dispatch_loop(Arc::clone(&shared)));
         Self { shared }
+    }
+
+    /// Quién devuelve los puntos de un canje que se descarta (por caducar, por desplazarlo otro
+    /// de más prioridad o al vaciar la cola) sin que ninguno de sus pasos llegara a ejecutarse.
+    pub fn on_discard(&self, hook: DiscardHook) {
+        if self.shared.on_discard.set(hook).is_err() {
+            tracing::warn!("el reembolso de la cola ya estaba conectado");
+        }
     }
 
     pub async fn enqueue(&self, new: NewJob) -> Result<Outcome> {
@@ -161,32 +178,47 @@ impl ActionQueue {
             created_ms: now,
             expires_ms: now.saturating_add(i64::try_from(new.ttl_ms).unwrap_or(i64::MAX)),
             next_step: 0,
+            refund: new.refund,
         };
         let initial = match job.mode {
             PlanMode::Sequence => 1,
             PlanMode::Parallel => job.steps.len(),
         };
 
+        // Se persiste ANTES de que el despachador pueda verlo: si no, un paso rápido podría
+        // terminar y borrarse antes de guardarse, y el registro huérfano se repetiría al reiniciar.
+        // Un fallo no impide ejecutar en memoria.
+        if let Err(e) = s.store.save(&job).await {
+            tracing::warn!(error = %e, "no se pudo persistir el job");
+        }
         let mut ops = StoreOps::default();
-        {
+        let dropped = {
             let mut st = s.lock();
             // Hacer sitio desplazando lo de menor prioridad, si el recién llegado vale más.
+            let mut dropped = false;
             while st.pending.len() + initial > s.cfg.max_pending {
                 let Some((_, entry)) = st.pending.iter().next_back() else {
                     break;
                 };
                 if job.priority <= entry.priority {
-                    return Ok(Outcome::Dropped);
+                    dropped = true;
+                    break;
                 }
                 let victim = entry.job_id.clone();
                 cancel_job(&mut st, &victim, &mut ops);
             }
-            s.insert_job(&mut st, job.clone(), job.next_step, now);
+            if !dropped {
+                s.insert_job(&mut st, job.clone(), job.next_step, now);
+            }
+            dropped
+        };
+        if dropped {
+            // Quien encola recibe `Dropped` y devuelve él los puntos (no se devuelven dos veces).
+            ops.delete.push(job.id.clone());
         }
-        // Persistir fuera del cerrojo; un fallo no impide ejecutar en memoria.
         s.apply_ops(ops).await;
-        if let Err(e) = s.store.save(&job).await {
-            tracing::warn!(error = %e, "no se pudo persistir el job");
+        if dropped {
+            return Ok(Outcome::Dropped);
         }
         s.notify.notify_one();
         Ok(Outcome::Queued)
@@ -201,6 +233,13 @@ impl ActionQueue {
         for job in jobs {
             if job.expires_ms <= now || job.steps.is_empty() || job.next_step >= job.steps.len() {
                 let _ = s.store.delete(&job.id).await;
+                // Caducó con la app cerrada: una secuencia sin avanzar no llegó a ejecutarse.
+                // En paralelo no se sabe si algún paso corrió, así que no se devuelve.
+                if job.expires_ms <= now && job.mode == PlanMode::Sequence && job.next_step == 0 {
+                    if let Some(r) = job.refund {
+                        s.refund(r);
+                    }
+                }
                 continue;
             }
             let next = job.next_step;
@@ -241,11 +280,14 @@ impl ActionQueue {
     }
 }
 
-/// Quita un job y todos sus pasos en espera.
+/// Quita un job y todos sus pasos en espera. Si no llegó a ejecutar nada, devuelve sus puntos.
 fn cancel_job(st: &mut State, job_id: &str, ops: &mut StoreOps) {
     st.pending.retain(|_, e| e.job_id != job_id);
-    if st.jobs.remove(job_id).is_some() {
+    if let Some(rt) = st.jobs.remove(job_id) {
         ops.delete.push(job_id.to_string());
+        if !rt.started {
+            ops.refunds.extend(rt.job.refund);
+        }
     }
 }
 
@@ -269,7 +311,9 @@ impl Shared {
         for i in &indices {
             self.push_entry(st, &job, *i, now);
         }
-        st.jobs.insert(job.id.clone(), JobRt { job, remaining });
+        // Restaurado a mitad de una secuencia: ya se ejecutó algo.
+        let started = from > 0;
+        st.jobs.insert(job.id.clone(), JobRt { job, remaining, started });
     }
 
     fn push_entry(&self, st: &mut State, job: &Job, step: usize, now: i64) {
@@ -286,7 +330,17 @@ impl Shared {
         st.pending.insert((Reverse(job.priority), st.seq), entry);
     }
 
+    fn refund(&self, r: Refund) {
+        match self.on_discard.get() {
+            Some(hook) => hook(r),
+            None => tracing::warn!(user = %r.user_id, cost = r.cost, "canje descartado sin nadie que devuelva los puntos"),
+        }
+    }
+
     async fn apply_ops(&self, ops: StoreOps) {
+        for r in ops.refunds {
+            self.refund(r);
+        }
         for id in ops.delete {
             if let Err(e) = self.store.delete(&id).await {
                 tracing::warn!(error = %e, %id, "no se pudo borrar el job persistido");
@@ -349,9 +403,10 @@ impl Shared {
         let Some(entry) = st.pending.remove(&key) else {
             return (None, wake_at, ops);
         };
-        let Some(rt) = st.jobs.get(&entry.job_id) else {
+        let Some(rt) = st.jobs.get_mut(&entry.job_id) else {
             return (None, Some(now), ops); // huérfana: reintenta de inmediato
         };
+        rt.started = true;
         let Some(step) = rt.job.steps.get(entry.step) else {
             return (None, Some(now), ops);
         };

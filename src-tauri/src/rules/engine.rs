@@ -14,6 +14,7 @@ use super::template::{event_vars, Vars};
 use super::validate_rule;
 use crate::actions::clock::Clock;
 use crate::actions::queue::{ActionQueue, NewJob, Outcome};
+use crate::actions::store::Refund;
 use crate::actions::ExecutorRegistry;
 use crate::bus::EventBus;
 use crate::db::Db;
@@ -258,6 +259,7 @@ impl RuleEngine {
                 vars: vars.clone(),
                 priority: rule.priority.unwrap_or(30),
                 ttl_ms: rule.ttl_ms,
+                refund: None,
             };
             let ok = matches!(self.queue.enqueue(job).await, Ok(Outcome::Queued));
             if ok {
@@ -372,6 +374,8 @@ impl RuleEngine {
                     vars: vars.clone(),
                     priority: rule.priority.unwrap_or(priority_hint),
                     ttl_ms: rule.ttl_ms,
+                    // Si la cola lo descarta más tarde sin ejecutarlo, ella devuelve los puntos.
+                    refund: paid.zip(user).map(|((cost, _), u)| Refund { user_id: u.id.clone(), cost, reward: rule.name.clone() }),
                 };
                 let ok = match self.queue.enqueue(job).await {
                     Ok(Outcome::Queued) => {
@@ -439,6 +443,7 @@ impl RuleEngine {
                 vars,
                 priority,
                 ttl_ms: rule.ttl_ms,
+                refund: None,
             })
             .await
     }

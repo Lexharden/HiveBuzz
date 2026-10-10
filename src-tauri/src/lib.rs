@@ -69,7 +69,12 @@ fn init_tracing() {
 pub fn run() {
     init_tracing();
 
-    let result = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // Debe ir primero: una segunda instancia abriría la misma base de datos, otro sidecar y otra
+    // conexión, y repetiría las acciones pendientes de la cola. En su lugar se muestra la ventana.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_main(app)));
+    let result = builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -77,7 +82,11 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .on_window_event(|window, event| {
             // Con «cerrar a la bandeja» la ventana solo se oculta; se sale desde el menú de la bandeja.
+            // Solo la ventana principal: la de inicio de sesión de TikTok debe cerrarse de verdad.
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() != "main" {
+                    return;
+                }
                 let to_tray = window.try_state::<AppState>().is_some_and(|s| s.prefs.get().close_to_tray);
                 if to_tray {
                     api.prevent_close();

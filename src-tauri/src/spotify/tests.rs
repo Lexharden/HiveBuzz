@@ -310,6 +310,26 @@ async fn a_revoked_grant_forgets_the_session() {
     assert_eq!(auth.access_token().await, Err(ApiError::NotConnected));
 }
 
+#[tokio::test]
+async fn an_invalid_refresh_token_also_forgets_the_session() {
+    // Spotify no dice «revoked» aquí: el código `invalid_grant` es lo que cuenta.
+    let (base, _) = fake_server(Box::new(|_| (400, vec![], json!({ "error": "invalid_grant", "error_description": "Invalid refresh token" }).to_string()))).await;
+    let (auth, store, _) = auth_with(&format!("{base}/t"));
+    store.set(KEY_SPOTIFY_REFRESH, "RT").unwrap();
+    assert_eq!(auth.access_token().await, Err(ApiError::NotConnected));
+    assert!(!auth.is_connected());
+}
+
+#[tokio::test]
+async fn changing_the_client_id_forgets_the_old_session() {
+    let (auth, store, _) = auth_with("http://127.0.0.1:9/t");
+    store.set(KEY_SPOTIFY_REFRESH, "RT").unwrap();
+    auth.set_client_id("cid123"); // mismo valor que ya tenía: nada cambia
+    assert!(auth.is_connected());
+    auth.set_client_id("otra-app");
+    assert!(!auth.is_connected());
+}
+
 // ------------------------------------------------------------ API HTTP
 
 async fn http_api(handler: Handler) -> (HttpSpotify, Arc<StdMutex<Vec<Req>>>) {

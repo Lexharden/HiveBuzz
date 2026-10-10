@@ -152,5 +152,6 @@ pub async fn check_update(app: AppHandle, state: State<'_, AppState>) -> Result<
 
 #[tauri::command]
 pub async fn install_update(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
-    updater::install(&app, &state.pending_update).await
+    // En Windows el instalador cierra el proceso sin pasar por `RunEvent::Exit`: se guarda antes.
+    updater::install(&app, &state.pending_update, state.persist()).await
 }

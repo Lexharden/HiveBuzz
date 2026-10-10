@@ -263,13 +263,15 @@ impl TwitchAuth {
             if status.is_success() {
                 match serde_json::from_str::<TokenResponse>(&text) {
                     Ok(t) if t.refresh_token.as_deref().is_some_and(|r| !r.is_empty()) => {
+                        // Si entretanto se canceló o se cerró sesión, no se resucita la sesión.
+                        if !self.still_current(attempt) {
+                            return;
+                        }
                         if let Err(e) = self.secrets.set(KEY_TWITCH_REFRESH, t.refresh_token.as_deref().unwrap_or("")) {
                             self.finish(attempt, LoginState::Failed { reason: format!("no se pudo guardar la sesión: {e}") });
                             return;
                         }
-                        if self.still_current(attempt) {
-                            self.store_access(&t);
-                        }
+                        self.store_access(&t);
                         self.finish(attempt, LoginState::Done);
                     }
                     _ => self.finish(attempt, LoginState::Failed { reason: "Twitch no devolvió una sesión válida".into() }),

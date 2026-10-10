@@ -92,10 +92,15 @@ impl SpotifyAuth {
     pub fn set_client_id(&self, id: &str) {
         let mut cur = self.client_id.write().unwrap_or_else(PoisonError::into_inner);
         if *cur != id {
+            // Otro Client ID = otra app de Spotify: los tokens anteriores ya no sirven. El primer
+            // valor (al arrancar, desde vacío) no cuenta como cambio.
+            let changed = !cur.is_empty();
             *cur = id.to_string();
-            // Otro Client ID = otra app de Spotify: los tokens anteriores ya no sirven.
             drop(cur);
             self.lock().access = None;
+            if changed {
+                let _ = self.secrets.delete(KEY_SPOTIFY_REFRESH);
+            }
         }
     }
 
@@ -186,11 +191,15 @@ impl SpotifyAuth {
         let status = resp.status();
         let text = resp.text().await.map_err(|e| ApiError::Other(e.without_url().to_string()))?;
         if !status.is_success() {
-            // El cuerpo de error de Spotify (`error_description`) es seguro de mostrar; los tokens nunca van ahí.
-            let why = serde_json::from_str::<serde_json::Value>(&text)
-                .ok()
-                .and_then(|v| v.get("error_description").or_else(|| v.get("error")).and_then(|x| x.as_str().map(str::to_string)))
-                .unwrap_or_else(|| status.to_string());
+            // El cuerpo de error de Spotify (`error` + `error_description`) es seguro de mostrar; los
+            // tokens nunca van ahí. Se conserva el código (`invalid_grant`) porque decide si se olvida la sesión.
+            let body = serde_json::from_str::<serde_json::Value>(&text).ok();
+            let field = |k: &str| body.as_ref().and_then(|v| v.get(k)).and_then(|x| x.as_str()).filter(|s| !s.is_empty());
+            let why = match (field("error"), field("error_description")) {
+                (Some(code), Some(desc)) => format!("{code}: {desc}"),
+                (Some(s), None) | (None, Some(s)) => s.to_string(),
+                (None, None) => status.to_string(),
+            };
             return Err(ApiError::Other(why));
         }
         serde_json::from_str(&text).map_err(|_| ApiError::Other("respuesta de token ilegible".into()))

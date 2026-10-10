@@ -116,6 +116,27 @@ pub fn ensure_overlay_token(store: &dyn SecretStore) -> Result<String> {
     Ok(token)
 }
 
+/// Como `ensure_overlay_token`, pero si el llavero no está disponible (p. ej. Linux sin Secret
+/// Service) el token se guarda en `fallback` en vez de impedir que la app arranque. El token solo
+/// protege el servidor local y ya viaja en las URLs de los overlays, así que un archivo basta.
+pub fn overlay_token_with_fallback(store: &dyn SecretStore, fallback: &std::path::Path) -> Result<String> {
+    match ensure_overlay_token(store) {
+        Ok(t) => Ok(t),
+        Err(e) => {
+            tracing::warn!(error = %e, "llavero no disponible; el token de los overlays se guarda en un archivo");
+            if let Ok(t) = std::fs::read_to_string(fallback) {
+                let t = t.trim();
+                if t.len() >= 32 && t.chars().all(|c| c.is_ascii_hexdigit()) {
+                    return Ok(t.to_string());
+                }
+            }
+            let token = generate_token();
+            std::fs::write(fallback, &token)?;
+            Ok(token)
+        }
+    }
+}
+
 /// 32 bytes aleatorios en hexadecimal.
 pub fn generate_token() -> String {
     let bytes: [u8; 32] = rand::random();
@@ -133,6 +154,32 @@ mod tests {
         assert_eq!(a.len(), 64);
         assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
         assert_ne!(a, b);
+    }
+
+    struct BrokenStore;
+    impl SecretStore for BrokenStore {
+        fn get(&self, _: &str) -> Result<Option<String>> {
+            Err(AppError::Invalid("sin llavero".into()))
+        }
+        fn set(&self, _: &str, _: &str) -> Result<()> {
+            Err(AppError::Invalid("sin llavero".into()))
+        }
+        fn delete(&self, _: &str) -> Result<()> {
+            Err(AppError::Invalid("sin llavero".into()))
+        }
+    }
+
+    #[test]
+    fn without_a_keyring_the_overlay_token_lives_in_a_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("overlay-token");
+        let a = overlay_token_with_fallback(&BrokenStore, &file).unwrap();
+        let b = overlay_token_with_fallback(&BrokenStore, &file).unwrap();
+        assert_eq!(a, b, "se reutiliza entre arranques");
+        assert_eq!(a.len(), 64);
+        // Con llavero funcionando, el archivo no se usa.
+        let store = MemoryStore::default();
+        assert_ne!(overlay_token_with_fallback(&store, &file).unwrap(), a);
     }
 
     #[test]

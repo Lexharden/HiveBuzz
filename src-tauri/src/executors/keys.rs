@@ -21,6 +21,9 @@ use crate::error::{AppError, Result};
 const MAX_HOLD_MS: u64 = 10_000;
 const MAX_GAP_MS: u64 = 5_000;
 const MAX_CHORDS: usize = 20;
+/// Duración máxima de toda la secuencia: muy por debajo del tiempo máximo de una acción en la cola.
+/// Si la cola la abortara, el hilo bloqueante seguiría pulsando teclas mientras empieza la siguiente.
+const MAX_TOTAL_MS: u64 = 60_000;
 const MAX_TARGETS: usize = 20;
 
 /// Ventana en primer plano.
@@ -177,9 +180,10 @@ impl ActionExecutor for PressKeysExecutor {
     }
 
     fn validate(&self, params: &Map<String, Value>) -> Result<()> {
-        parse_keys(params)?;
-        ms(params, "holdMs", 50, MAX_HOLD_MS)?;
-        ms(params, "gapMs", 50, MAX_GAP_MS)?;
+        let chords = parse_keys(params)?;
+        let hold = ms(params, "holdMs", 50, MAX_HOLD_MS)?;
+        let gap = ms(params, "gapMs", 50, MAX_GAP_MS)?;
+        check_total(chords.len(), hold, gap)?;
         let any = opt_bool(params, "anyWindow", false)?;
         if parse_targets(params)?.is_empty() && !any {
             return Err(AppError::Invalid(
@@ -191,8 +195,9 @@ impl ActionExecutor for PressKeysExecutor {
 
     async fn execute(&self, _ctx: &ActionContext, params: &Map<String, Value>) -> Result<()> {
         let chords = parse_keys(params)?;
-        let hold = Duration::from_millis(ms(params, "holdMs", 50, MAX_HOLD_MS)?);
-        let gap = Duration::from_millis(ms(params, "gapMs", 50, MAX_GAP_MS)?);
+        let (hold_ms, gap_ms) = (ms(params, "holdMs", 50, MAX_HOLD_MS)?, ms(params, "gapMs", 50, MAX_GAP_MS)?);
+        check_total(chords.len(), hold_ms, gap_ms)?;
+        let (hold, gap) = (Duration::from_millis(hold_ms), Duration::from_millis(gap_ms));
         let targets = parse_targets(params)?;
         let any = opt_bool(params, "anyWindow", false)?;
         if targets.is_empty() && !any {
@@ -353,6 +358,19 @@ mod win {
     }
 }
 
+fn check_total(chords: usize, hold_ms: u64, gap_ms: u64) -> Result<()> {
+    let n = chords as u64;
+    let total = n * hold_ms + n.saturating_sub(1) * gap_ms;
+    if total > MAX_TOTAL_MS {
+        return Err(AppError::Invalid(format!(
+            "la secuencia de teclas duraría {} s; el máximo es {} s (menos teclas, o menos tiempo pulsadas o entre ellas)",
+            total.div_ceil(1000),
+            MAX_TOTAL_MS / 1000
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -410,6 +428,10 @@ mod tests {
         assert!(e.validate(&obj(json!({"keys": "f5", "targetWindows": ["obs"], "holdMs": 999_999}))).is_err());
         assert!(e.validate(&obj(json!({"keys": "zz", "anyWindow": true}))).is_err());
         assert!(e.validate(&obj(json!({"targetWindows": ["obs"]}))).is_err());
+        // 20 combinaciones × 10 s: cada valor es válido, pero el total no.
+        let many: Vec<&str> = vec!["f5"; 20];
+        assert!(e.validate(&obj(json!({"keys": many, "anyWindow": true, "holdMs": 10_000}))).is_err());
+        assert!(e.validate(&obj(json!({"keys": many, "anyWindow": true, "holdMs": 1_000, "gapMs": 1_000}))).is_ok());
     }
 
     struct Fake {

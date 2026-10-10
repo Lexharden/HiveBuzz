@@ -146,7 +146,7 @@ impl AppState {
             }
         };
         let secrets: Arc<dyn SecretStore> = Arc::new(KeyringStore);
-        let overlay_token = secrets::ensure_overlay_token(secrets.as_ref())?;
+        let overlay_token = secrets::overlay_token_with_fallback(secrets.as_ref(), &data_dir.join("overlay-token"))?;
 
         let clock: Arc<dyn Clock> = Arc::new(AppClock::new());
         let bus = EventBus::new(2048);
@@ -300,6 +300,18 @@ impl AppState {
             Ok(n) => tracing::info!(restored = n, "acciones pendientes recuperadas"),
             Err(e) => tracing::warn!(error = %e, "no se pudieron recuperar las acciones pendientes"),
         }
+        // Canjes descartados por la cola sin llegar a ejecutarse: se devuelven los puntos.
+        {
+            let points = Arc::clone(&points);
+            queue.on_discard(Arc::new(move |r| {
+                let points = Arc::clone(&points);
+                tokio::spawn(async move {
+                    if let Err(e) = points.refund(&r.user_id, r.cost, &r.reward).await {
+                        tracing::error!(reward = %r.reward, error = %e, "no se pudieron devolver los puntos de un canje descartado");
+                    }
+                });
+            }));
+        }
         tts.attach_queue(Arc::clone(&queue));
         wheel.attach_queue(Arc::clone(&queue));
         let rules = RuleEngine::new(db.clone(), Arc::clone(&queue), registry.clone(), Arc::clone(&clock));
@@ -414,27 +426,28 @@ impl AppState {
         self.audio.stop_all();
         self.queue.shutdown();
         self.sidecar.shutdown();
-        let (goals, timers, board, points, stats) =
-            (Arc::clone(&self.goals), Arc::clone(&self.timers), Arc::clone(&self.leaderboard), Arc::clone(&self.points), Arc::clone(&self.stats));
-        // Mejor esfuerzo y con tope de tiempo: cerrar la app no debe quedarse esperando a la base de datos.
-        tauri::async_runtime::block_on(async move {
-            let flush = async {
-                goals.flush().await;
-                timers.flush().await;
-                if let Err(e) = points.flush().await {
-                    tracing::warn!(error = %e, "no se pudieron guardar los puntos pendientes");
-                }
-                if let Err(e) = stats.flush().await {
-                    tracing::warn!(error = %e, "no se pudieron guardar las estadísticas pendientes");
-                }
-                if let Err(e) = board.flush().await {
-                    tracing::warn!(error = %e, "no se pudieron guardar las donaciones pendientes");
-                }
-            };
-            if tokio::time::timeout(SHUTDOWN_FLUSH_TIMEOUT, flush).await.is_err() {
-                tracing::warn!("se agotó el tiempo guardando el estado al cerrar");
+        tauri::async_runtime::block_on(self.persist());
+    }
+
+    /// Vuelca a SQLite lo que vive en memoria (metas, timers, puntos, estadísticas, donaciones).
+    /// Mejor esfuerzo y con tope de tiempo: cerrar o actualizar no debe quedarse esperando a la base de datos.
+    pub async fn persist(&self) {
+        let flush = async {
+            self.goals.flush().await;
+            self.timers.flush().await;
+            if let Err(e) = self.points.flush().await {
+                tracing::warn!(error = %e, "no se pudieron guardar los puntos pendientes");
             }
-        });
+            if let Err(e) = self.stats.flush().await {
+                tracing::warn!(error = %e, "no se pudieron guardar las estadísticas pendientes");
+            }
+            if let Err(e) = self.leaderboard.flush().await {
+                tracing::warn!(error = %e, "no se pudieron guardar las donaciones pendientes");
+            }
+        };
+        if tokio::time::timeout(SHUTDOWN_FLUSH_TIMEOUT, flush).await.is_err() {
+            tracing::warn!("se agotó el tiempo guardando el estado al cerrar");
+        }
     }
 }
 

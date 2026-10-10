@@ -83,7 +83,7 @@ fn step(kind: &str, label: &str, delay_ms: u64) -> Step {
 }
 
 fn job(steps: Vec<Step>, mode: PlanMode, priority: i32, ttl_ms: u64) -> NewJob {
-    NewJob { rule_id: "r".into(), mode, steps, vars: Vars::new(), priority, ttl_ms }
+    NewJob { rule_id: "r".into(), mode, steps, vars: Vars::new(), priority, ttl_ms, refund: None }
 }
 
 fn seq(steps: Vec<Step>) -> NewJob {
@@ -209,6 +209,7 @@ async fn restore_resumes_sequences_and_discards_expired_jobs() {
         created_ms: now - 1000,
         expires_ms,
         next_step,
+        refund: None,
     };
     r.store.save(&mk("alive", 1, now + 60_000)).await.expect("save");
     r.store.save(&mk("dead", 0, now - 1)).await.expect("save");
@@ -277,4 +278,38 @@ async fn global_parallel_cap_is_respected() {
     settle(1_000).await;
     // Dos arrancan en 0; la tercera espera a que termine alguna (10 ms).
     assert_eq!(starts(&r), [("a".into(), 0), ("b".into(), 0), ("c".into(), 10)]);
+}
+
+fn paid(steps: Vec<Step>, priority: i32, ttl_ms: u64, who: &str) -> NewJob {
+    NewJob { refund: Some(Refund { user_id: who.into(), cost: 50, reward: "premio".into() }), ..job(steps, PlanMode::Sequence, priority, ttl_ms) }
+}
+
+fn refund_log(r: &Rig) -> Arc<Mutex<Vec<String>>> {
+    let got: Arc<Mutex<Vec<String>>> = Arc::default();
+    let g = Arc::clone(&got);
+    r.queue.on_discard(Arc::new(move |rf| g.lock().expect("lock").push(rf.user_id)));
+    got
+}
+
+#[tokio::test(start_paused = true)]
+async fn paid_jobs_discarded_before_running_are_refunded() {
+    let r = rig(QueueConfig { max_pending: 1, ..QueueConfig::default() });
+    let got = refund_log(&r);
+    r.queue.enqueue(seq(vec![step("tts", "running", 0)])).await.expect("enq");
+    settle(10).await;
+    // Desplazado por uno de más prioridad.
+    r.queue.enqueue(paid(vec![step("tts", "evicted", 0)], 0, 600_000, "ana")).await.expect("enq");
+    r.queue.enqueue(job(vec![step("tts", "vip", 0)], PlanMode::Sequence, 10, 600_000)).await.expect("enq");
+    // Caducado en la cola (el grupo «tts» está ocupado 10 s).
+    settle(3_000).await;
+    r.queue.enqueue(seq(vec![step("slow", "busy", 0)])).await.expect("enq");
+    settle(10).await;
+    r.queue.enqueue(paid(vec![step("tts", "stale", 0)], 0, 300, "bob")).await.expect("enq");
+    settle(15_000).await;
+    assert_eq!(*got.lock().expect("lock"), ["ana", "bob"]);
+    // Uno que se ejecuta no se devuelve, ni uno que la cola rechaza al encolar (eso lo hace quien encola).
+    r.queue.enqueue(paid(vec![step("snd", "ok", 0)], 0, 600_000, "carla")).await.expect("enq");
+    settle(1_000).await;
+    assert_eq!(got.lock().expect("lock").len(), 2);
+    assert!(r.store.is_empty());
 }

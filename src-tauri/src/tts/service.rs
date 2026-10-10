@@ -262,6 +262,7 @@ impl TtsService {
             vars,
             priority: 0,
             ttl_ms: cfg.max_wait_ms,
+            refund: None,
         };
         match queue.enqueue(job).await {
             Ok(Outcome::Dropped) => tracing::debug!("TTS: cola llena, se descartó un mensaje de chat"),

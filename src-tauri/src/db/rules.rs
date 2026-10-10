@@ -192,6 +192,7 @@ mod tests {
             created_ms: 1,
             expires_ms: 99,
             next_step: 0,
+            refund: None,
         };
         JobStore::save(&db, &job).await.expect("save");
         JobStore::set_progress(&db, "j1", 1).await.expect("progress");

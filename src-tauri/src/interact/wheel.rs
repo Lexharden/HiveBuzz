@@ -241,6 +241,7 @@ impl WheelService {
                 vars,
                 priority: PRIZE_PRIORITY,
                 ttl_ms: PRIZE_TTL_MS,
+                refund: None,
             };
             match self.queue.get() {
                 Some(queue) => {

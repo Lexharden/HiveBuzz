@@ -422,3 +422,69 @@ async fn eventsub_follow_mapping_rejects_bad_ids() {
     assert_eq!(eventsub::map_notification("stream.offline", &json!({}), "m", 1), Some(Notice::Offline));
     assert!(eventsub::map_notification("channel.raid", &json!({}), "m", 1).is_none());
 }
+
+/// Servidor de un solo uso que envía `msgs` (con su espera previa en ms) y luego mantiene o cierra.
+async fn scripted_ws(msgs: Vec<(u64, serde_json::Value)>, close_after: bool) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://127.0.0.1:{}", listener.local_addr().unwrap().port());
+    tokio::spawn(async move {
+        let Ok((stream, _)) = listener.accept().await else { return };
+        let Ok(mut ws) = tokio_tungstenite::accept_async(stream).await else { return };
+        for (wait, m) in msgs {
+            tokio::time::sleep(std::time::Duration::from_millis(wait)).await;
+            if ws.send(Message::text(m.to_string())).await.is_err() {
+                return;
+            }
+        }
+        if close_after {
+            let _ = ws.close(None).await;
+        } else {
+            while ws.next().await.is_some() {}
+        }
+    });
+    url
+}
+
+fn es_msg(id: &str, kind: &str, payload: serde_json::Value) -> serde_json::Value {
+    json!({ "metadata": { "message_id": id, "message_type": kind }, "payload": payload })
+}
+
+fn es_follow(id: &str, uid: &str) -> serde_json::Value {
+    es_msg(id, "notification", json!({ "subscription": { "type": "channel.follow" }, "event": { "user_id": uid, "user_login": format!("fan{uid}") } }))
+}
+
+#[tokio::test]
+async fn eventsub_reconnect_keeps_the_old_socket_until_the_new_welcome() {
+    let welcome = |id: &str| es_msg(id, "session_welcome", json!({ "session": { "id": "S", "keepalive_timeout_seconds": 30 } }));
+    // La nueva conexión tarda en dar la bienvenida; mientras, la vieja entrega un follow.
+    let new_url = scripted_ws(vec![(300, welcome("w2")), (50, es_follow("n2", "2"))], true).await;
+    let old_url = scripted_ws(
+        vec![
+            (0, welcome("w1")),
+            (50, es_msg("r1", "session_reconnect", json!({ "session": { "reconnect_url": new_url } }))),
+            (100, es_follow("n1", "1")),
+        ],
+        false,
+    )
+    .await;
+    let (base, _) = fake_http(Box::new(|r| match r.path.split('?').next().unwrap_or("") {
+        "/oauth2/token" => (200, json!({ "access_token": "AT", "expires_in": 3600 }).to_string()),
+        _ => (202, "{}".into()),
+    }))
+    .await;
+    let store = Arc::new(MemoryStore::default());
+    store.set(KEY_TWITCH_REFRESH, "RT").unwrap();
+    let auth = TwitchAuth::with_endpoint(store, Arc::new(TestClock::default()), &base, None).unwrap();
+    auth.set_client_id("cid");
+    let helix = Helix::with_base(Arc::clone(&auth), &format!("{base}/helix")).unwrap();
+    let (tx, mut rx) = mpsc::channel(16);
+    let end = tokio::time::timeout(std::time::Duration::from_secs(5), eventsub::run(&old_url, &helix, "999", tx, || 1)).await.expect("termina al cerrar la nueva");
+    assert!(matches!(end, eventsub::EsEnd::Dropped(_)));
+    let mut ids = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        if let Notice::Follow(ev) = n {
+            ids.push(ev.user.unique_id.clone());
+        }
+    }
+    assert_eq!(ids, ["fan1", "fan2"], "el follow que llegó por la conexión vieja durante el relevo no se pierde");
+}
