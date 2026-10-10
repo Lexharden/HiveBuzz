@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.2.0] - 2026-10-10
+
 ### Añadido
 - **Alertas automáticas**: el overlay de Alertas muestra solo los regalos (desde un mínimo de monedas), follows y
   suscripciones (y, si se activa, shares), sin crear reglas. Se configuran en *Overlays → Alertas*; las reglas con
