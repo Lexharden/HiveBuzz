@@ -20,9 +20,18 @@ use crate::error::{AppError, Result};
 
 const TRUSTED_CLIENT_TOKEN: &str = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
 /// Debe parecerse a un Edge reciente: Microsoft rechaza (403) versiones muy viejas.
-/// Si el servicio deja de responder, esta constante es lo primero que hay que actualizar.
+/// Si el servicio deja de responder, comprueba primero los hosts de `ENDPOINTS` (Microsoft los
+/// ha movido) y después esta constante.
 const CHROMIUM_VERSION: &str = "143.0.3650.75";
-const ENDPOINT: &str = "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1";
+
+/// Host de síntesis y nombre del parámetro que lleva el token público. Desde octubre de 2026 el host
+/// histórico responde 403 al WebSocket (primero en varios países, luego en todos); Edge sintetiza por
+/// `api.msedgeservices.com`, que acepta el mismo token como `Ocp-Apim-Subscription-Key`. Se prueban en
+/// orden y se conserva el antiguo como alternativa por si Microsoft lo reabre o retira el nuevo.
+const ENDPOINTS: &[(&str, &str)] = &[
+    ("wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1", "Ocp-Apim-Subscription-Key"),
+    ("wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1", "TrustedClientToken"),
+];
 const OUTPUT_FORMAT: &str = "audio-24khz-48kbitrate-mono-mp3";
 const TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -219,11 +228,24 @@ impl TtsEngine for EdgeEngine {
             return Err(AppError::Invalid(format!("voz de Edge desconocida: {}", req.voice)));
         }
         let attempt = async {
-            match fetch_audio(req, 0).await {
+            let mut last = other("Edge-TTS no tiene ningún servidor configurado");
+            let mut skew_known = 0;
+            for &(host, key_param) in ENDPOINTS {
+                let mut result = fetch_audio(req, host, key_param, skew_known).await;
                 // 403 con cabecera `Date`: el reloj local está desfasado y el token GEC no vale.
-                Err(Fetch::Forbidden { skew_secs: Some(skew) }) if skew != 0 => fetch_audio(req, skew).await,
-                other => other,
+                if let Err(Fetch::Forbidden { skew_secs: Some(skew) }) = result {
+                    if skew != 0 {
+                        skew_known = skew;
+                        result = fetch_audio(req, host, key_param, skew).await;
+                    }
+                }
+                match result {
+                    Ok(audio) => return Ok(audio),
+                    // Un 403 o un fallo de conexión en este host: se prueba el siguiente.
+                    Err(e) => last = e,
+                }
             }
+            Err(last)
         };
         let audio = tokio::time::timeout(TIMEOUT, attempt)
             .await
@@ -246,7 +268,7 @@ impl From<Fetch> for AppError {
     fn from(f: Fetch) -> Self {
         match f {
             Fetch::Forbidden { .. } => AppError::Invalid(
-                "Edge-TTS rechazó la conexión (403): su protocolo pudo haber cambiado; usa Piper o SAPI".into(),
+                "Edge-TTS rechazó la conexión (403) en todos sus servidores: su protocolo pudo haber cambiado; usa Piper o SAPI".into(),
             ),
             Fetch::Other(m) => AppError::Invalid(m),
         }
@@ -257,14 +279,24 @@ fn other(msg: impl Into<String>) -> Fetch {
     Fetch::Other(msg.into())
 }
 
-async fn fetch_audio(req: &SynthRequest, skew_secs: i64) -> std::result::Result<Vec<u8>, Fetch> {
+/// URL del WebSocket: token público (con el nombre de parámetro propio de cada host), id de conexión y GEC.
+pub fn connection_url(host: &str, key_param: &str, connection_id: &str, unix_secs: u64) -> String {
+    format!(
+        "{host}?{key_param}={TRUSTED_CLIENT_TOKEN}&ConnectionId={connection_id}\
+         &Sec-MS-GEC={}&Sec-MS-GEC-Version=1-{CHROMIUM_VERSION}",
+        gec_token(unix_secs)
+    )
+}
+
+async fn fetch_audio(
+    req: &SynthRequest,
+    host: &str,
+    key_param: &str,
+    skew_secs: i64,
+) -> std::result::Result<Vec<u8>, Fetch> {
     let unix = u64::try_from(unix_now() + skew_secs).unwrap_or(0);
     let connection_id = uuid::Uuid::new_v4().simple().to_string();
-    let url = format!(
-        "{ENDPOINT}?TrustedClientToken={TRUSTED_CLIENT_TOKEN}&ConnectionId={connection_id}\
-         &Sec-MS-GEC={}&Sec-MS-GEC-Version=1-{CHROMIUM_VERSION}",
-        gec_token(unix)
-    );
+    let url = connection_url(host, key_param, &connection_id, unix);
     let major = CHROMIUM_VERSION.split('.').next().unwrap_or("143");
     let mut request = url.into_client_request().map_err(|e| other(format!("Edge-TTS: URL inválida: {e}")))?;
     let muid = uuid::Uuid::new_v4().simple().to_string().to_uppercase();
@@ -358,6 +390,15 @@ mod tests {
         assert_eq!(clock_skew_from_date_header("Thu, 08 Oct 2026 12:00:00 GMT", server - 90), Some(90));
         assert_eq!(clock_skew_from_date_header("Thu, 08 Oct 2026 12:00:00 GMT", server + 30), Some(-30));
         assert_eq!(clock_skew_from_date_header("no es una fecha", 0), None);
+    }
+
+    #[test]
+    fn each_host_gets_the_token_under_its_own_parameter_name() {
+        let new = connection_url(ENDPOINTS[0].0, ENDPOINTS[0].1, "abc", 1_700_000_000);
+        assert!(new.starts_with("wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?Ocp-Apim-Subscription-Key="));
+        let old = connection_url(ENDPOINTS[1].0, ENDPOINTS[1].1, "abc", 1_700_000_000);
+        assert!(old.contains("?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=abc&Sec-MS-GEC="));
+        assert!(new.ends_with("&Sec-MS-GEC-Version=1-143.0.3650.75"));
     }
 
     #[test]

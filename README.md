@@ -273,7 +273,8 @@ apaga en *Overlays → Alertas*. Las reglas con «Mostrar alerta» añaden alert
 - **SAPI**: voces del sistema en Windows, sin descargas, incluidas las «OneCore» de los paquetes de idioma
   (*Configuración → Hora e idioma → Voz*), que se sintetizan con `Windows.Media.SpeechSynthesis`.
 - **Edge-TTS** (opcional): 92 voces en línea; servicio no oficial de Microsoft; si deja de responder, se actualiza la
-  constante `CHROMIUM_VERSION` en `src-tauri/src/tts/edge.rs`.
+  lista `ENDPOINTS` (hosts de síntesis; se prueban en orden) y la constante `CHROMIUM_VERSION` en
+  `src-tauri/src/tts/edge.rs`.
 - Todo texto leído (del chat o de una regla) pasa por los filtros de groserías, enlaces, emojis,
   repeticiones y longitud.
 - **No hablar encima** (`src-tauri/src/mic.rs`): con la opción activada, un hilo escucha el micrófono con `cpal` y un
