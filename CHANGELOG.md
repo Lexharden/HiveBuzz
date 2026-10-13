@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.2.1] - 2026-10-12
+
+### Corregido
+- **Edge-TTS** dejó de responder (403) porque Microsoft retiró el servidor histórico: ahora se prueba primero
+  `api.msedgeservices.com` y se conserva el antiguo como alternativa.
+
 ## [0.2.0] - 2026-10-10
 
 ### Añadido
