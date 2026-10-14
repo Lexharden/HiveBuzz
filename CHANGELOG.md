@@ -4,6 +4,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.2.2] - 2026-10-13
+
+### Añadido
+- **Sonido por emote**: nuevo disparador de reglas «Emote» (por id o cualquiera) que se activa con los emotes de tu
+  comunidad, sueltos o dentro de un chat; el editor muestra las miniaturas de los emotes ya vistos para elegirlos y
+  la acción «Reproducir sonido» pone el audio. Hay una plantilla «Sonido por emote» lista para elegir solo el sonido. Los emotes se crean en TikTok; HiveBuzz los reconoce por su id.
+
+### Corregido
+- **Bot de chat**: el aviso ahora muestra la respuesta real de Euler Stream cuando rechaza el mensaje (puede requerir plan de pago).
+- **Sesión de TikTok**: la ventana de login se presenta como un navegador de escritorio, el error real se registra y hay
+  una alternativa para pegar las cookies a mano.
+- **Login de TikTok**: «Entrar con Google/Facebook/Apple» ya puede abrir su ventana emergente.
+- **Acerca de**: se quitó el botón y los textos que enviaban a GitHub.
+- **Overlays**: botón «Copiar (localhost)» para TikTok LIVE Studio y textos que ya no prometen que acepte las URLs.
+
 ## [0.2.1] - 2026-10-12
 
 ### Corregido

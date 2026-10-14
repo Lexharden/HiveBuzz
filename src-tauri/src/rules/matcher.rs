@@ -65,6 +65,17 @@ fn match_live(trigger: &Trigger, ev: &LiveEvent, like_acc: &mut u64) -> Option<T
         Trigger::SubEmote => {
             (ev.kind == EventType::Emote && ev.user.is_subscriber).then(|| one(Vars::new()))
         }
+        Trigger::Emote { emote_id } => {
+            let sent = match ev.kind {
+                EventType::Emote | EventType::Chat => ev.chat.as_ref().and_then(|c| c.emotes.as_deref()).unwrap_or(&[]),
+                _ => &[],
+            };
+            let wanted = emote_id.as_deref().map(str::trim).filter(|w| !w.is_empty());
+            let hit = sent.iter().find(|e| wanted.is_none_or(|w| e.id == w))?;
+            let mut vars = Vars::new();
+            vars.insert("emote_id".into(), hit.id.clone());
+            Some(one(vars))
+        }
         Trigger::Like { every } => {
             if ev.kind != EventType::Like || *every == 0 {
                 return None;
@@ -218,6 +229,27 @@ mod tests {
         assert!(m(&Trigger::SubEmote, &e).is_none());
         e.user.is_subscriber = true;
         assert!(m(&Trigger::SubEmote, &e).is_some());
+    }
+
+    #[test]
+    fn emote_trigger_matches_by_id_in_emote_messages_and_chats() {
+        let with = |kind, ids: &[&str]| {
+            let mut e = sample_event("x");
+            e.kind = kind;
+            e.user.is_subscriber = false;
+            e.chat = Some(crate::events::Chat {
+                text: String::new(),
+                emotes: Some(ids.iter().map(|id| crate::events::Emote { id: (*id).into(), image: String::new() }).collect()),
+            });
+            e
+        };
+        let any = Trigger::Emote { emote_id: None };
+        let risa = Trigger::Emote { emote_id: Some(" risa ".into()) };
+        assert!(m(&any, &with(EventType::Emote, &["a"])).is_some(), "sin id: cualquiera, sin exigir suscriptor");
+        assert!(m(&risa, &with(EventType::Chat, &["x", "risa"])).is_some(), "dentro de un chat");
+        assert!(m(&risa, &with(EventType::Emote, &["otro"])).is_none());
+        assert!(m(&any, &with(EventType::Chat, &[])).is_none(), "un chat sin emotes no cuenta");
+        assert!(m(&any, &with(EventType::Follow, &["a"])).is_none(), "solo mensajes de emote o chat");
     }
 
     #[test]

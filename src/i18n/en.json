@@ -68,7 +68,7 @@
   },
   "settings": {
     "overlays": "Overlays",
-    "overlaysHint": "Copy the URL and paste it as a Browser Source in OBS or TikTok LIVE Studio. It contains your token: don't share it.",
+    "overlaysHint": "Copy the URL and paste it as a Browser Source in OBS. TikTok LIVE Studio doesn't always accept local addresses (“invalid link”): try “Copy (localhost)” or use OBS with its virtual camera. It contains your token: don't share it.",
     "copy": "Copy URL",
     "copied": "Copied",
     "euler": "Euler Stream API key",
@@ -102,6 +102,11 @@
     "subscribe": "Subscription",
     "join": "Joined the LIVE",
     "subEmote": "Subscriber emote",
+    "emote": "Emote (sound per emote)",
+    "emoteId": "Emote ID",
+    "emoteIdHint": "Empty = any emote. Pick one below or paste its id.",
+    "emoteSeen": "Emotes your community already sent (click to pick)",
+    "emoteNoneSeen": "No emote seen in chat yet. Connect to a LIVE and it will show up here when someone sends one.",
     "like": "Likes (every N)",
     "command": "Chat command",
     "keyword": "Keyword",
@@ -425,7 +430,9 @@
   "overlays": {
     "groupStyle": "Style",
     "groupBehavior": "Behavior",
-    "urlHint": "Add this URL as a Browser Source in OBS or TikTok LIVE Studio. Changes show instantly, no reload.",
+    "urlHint": "Add this URL as a Browser Source in OBS. TikTok LIVE Studio may say “invalid link”: try “Copy (localhost)” or send OBS to LIVE Studio through its virtual camera. Changes show instantly, no reload.",
+    "copyLocalhost": "Copy (localhost)",
+    "copyLocalhostHint": "Same address with “localhost” instead of 127.0.0.1, in case TikTok LIVE Studio rejects the other.",
     "test": "Test",
     "reset": "Reset",
     "confirmReset": "Go back to this overlay's default values?",
@@ -730,7 +737,7 @@
     },
     "login": {
       "title": "TikTok session",
-      "hint": "Optional: only needed for the bot to write. The password is typed on TikTok's website; HiveBuzz only stores the session cookies in the system keyring.",
+      "hint": "Optional: only for the bot to write in chat. Besides the session you need an Euler Stream API key (it may require a paid plan: check yours). The password is typed on TikTok's website; HiveBuzz only stores the session cookies in the system keyring.",
       "active": "Session saved.",
       "none": "No session: read-only mode.",
       "start": "Open TikTok login",
@@ -739,7 +746,10 @@
       "opened": "Log in in the window and press «I've logged in».",
       "saved": "Session saved.",
       "notYet": "The session isn't detected yet.",
-      "reconnect": "Reconnect to the LIVE to apply the session."
+      "reconnect": "Reconnect to the LIVE to apply the session.",
+      "manualToggle": "Window doesn't open? Paste the cookies by hand",
+      "manualHint": "Sign in to tiktok.com in your browser, open developer tools (F12) → Application/Storage → Cookies → tiktok.com and copy the value of “sessionid” and “tt-target-idc”.",
+      "manualSave": "Save session"
     }
   },
   "integrations": {
@@ -1322,6 +1332,11 @@
       "desc": "For 100 points, the voice reads what the viewer writes after !di.",
       "say": "{nickname} says: {args}"
     },
+    "emoteSound": {
+      "name": "Sound per emote",
+      "desc": "Plays a sound when your community sends an emote. When customizing you pick the sound (and, if you like, one specific emote).",
+      "edit": "pick your sound"
+    },
     "modSay": {
       "name": "Moderator !anuncio",
       "desc": "Moderators make the voice read an announcement.",
@@ -1340,8 +1355,7 @@
     "dev": {
       "title": "Who makes it",
       "body": "Hi, I'm Yafel. I design and code HiveBuzz. For news or more projects, visit the website or follow me on Instagram.",
-      "website": "Open the website",
-      "github": "Code on GitHub"
+      "website": "Open the website"
     },
     "team": {
       "title": "Team and thanks",

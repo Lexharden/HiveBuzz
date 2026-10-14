@@ -64,10 +64,10 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
     [selected],
   );
 
-  async function copyUrl() {
-    if (!url) return;
+  async function copyUrl(text: string | undefined = url) {
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -98,6 +98,9 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
               actions={
                 <div className="flex gap-2">
                   <Btn onClick={() => void copyUrl()} disabled={!url}>{copied ? t("settings.copied") : t("settings.copy")}</Btn>
+                  <Btn onClick={() => void copyUrl(url?.replace("//127.0.0.1:", "//localhost:"))} disabled={!url} title={t("overlays.copyLocalhostHint")}>
+                    {t("overlays.copyLocalhost")}
+                  </Btn>
                   {TESTABLE.has(def.id) && <Btn onClick={() => void api.testOverlay(def.id).catch((e: unknown) => setError(errorMessage(e)))}>▶ {t("overlays.test")}</Btn>}
                   <Btn
                     onClick={() => {

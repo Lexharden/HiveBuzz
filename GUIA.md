@@ -62,7 +62,8 @@ Cada pantalla trae una frase que explica para qué sirve.
 2. Cambia colores, fuente, posición, tamaño… la **vista previa** se actualiza al instante. Botón ▶ *Probar* manda ejemplos.
    **Alertas** funciona sin reglas: regalos, follows y suscripciones salen solos (ajústalo en *Comportamiento*).
 3. En **Ajustes → Overlays** copia la URL del overlay.
-4. En OBS (o TikTok LIVE Studio): *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080.
+4. En OBS: *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080. TikTok LIVE Studio puede decir
+   «enlace no válido» con estas direcciones locales: prueba el botón *Copiar (localhost)* o usa la cámara virtual de OBS.
 5. ⚠️ La URL lleva tu token: **no la compartas**.
 
 ---
@@ -204,7 +205,7 @@ TikTok, contraseña de OBS, Spotify) van al **llavero del sistema**, nunca a la 
 |---|---|
 | No conecta | Estado en el Panel; *Ajustes → Registro*; prueba la API key de Euler |
 | Overlay vacío en OBS | URL completa con token; servidor local sin error en Ajustes; puerto libre |
-| El bot no escribe | ¿Está activado? ¿Hay sesión de TikTok? Reconecta al LIVE después de iniciar sesión |
+| El bot no escribe | ¿Está activado? ¿Hay sesión de TikTok? Escribir en el chat exige además una API key de Euler Stream (puede requerir un plan de pago: el aviso del bot muestra la respuesta de Euler). Reconecta al LIVE después de iniciar sesión |
 | Spotify no encola | Premium, dispositivo activo, Redirect URI exacta, "Conectado" en verde |
 | Spotify: 403 Forbidden | Añade tu cuenta en *Settings → User Management* de tu app de Spotify y reconecta |
 | Las teclas no se envían | La ventana activa debe estar en la lista blanca; si el juego es "administrador", abre HiveBuzz igual |

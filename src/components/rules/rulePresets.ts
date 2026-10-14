@@ -91,6 +91,11 @@ export const RULE_PRESETS: RulePreset[] = [
     conditions: { userCooldownMs: 30_000 },
     costPoints: 100,
   }),
+  // Sonido por emote: sin sonido elegido (la regla pide uno antes de guardarse) y con el emote «cualquiera».
+  preset("emoteSound", "interaction", { type: "emote" }, () => [{ type: "playSound", volume: 100, wait: true }], {
+    conditions: { userCooldownMs: 10_000, globalCooldownMs: 1_000 },
+    needsEdit: true,
+  }),
   preset("modSay", "interaction", { type: "command", command: "anuncio" }, (t) => [tts(t("presets.modSay.say"))], {
     conditions: { rolesAny: ["moderator"], globalCooldownMs: 10_000 },
   }),

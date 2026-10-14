@@ -7,6 +7,7 @@ export const TRIGGER_TYPES: TriggerType[] = [
   "subscribe",
   "join",
   "subEmote",
+  "emote",
   "like",
   "command",
   "keyword",

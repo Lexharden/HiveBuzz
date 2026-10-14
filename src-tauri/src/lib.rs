@@ -207,6 +207,7 @@ pub fn run() {
             commands_bot::has_tiktok_session,
             commands_bot::tiktok_login_start,
             commands_bot::tiktok_login_finish,
+            commands_bot::tiktok_login_manual,
             commands_bot::tiktok_logout,
             commands_integrations::get_obs_config,
             commands_integrations::set_obs_config,

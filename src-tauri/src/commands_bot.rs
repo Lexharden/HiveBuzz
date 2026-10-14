@@ -186,6 +186,7 @@ pub fn clear_poll(state: State<'_, AppState>) {
 const LOGIN_WINDOW: &str = "tiktok-login";
 const LOGIN_URL: &str = "https://www.tiktok.com/login";
 const COOKIES_URL: &str = "https://www.tiktok.com/";
+const LOGIN_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0";
 
 fn parse_url(raw: &str) -> Result<tauri::Url> {
     raw.parse().map_err(|_| AppError::Invalid("URL no válida".into()))
@@ -205,12 +206,29 @@ pub async fn tiktok_login_start(app: AppHandle) -> Result<()> {
         let _ = w.set_focus();
         return Ok(());
     }
+    // TikTok suele rechazar o dejar en blanco el login desde un WebView embebido: se presenta como un Edge de escritorio.
     WebviewWindowBuilder::new(&app, LOGIN_WINDOW, WebviewUrl::External(parse_url(LOGIN_URL)?))
         .title("Iniciar sesión en TikTok")
         .inner_size(520.0, 760.0)
+        .user_agent(LOGIN_USER_AGENT)
+        // «Entrar con Google/Facebook/Apple» abre una ventana emergente; sin esto TikTok dice «Failed to open popup window».
+        .on_new_window(|_url, _features| tauri::webview::NewWindowResponse::Allow)
         .build()
-        .map_err(|e| AppError::Invalid(format!("no se pudo abrir la ventana de TikTok: {e}")))?;
+        .map_err(|e| {
+            tracing::warn!(error = %e, "no se pudo abrir la ventana de inicio de sesión de TikTok");
+            AppError::Invalid(format!("no se pudo abrir la ventana de TikTok: {e}. Usa «Pegar cookies» como alternativa"))
+        })?;
     Ok(())
+}
+
+/// Guarda la sesión a partir de las dos cookies pegadas a mano (alternativa cuando la ventana de login no funciona).
+#[tauri::command]
+pub fn tiktok_login_manual(state: State<'_, AppState>, session_id: String, tt_target_idc: String) -> Result<()> {
+    let clean = |v: String| v.trim().trim_matches('"').to_string();
+    crate::secrets::save_tiktok_session(
+        state.secrets.as_ref(),
+        &SessionPayload { session_id: clean(session_id), tt_target_idc: clean(tt_target_idc) },
+    )
 }
 
 /// Lee las cookies de la ventana de inicio de sesión y, si hay sesión, la guarda y cierra la ventana.

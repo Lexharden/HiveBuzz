@@ -40,7 +40,7 @@ export function PresetsPanel({ rules, onAdd, onCustomize, onClose }: Props) {
                       <div className="text-xs text-zinc-400">{t(`presets.${p.key}.desc`)}</div>
                       <div className="mt-1 flex flex-wrap gap-1">
                         {p.needsBot && <span className="rounded bg-sky-500/15 px-1.5 text-[10px] text-sky-300">{t("presets.needsBot")}</span>}
-                        {p.needsEdit && <span className="rounded bg-amber-500/15 px-1.5 text-[10px] text-amber-300">{t("presets.needsEdit")}</span>}
+                        {p.needsEdit && <span className="rounded bg-amber-500/15 px-1.5 text-[10px] text-amber-300">{t(`presets.${p.key}.edit`, { defaultValue: t("presets.needsEdit") })}</span>}
                       </div>
                     </div>
                     {isAdded(p) ? (

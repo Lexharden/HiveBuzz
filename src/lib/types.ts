@@ -59,6 +59,7 @@ export type Trigger =
   | { type: "subscribe" }
   | { type: "join" }
   | { type: "subEmote" }
+  | { type: "emote"; emoteId?: string }
   | { type: "like"; every: number }
   | { type: "command"; command: string }
   | { type: "keyword"; keywords: string[]; wholeWord: boolean }

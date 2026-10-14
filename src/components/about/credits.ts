@@ -4,7 +4,6 @@ export const LINKS = {
   website: "https://yafel.dev",
   instagram: "https://www.instagram.com/yaafel/",
   instagramHandle: "@yaafel",
-  github: "https://github.com/Lexharden/HiveBuzz",
   discord: "https://discord.gg/QTdQffuZF3",
   youtube: "https://www.youtube.com/@HiveShock",
   kofi: "https://ko-fi.com/yafel",

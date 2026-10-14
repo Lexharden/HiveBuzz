@@ -43,6 +43,18 @@ pub fn sample_event_for(trigger: &Trigger) -> Option<LiveEvent> {
             ev.user.is_subscriber = true;
             ev
         }
+        Trigger::Emote { emote_id } => {
+            let mut ev = build_event(SimKind::Chat);
+            ev.kind = EventType::Emote;
+            ev.chat = Some(crate::events::Chat {
+                text: String::new(),
+                emotes: Some(vec![crate::events::Emote {
+                    id: emote_id.clone().filter(|i| !i.trim().is_empty()).unwrap_or_else(|| "emote-de-prueba".into()),
+                    image: String::new(),
+                }]),
+            });
+            ev
+        }
         Trigger::Like { every } => {
             let mut ev = build_event(SimKind::Like);
             if let Some(l) = ev.like.as_mut() {
@@ -80,6 +92,8 @@ mod tests {
             Trigger::Subscribe,
             Trigger::Join,
             Trigger::SubEmote,
+            Trigger::Emote { emote_id: None },
+            Trigger::Emote { emote_id: Some("risa".into()) },
             Trigger::Like { every: 250 },
             Trigger::Command { command: "!sonido".into() },
             Trigger::Command { command: "tts".into() },

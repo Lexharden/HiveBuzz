@@ -68,7 +68,7 @@
   },
   "settings": {
     "overlays": "Overlays",
-    "overlaysHint": "Copia la URL y pégala como Browser Source en OBS o TikTok LIVE Studio. Contiene tu token: no la compartas.",
+    "overlaysHint": "Copia la URL y pégala como Browser Source en OBS. TikTok LIVE Studio no siempre acepta direcciones locales («enlace no válido»): prueba «Copiar (localhost)» o usa OBS con su cámara virtual. Contiene tu token: no la compartas.",
     "copy": "Copiar URL",
     "copied": "Copiada",
     "euler": "API key de Euler Stream",
@@ -102,6 +102,11 @@
     "subscribe": "Suscripción",
     "join": "Entrada al LIVE",
     "subEmote": "Emote de suscriptor",
+    "emote": "Emote (sonido por emote)",
+    "emoteId": "ID del emote",
+    "emoteIdHint": "Vacío = cualquier emote. Elige uno de abajo o pega su id.",
+    "emoteSeen": "Emotes que ya mandó tu comunidad (clic para elegir)",
+    "emoteNoneSeen": "Aún no se ha visto ningún emote en el chat. Conecta a un LIVE y cuando alguien mande uno aparecerá aquí.",
     "like": "Likes (cada N)",
     "command": "Comando de chat",
     "keyword": "Palabra clave",
@@ -425,7 +430,9 @@
   "overlays": {
     "groupStyle": "Estilo",
     "groupBehavior": "Comportamiento",
-    "urlHint": "Añade esta URL como Browser Source en OBS o TikTok LIVE Studio. Los cambios se ven al instante, sin recargar.",
+    "urlHint": "Añade esta URL como Browser Source en OBS. En TikTok LIVE Studio puede dar «enlace no válido»: prueba «Copiar (localhost)» o envía OBS a LIVE Studio con su cámara virtual. Los cambios se ven al instante, sin recargar.",
+    "copyLocalhost": "Copiar (localhost)",
+    "copyLocalhostHint": "Misma dirección con «localhost» en vez de 127.0.0.1, por si TikTok LIVE Studio rechaza la otra.",
     "test": "Probar",
     "reset": "Restablecer",
     "confirmReset": "¿Volver a los valores por defecto de este overlay?",
@@ -730,7 +737,7 @@
     },
     "login": {
       "title": "Sesión de TikTok",
-      "hint": "Opcional: solo hace falta para que el bot escriba. La contraseña se escribe en la web de TikTok; HiveBuzz solo guarda las cookies de sesión en el llavero del sistema.",
+      "hint": "Opcional: solo para que el bot escriba en el chat. Además de la sesión hace falta una API key de Euler Stream (puede exigir un plan de pago: revisa tu plan). La contraseña se escribe en la web de TikTok; HiveBuzz solo guarda las cookies de sesión en el llavero del sistema.",
       "active": "Sesión guardada.",
       "none": "Sin sesión: modo solo lectura.",
       "start": "Abrir login de TikTok",
@@ -739,7 +746,10 @@
       "opened": "Inicia sesión en la ventana y pulsa «Ya inicié sesión».",
       "saved": "Sesión guardada.",
       "notYet": "Aún no se detecta la sesión.",
-      "reconnect": "Vuelve a conectar al LIVE para aplicar la sesión."
+      "reconnect": "Vuelve a conectar al LIVE para aplicar la sesión.",
+      "manualToggle": "¿No se abre la ventana? Pegar las cookies a mano",
+      "manualHint": "Inicia sesión en tiktok.com con tu navegador, abre las herramientas de desarrollo (F12) → Aplicación/Almacenamiento → Cookies → tiktok.com y copia el valor de «sessionid» y de «tt-target-idc».",
+      "manualSave": "Guardar sesión"
     }
   },
   "integrations": {
@@ -1322,6 +1332,11 @@
       "desc": "Por 100 puntos, la voz lee lo que el espectador escriba tras !di.",
       "say": "{nickname} dice: {args}"
     },
+    "emoteSound": {
+      "name": "Sonido por emote",
+      "desc": "Suena un audio cuando tu comunidad manda un emote. Al personalizarla eliges el sonido (y, si quieres, un emote concreto).",
+      "edit": "elige tu sonido"
+    },
     "modSay": {
       "name": "!anuncio de moderador",
       "desc": "Los moderadores hacen que la voz lea un anuncio.",
@@ -1340,8 +1355,7 @@
     "dev": {
       "title": "Quién lo hace",
       "body": "Hola, soy Yafel. Diseño y programo HiveBuzz. Si quieres novedades o más proyectos, pásate por la web o sígueme en Instagram.",
-      "website": "Abrir la web",
-      "github": "Código en GitHub"
+      "website": "Abrir la web"
     },
     "team": {
       "title": "Equipo y agradecimientos",

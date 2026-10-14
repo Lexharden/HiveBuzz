@@ -2,8 +2,12 @@
 // Es la única pieza que conoce la librería: cambiarla o cambiar el proveedor de firma
 // (hoy Euler Stream) solo toca este archivo.
 
-import { ControlAction, ControlEvent, TikTokLiveConnection, WebcastEvent } from "tiktok-live-connector";
+import { ControlAction, ControlEvent, PremiumFeatureError, TikTokLiveConnection, WebcastEvent } from "tiktok-live-connector";
 import type { ClientCallbacks, ClientFactory, ConnectTarget, LiveClient } from "./connector";
+
+/** Euler Stream puede exigir un plan de pago para enviar chat; se muestra su respuesta real, sin darla por segura. */
+export const chatRefusedMessage = (detail: string): string =>
+  `Euler Stream rechazó enviar el mensaje (escribir en el chat puede requerir un plan de pago; revisa tu plan): ${detail}`.slice(0, 400);
 
 export const createTikTokClient: ClientFactory = (target: ConnectTarget, cb: ClientCallbacks): LiveClient => {
   const common = {
@@ -82,7 +86,13 @@ export const createTikTokClient: ClientFactory = (target: ConnectTarget, cb: Cli
     ...(target.session
       ? {
           sendChat: async (text: string) => {
-            await connection.sendMessage(text);
+            try {
+              await connection.sendMessage(text);
+            } catch (err) {
+              // Euler Stream envía los mensajes desde su nube y lo cobra: sin plan de pago responde 401/403.
+              if (err instanceof PremiumFeatureError) throw new Error(chatRefusedMessage(err.message));
+              throw err;
+            }
           },
         }
       : {}),

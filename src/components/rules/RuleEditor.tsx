@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Conditions, Goal, Media, Role, Rule, Sound, Step, TimerView, Trigger, TriggerType, VoiceInfo } from "../../lib/types";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
+import { api } from "../../lib/api";
 import { ActionParams } from "./ActionParams";
 import { defaultAction, defaultTrigger, TRIGGER_TYPES } from "./ruleDefaults";
 
@@ -147,6 +148,70 @@ export function RuleEditor({ initial, isNew, actionTypes, sounds, media, voices,
   );
 }
 
+interface SeenEmote {
+  id: string;
+  image: string;
+  count: number;
+}
+
+/** Emotes distintos de los últimos eventos (los que ya mandó tu comunidad), del más frecuente al menos. */
+async function seenEmotes(): Promise<SeenEmote[]> {
+  const found = new Map<string, SeenEmote>();
+  for (const ev of await api.recentEvents(500)) {
+    for (const e of ev.chat?.emotes ?? []) {
+      const prev = found.get(e.id);
+      found.set(e.id, { id: e.id, image: prev?.image || e.image, count: (prev?.count ?? 0) + 1 });
+    }
+  }
+  return [...found.values()].sort((a, b) => b.count - a.count).slice(0, 60);
+}
+
+/** Elegir el emote que dispara la regla: miniaturas de los vistos en el chat o el id a mano. */
+function EmoteField({ trigger, onChange }: { trigger: Extract<Trigger, { type: "emote" }>; onChange: (t: Trigger) => void }) {
+  const { t } = useTranslation();
+  const [seen, setSeen] = useState<SeenEmote[]>([]);
+  const [broken, setBroken] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    void seenEmotes().then((s) => !cancelled && setSeen(s)).catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const pick = (emoteId: string) => onChange(emoteId ? { ...trigger, emoteId } : { type: "emote" });
+  return (
+    <div className="space-y-2">
+      <Field label={t("trigger.emoteId")} hint={t("trigger.emoteIdHint")}>
+        <TextInput value={trigger.emoteId ?? ""} onChange={pick} />
+      </Field>
+      {seen.length === 0 ? (
+        <p className="text-xs text-zinc-500">{t("trigger.emoteNoneSeen")}</p>
+      ) : (
+        <div>
+          <p className="mb-1 text-xs text-zinc-400">{t("trigger.emoteSeen")}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {seen.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                title={`${e.id} · ×${e.count}`}
+                onClick={() => pick(e.id)}
+                className={`flex h-10 min-w-10 items-center justify-center rounded-md border bg-brand-950 p-0.5 text-[10px] text-zinc-300 ${trigger.emoteId === e.id ? "border-amber-400" : "border-zinc-700 hover:border-zinc-500"}`}
+              >
+                {e.image && !broken.has(e.id) ? (
+                  <img src={e.image} alt={e.id} className="h-9 w-9 rounded object-contain" onError={() => setBroken((b) => new Set(b).add(e.id))} />
+                ) : (
+                  <span className="max-w-16 truncate px-1">{e.id}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TriggerFields({ trigger, onChange, goals, timers }: { trigger: Trigger; onChange: (t: Trigger) => void; goals: Goal[]; timers: TimerView[] }) {
   const { t } = useTranslation();
   switch (trigger.type) {
@@ -164,6 +229,8 @@ function TriggerFields({ trigger, onChange, goals, timers }: { trigger: Trigger;
           </Field>
         </div>
       );
+    case "emote":
+      return <EmoteField trigger={trigger} onChange={onChange} />;
     case "like":
       return (
         <Field label={t("trigger.likeEvery")}>

@@ -83,9 +83,6 @@ export function AboutPage() {
             <SocialBtn url={LINKS.instagram} className="bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF]" icon={BRAND_ICONS.instagram}>
               {LINKS.instagramHandle}
             </SocialBtn>
-            <SocialBtn url={LINKS.github} className="bg-[#24292f]" icon={BRAND_ICONS.github}>
-              {t("about.dev.github")}
-            </SocialBtn>
           </div>
           <p className="mt-2 text-xs text-zinc-500">{LINKS.website.replace("https://", "")}</p>
         </Card>

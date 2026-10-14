@@ -461,6 +461,9 @@ function LoginSection() {
   const { t } = useTranslation();
   const [has, setHas] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [manual, setManual] = useState(false);
+  const [sessionId, setSessionId] = useState("");
+  const [idc, setIdc] = useState("");
   const { run, error, busy } = useAction();
   const refresh = () => void api.hasTiktokSession().then(setHas);
   useEffect(refresh, []);
@@ -490,6 +493,34 @@ function LoginSection() {
             </Btn>
           )}
         </div>
+        <button type="button" className="text-xs text-amber-400 underline" onClick={() => setManual((v) => !v)}>
+          {t("interact.login.manualToggle")}
+        </button>
+        {manual && (
+          <div className="space-y-2 rounded-lg border border-zinc-700 p-3">
+            <p className="text-xs text-zinc-400">{t("interact.login.manualHint")}</p>
+            <Field label="sessionid">
+              <TextInput type="password" value={sessionId} onChange={setSessionId} autoComplete="off" />
+            </Field>
+            <Field label="tt-target-idc">
+              <TextInput value={idc} onChange={setIdc} autoComplete="off" placeholder="useast2a" />
+            </Field>
+            <Btn
+              disabled={busy || !sessionId.trim() || !idc.trim()}
+              onClick={() =>
+                void run(async () => {
+                  await api.tiktokLoginManual(sessionId, idc);
+                  setSessionId("");
+                  setIdc("");
+                  setMsg(t("interact.login.saved"));
+                  refresh();
+                })
+              }
+            >
+              {t("interact.login.manualSave")}
+            </Btn>
+          </div>
+        )}
         {msg && <p className="text-xs text-zinc-400">{msg}</p>}
         <p className="text-xs text-zinc-500">{t("interact.login.reconnect")}</p>
         <ErrorText error={error} />

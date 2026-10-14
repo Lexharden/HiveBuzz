@@ -142,5 +142,6 @@ export const interactApi = {
   hasTiktokSession: () => invoke<boolean>("has_tiktok_session"),
   tiktokLoginStart: () => invoke<void>("tiktok_login_start"),
   tiktokLoginFinish: () => invoke<boolean>("tiktok_login_finish"),
+  tiktokLoginManual: (sessionId: string, ttTargetIdc: string) => invoke<void>("tiktok_login_manual", { sessionId, ttTargetIdc }),
   tiktokLogout: () => invoke<void>("tiktok_logout"),
 };

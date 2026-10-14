@@ -54,6 +54,12 @@ pub enum Trigger {
     Join,
     /// Emote enviado por un suscriptor.
     SubEmote,
+    /// Un emote concreto (por id; sin id, cualquiera) mandado como mensaje de emote o dentro de un chat.
+    #[serde(rename_all = "camelCase")]
+    Emote {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        emote_id: Option<String>,
+    },
     /// Cada `every` likes acumulados.
     Like { every: u64 },
     /// Comando de chat, p. ej. `!sonido` (con o sin `!`).

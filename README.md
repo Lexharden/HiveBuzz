@@ -3,7 +3,7 @@
 # HiveBuzz
 
 App de escritorio **gratuita e independiente** para streamers de TikTok LIVE: alertas, TTS,
-overlays para OBS / TikTok LIVE Studio, chatbot, puntos y acciones automáticas.
+overlays para OBS, chatbot, puntos y acciones automáticas.
 
 Todo corre en la PC del streamer: sin servidor propio y sin costo de infraestructura. La conexión
 a TikTok sale desde tu IP.
@@ -169,7 +169,8 @@ el cambio se aplica al reiniciar). En *Ajustes → Overlays* están las URLs lis
 http://127.0.0.1:17890/overlay/feed?token=<TOKEN>
 ```
 
-Pégalas como **Browser Source** en OBS o TikTok LIVE Studio.
+Pégalas como **Browser Source** en OBS. TikTok LIVE Studio puede rechazarlas («enlace no válido»): prueba el botón
+*Copiar (localhost)* o envía OBS a LIVE Studio con su cámara virtual.
 
 Seguridad del servidor local:
 
@@ -288,7 +289,8 @@ Pruebas con red (no corren por defecto): `cargo test edge_live -- --ignored` y
 ## Chatbot, puntos, ruleta y encuestas (Fase 4)
 
 - **Bot**: pestaña *Bot y puntos*. Para que escriba en el chat hay que iniciar sesión en TikTok
-  (sección *Sesión de TikTok*) y volver a conectar al LIVE. El bot nace apagado.
+  (sección *Sesión de TikTok*, o pegando las cookies a mano si la ventana no abre), tener una **API key de Euler Stream**
+  (escribir puede exigir un plan de pago de Euler: si el aviso lo dice, revisa tu plan) y volver a conectar al LIVE. El bot nace apagado.
 - **Puntos y recompensas**: configura cuánto se gana; una recompensa es una regla de *comando de chat*
   con coste en puntos. CSV de espectadores: exportar/importar desde la misma pestaña.
 - **Ruleta**: acción `spinWheel` (p. ej. al recibir un regalo o con un comando); overlay `/overlay/wheel`.
