@@ -8,7 +8,7 @@ impl Db {
     /// ajustes de la lista blanca) por la del paquete, todo en una transacción: o entra entero o no entra.
     /// No toca viewers, puntos, donaciones ni el log de eventos (son datos de la comunidad).
     pub async fn replace_config(&self, b: &Bundle, now_ms: i64) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         for stmt in [
             "DELETE FROM rules",
             "DELETE FROM goals",

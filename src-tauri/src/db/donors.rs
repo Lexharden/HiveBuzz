@@ -10,7 +10,7 @@ impl Db {
         if donations.is_empty() {
             return Ok(());
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         for d in donations {
             sqlx::query(
                 "INSERT INTO donor_daily (day, user_id, unique_id, nickname, avatar, coins, gifts) \

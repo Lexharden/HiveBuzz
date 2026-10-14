@@ -37,7 +37,7 @@ impl Db {
 
     /// Guarda varias metas en una transacción (el progreso cambia con cada like).
     pub async fn save_goals(&self, goals: &[Goal]) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         for g in goals {
             sqlx::query(
                 "INSERT INTO goals (id, position, json) \

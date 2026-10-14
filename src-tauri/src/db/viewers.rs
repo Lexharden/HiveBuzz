@@ -67,7 +67,7 @@ impl Db {
         if awards.is_empty() {
             return Ok(());
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         for a in awards {
             upsert_award(&mut tx, a).await?;
         }
@@ -105,7 +105,7 @@ impl Db {
     /// Gasta puntos de forma atómica: o hay saldo suficiente y se descuenta, o no pasa nada.
     /// Devuelve el saldo restante, o `None` si no alcanzaba.
     pub async fn spend_points(&self, user_id: &str, cost: u64, reason: &str, ts: i64) -> Result<Option<u64>> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let r = sqlx::query("UPDATE viewers SET points = points - ?2, total_spent = total_spent + ?2 WHERE user_id = ?1 AND points >= ?2")
             .bind(user_id)
             .bind(to_i64(cost))
@@ -126,7 +126,7 @@ impl Db {
 
     /// Ajuste manual con signo (restar nunca baja de 0). Devuelve el saldo resultante.
     pub async fn adjust_points(&self, user_id: &str, delta: i64, reason: &str, ts: i64) -> Result<u64> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let current: Option<i64> = sqlx::query_scalar("SELECT points FROM viewers WHERE user_id = ?1")
             .bind(user_id)
             .fetch_optional(&mut *tx)
@@ -221,7 +221,7 @@ impl Db {
 
     /// Borra TODOS los espectadores y su historial.
     pub async fn clear_viewers(&self) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         sqlx::query("DELETE FROM viewers").execute(&mut *tx).await?;
         sqlx::query("DELETE FROM point_history").execute(&mut *tx).await?;
         tx.commit().await?;
@@ -239,7 +239,7 @@ impl Db {
     pub async fn import_viewers_csv(&self, text: &str, mode: ImportMode, ts: i64) -> Result<ImportReport> {
         let parsed = csv_io::parse(text)?;
         let mut report = ImportReport { errors: parsed.errors, ..Default::default() };
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         for row in &parsed.rows {
             if import_row(&mut tx, row, mode, ts).await? {
                 report.created += 1;

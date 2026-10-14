@@ -209,3 +209,32 @@ async fn deleting_and_clearing() {
     assert_eq!(db.count_viewers("").await.expect("n"), 0);
     assert!(db.point_history("2", 10).await.expect("h").is_empty());
 }
+
+/// Con una base en archivo (varias conexiones) y escrituras simultáneas, ninguna debe fallar con «database is locked»:
+/// las transacciones de escritura empiezan con `BEGIN IMMEDIATE`, así esperan su turno en vez de fallar al subir de lectura a escritura.
+#[tokio::test]
+async fn concurrent_writers_wait_their_turn_instead_of_failing() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let db = Db::open(&dir.path().join("t.db")).await.expect("db");
+    let mut tasks = Vec::new();
+    for i in 0..24_i64 {
+        let db = db.clone();
+        tasks.push(tokio::spawn(async move {
+            let id = format!("u{}", i % 6);
+            db.apply_awards(&[award(&id, &id, 1, Reason::Comment, Stats::default(), i)]).await
+        }));
+    }
+    for t in tasks {
+        t.await.expect("join").expect("escritura sin 'database is locked'");
+    }
+    let total: i64 = total_points(&db).await;
+    assert_eq!(total, 24);
+}
+
+async fn total_points(db: &Db) -> i64 {
+    let mut sum = 0;
+    for i in 0..6 {
+        sum += i64::try_from(db.balance(&format!("u{i}")).await.expect("balance")).expect("i64");
+    }
+    sum
+}

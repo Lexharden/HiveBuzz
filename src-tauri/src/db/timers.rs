@@ -23,7 +23,7 @@ impl Db {
 
     /// Guarda varios timers en una transacción (las nuevas filas van al final).
     pub async fn save_timers(&self, timers: &[StoredTimer]) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         for t in timers {
             sqlx::query(
                 "INSERT INTO timers (id, position, json) \

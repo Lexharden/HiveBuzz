@@ -21,7 +21,7 @@ impl Db {
         if events.is_empty() {
             return Ok(());
         }
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         for ev in events {
             let payload = serde_json::to_string(ev.as_ref())?;
             let kind = serde_json::to_value(ev.kind)?

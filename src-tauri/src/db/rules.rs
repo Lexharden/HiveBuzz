@@ -43,7 +43,7 @@ impl Db {
 
     /// Sustituye todas las reglas por las dadas, en ese orden, en una sola transacción.
     pub async fn replace_rules(&self, rules: &[Rule], now_ms: i64) -> Result<()> {
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         sqlx::query("DELETE FROM rules").execute(&mut *tx).await?;
         for (i, rule) in rules.iter().enumerate() {
             sqlx::query("INSERT INTO rules (id, name, position, json, updated_ms) VALUES (?1, ?2, ?3, ?4, ?5)")

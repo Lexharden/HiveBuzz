@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.2.3] - 2026-10-14
+
+### Corregido
+- **Base de datos**: los puntos de los espectadores ya no fallan con «database is locked» cuando varias escrituras coinciden;
+  las transacciones de escritura esperan su turno (`BEGIN IMMEDIATE`).
+
 ## [0.2.2] - 2026-10-13
 
 ### Añadido
