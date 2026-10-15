@@ -21,11 +21,13 @@ pub struct AppPrefs {
     pub language: String,
     /// Comprobar si hay actualización al abrir la app.
     pub auto_update_check: bool,
+    /// Salida de audio para sonidos y voz (nombre tal como la lista el sistema); `None` = la predeterminada.
+    pub audio_output: Option<String>,
 }
 
 impl Default for AppPrefs {
     fn default() -> Self {
-        Self { close_to_tray: false, start_minimized: true, language: "es".into(), auto_update_check: true }
+        Self { close_to_tray: false, start_minimized: true, language: "es".into(), auto_update_check: true, audio_output: None }
     }
 }
 
@@ -79,7 +81,7 @@ mod tests {
         let svc = PrefsService::new(db.clone());
         svc.load().await.unwrap();
         assert_eq!(svc.get(), AppPrefs::default());
-        let saved = svc.set(AppPrefs { close_to_tray: true, start_minimized: false, language: "en".into(), auto_update_check: false }).await.unwrap();
+        let saved = svc.set(AppPrefs { close_to_tray: true, start_minimized: false, language: "en".into(), auto_update_check: false, audio_output: Some("Altavoces (Realtek)".into()) }).await.unwrap();
         let again = PrefsService::new(db.clone());
         again.load().await.unwrap();
         assert_eq!(again.get(), saved);

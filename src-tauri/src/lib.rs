@@ -162,6 +162,8 @@ pub fn run() {
             commands::import_piper_voice,
             commands::delete_piper_voice,
             commands::list_mic_devices,
+            commands::list_audio_outputs,
+            commands::test_audio_output,
             commands::get_mic_status,
             commands::mic_preview,
             commands::list_overlays,

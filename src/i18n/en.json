@@ -855,6 +855,18 @@
   "system": {
     "save": "Save",
     "saved": "Saved",
+    "audio": {
+      "title": "Audio output",
+      "hint": "Where sounds and voice play. Useful to send them to a virtual cable (VB-Cable) or a mixer and capture them separately in OBS.",
+      "output": "Output device",
+      "default": "System default",
+      "defaultNamed": "System default: {{name}}",
+      "disconnected": "{{name}} (disconnected)",
+      "missing": "The chosen output is not connected: the default one is used meanwhile.",
+      "none": "No audio output was detected.",
+      "test": "Play test sound",
+      "refresh": "Search again"
+    },
     "prefs": {
       "title": "Application",
       "language": "Language",

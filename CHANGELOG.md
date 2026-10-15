@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.2.4] - 2026-10-14
+
+### Añadido
+- **Salida de audio**: Ajustes → «Salida de audio» lista las salidas que detecta el sistema para elegir dónde suenan los sonidos y la voz, con botón de prueba. Si la elegida se desconecta, se usa la predeterminada.
+
 ## [0.2.3] - 2026-10-14
 
 ### Corregido

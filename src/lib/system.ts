@@ -7,6 +7,13 @@ export interface AppPrefs {
   startMinimized: boolean;
   language: "es" | "en";
   autoUpdateCheck: boolean;
+  /** Salida de audio de sonidos y voz; `null` = la predeterminada del sistema. */
+  audioOutput: string | null;
+}
+
+export interface AudioOutput {
+  name: string;
+  isDefault: boolean;
 }
 
 export interface LogEntry {
@@ -117,6 +124,8 @@ export interface SpotifyTrack {
 export const systemApi = {
   getPrefs: () => invoke<AppPrefs>("get_app_prefs"),
   setPrefs: (prefs: AppPrefs) => invoke<AppPrefs>("set_app_prefs", { prefs }),
+  listAudioOutputs: () => invoke<AudioOutput[]>("list_audio_outputs"),
+  testAudioOutput: () => invoke<void>("test_audio_output"),
   getAutostart: () => invoke<boolean>("get_autostart"),
   setAutostart: (enabled: boolean) => invoke<boolean>("set_autostart", { enabled }),
 

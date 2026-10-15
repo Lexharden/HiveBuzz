@@ -249,7 +249,7 @@ impl SpeechDetector for MicMonitor {
 
 /// Nombre con el que Windows muestra el micrófono: «Micrófono (Yeti Nano)». La descripción corta
 /// de cpal suele ser solo «Micrófono», igual para todos, y no sirve para distinguirlos.
-fn device_name(d: &cpal::Device) -> Option<String> {
+pub(crate) fn device_name(d: &cpal::Device) -> Option<String> {
     let desc = d.description().ok()?;
     Some(full_name(desc.name(), desc.extended().first().map(String::as_str), desc.driver()))
 }
@@ -263,7 +263,7 @@ fn full_name(short: &str, friendly: Option<&str>, driver: Option<&str>) -> Strin
 }
 
 /// ¿Es el micrófono guardado? También acepta el nombre corto que guardaban versiones anteriores.
-fn matches_device(d: &cpal::Device, wanted: &str) -> bool {
+pub(crate) fn matches_device(d: &cpal::Device, wanted: &str) -> bool {
     device_name(d).as_deref() == Some(wanted) || d.description().is_ok_and(|desc| desc.name() == wanted)
 }
 

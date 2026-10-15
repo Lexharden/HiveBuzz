@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
-import { systemApi as api, type AppPrefs, type BackupSummary, type LogEntry, type ProfileInfo } from "../../lib/system";
+import { systemApi as api, type AppPrefs, type AudioOutput, type BackupSummary, type LogEntry, type ProfileInfo } from "../../lib/system";
 import { UpdatesCard } from "./UpdatesCard";
 import { Btn, Card, Checkbox, ErrorText, Field, Select, TextInput, useAction } from "../ui";
 
@@ -9,6 +9,7 @@ export function SystemPanel({ onChanged }: { onChanged: () => Promise<void> }) {
   return (
     <div className="space-y-4">
       <PrefsCard onChanged={onChanged} />
+      <AudioOutputCard />
       <UpdatesCard />
       <ProfilesCard />
       <BackupCard />
@@ -59,6 +60,59 @@ function PrefsCard({ onChanged }: { onChanged: () => Promise<void> }) {
         </div>
 
         {msg && <p className="text-xs text-emerald-400">{msg}</p>}
+        <ErrorText error={error} />
+      </div>
+    </Card>
+  );
+}
+
+const SYSTEM_DEFAULT = "";
+
+/** Dónde suenan los sonidos y la voz: las salidas que detecta el sistema. */
+function AudioOutputCard() {
+  const { t } = useTranslation();
+  const [prefs, setPrefs] = useState<AppPrefs | null>(null);
+  const [outputs, setOutputs] = useState<AudioOutput[]>([]);
+  const [loading, setLoading] = useState(false);
+  const { run, error } = useAction();
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    void api
+      .listAudioOutputs()
+      .then(setOutputs)
+      .catch(() => setOutputs([]))
+      .finally(() => setLoading(false));
+  }, []);
+  useEffect(() => {
+    void api.getPrefs().then(setPrefs);
+    refresh();
+  }, [refresh]);
+
+  if (!prefs) return null;
+  const current = prefs.audioOutput ?? SYSTEM_DEFAULT;
+  const missing = prefs.audioOutput !== null && !loading && !outputs.some((o) => o.name === prefs.audioOutput);
+  const defaultName = outputs.find((o) => o.isDefault)?.name;
+  const options = [
+    { value: SYSTEM_DEFAULT, label: defaultName ? t("system.audio.defaultNamed", { name: defaultName }) : t("system.audio.default") },
+    ...outputs.filter((o) => !o.isDefault).map((o) => ({ value: o.name, label: o.name })),
+    ...(missing && prefs.audioOutput ? [{ value: prefs.audioOutput, label: t("system.audio.disconnected", { name: prefs.audioOutput }) }] : []),
+  ];
+  const choose = (value: string) =>
+    void run(async () => setPrefs(await api.setPrefs({ ...prefs, audioOutput: value === SYSTEM_DEFAULT ? null : value })));
+
+  return (
+    <Card title={t("system.audio.title")} hint={t("system.audio.hint")}>
+      <div className="space-y-3">
+        <Field label={t("system.audio.output")}>
+          <Select value={current} onChange={choose} options={options} />
+        </Field>
+        {outputs.length === 0 && !loading && <p className="text-xs text-amber-400">{t("system.audio.none")}</p>}
+        {missing && <p className="text-xs text-amber-400">{t("system.audio.missing")}</p>}
+        <div className="flex gap-2">
+          <Btn onClick={() => void run(() => api.testAudioOutput())}>{t("system.audio.test")}</Btn>
+          <Btn variant="ghost" onClick={refresh}>{t("system.audio.refresh")}</Btn>
+        </div>
         <ErrorText error={error} />
       </div>
     </Card>

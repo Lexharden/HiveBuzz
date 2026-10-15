@@ -15,7 +15,9 @@ pub fn get_app_prefs(state: State<'_, AppState>) -> AppPrefs {
 
 #[tauri::command]
 pub async fn set_app_prefs(state: State<'_, AppState>, prefs: AppPrefs) -> Result<AppPrefs> {
-    state.prefs.set(prefs).await
+    let saved = state.prefs.set(prefs).await?;
+    state.audio.set_output(saved.audio_output.clone());
+    Ok(saved)
 }
 
 #[tauri::command]

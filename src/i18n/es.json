@@ -855,6 +855,18 @@
   "system": {
     "save": "Guardar",
     "saved": "Guardado",
+    "audio": {
+      "title": "Salida de audio",
+      "hint": "Dónde suenan los sonidos y la voz. Útil para mandarlos a un cable virtual (VB-Cable) o a un mezclador y capturarlos aparte en OBS.",
+      "output": "Dispositivo de salida",
+      "default": "Predeterminado del sistema",
+      "defaultNamed": "Predeterminado del sistema: {{name}}",
+      "disconnected": "{{name}} (desconectado)",
+      "missing": "La salida elegida no está conectada: mientras tanto se usa la predeterminada.",
+      "none": "No se detectó ninguna salida de audio.",
+      "test": "Probar sonido",
+      "refresh": "Volver a buscar"
+    },
     "prefs": {
       "title": "Aplicación",
       "language": "Idioma",

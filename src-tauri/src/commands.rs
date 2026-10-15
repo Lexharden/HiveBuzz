@@ -334,6 +334,20 @@ pub async fn list_mic_devices() -> Vec<crate::mic::MicDevice> {
     tokio::task::spawn_blocking(crate::mic::input_devices).await.unwrap_or_default()
 }
 
+/// Salidas de audio detectadas (para elegir dónde suenan los sonidos y la voz).
+#[tauri::command]
+pub async fn list_audio_outputs() -> Vec<crate::audio::OutputDevice> {
+    tokio::task::spawn_blocking(crate::audio::output_devices).await.unwrap_or_default()
+}
+
+/// Suena un tono corto por la salida guardada, para comprobar que es la correcta.
+#[tauri::command]
+pub async fn test_audio_output(state: State<'_, AppState>) -> Result<()> {
+    let path = std::env::temp_dir().join("hivebuzz-test-tone.wav");
+    std::fs::write(&path, crate::audio::tone_wav_bytes(1, 660.0, 9_000.0))?;
+    crate::audio::AudioBackend::play(&*state.audio, path, 1.0, crate::audio::TAG_SOUND).await
+}
+
 /// Nivel actual del micrófono y si detecta voz (para calibrar la sensibilidad).
 #[tauri::command]
 pub fn get_mic_status(state: State<'_, AppState>) -> crate::mic::MicStatus {

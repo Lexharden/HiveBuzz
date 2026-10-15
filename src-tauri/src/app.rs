@@ -255,6 +255,7 @@ impl AppState {
         if let Err(e) = prefs.load().await {
             tracing::error!(error = %e, "no se pudieron cargar las preferencias");
         }
+        audio.set_output(prefs.get().audio_output);
         // Spotify: PKCE sin servidor propio; peticiones por chat y «Sonando ahora».
         let spotify_auth = SpotifyAuth::new(Arc::clone(&secrets), Arc::clone(&clock))?;
         let spotify_api = HttpSpotify::new(Arc::clone(&spotify_auth))?;

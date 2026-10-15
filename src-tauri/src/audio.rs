@@ -33,6 +33,84 @@ pub trait AudioBackend: Send + Sync {
 
     /// Reanuda lo pausado, retrocediendo antes `rewind` (`Duration::MAX` = desde el principio).
     fn resume_tag(&self, tag: Tag, rewind: Duration);
+
+    /// Elige la salida de audio por nombre (`None` = la predeterminada del sistema). Corta lo que
+    /// esté sonando y la próxima reproducción abre esa salida.
+    fn set_output(&self, _name: Option<String>) {}
+}
+
+/// Una salida de audio detectada en el equipo.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutputDevice {
+    pub name: String,
+    pub is_default: bool,
+}
+
+/// Salidas de audio disponibles, primero la predeterminada del sistema.
+pub fn output_devices() -> Vec<OutputDevice> {
+    use cpal::traits::HostTrait;
+    let host = cpal::default_host();
+    let default = host.default_output_device().and_then(|d| crate::mic::device_name(&d));
+    let Ok(devices) = host.output_devices() else {
+        return Vec::new();
+    };
+    let mut list: Vec<OutputDevice> = devices
+        .filter_map(|d| crate::mic::device_name(&d))
+        .map(|name| OutputDevice { is_default: default.as_deref() == Some(name.as_str()), name })
+        .collect();
+    list.sort_by(|a, b| b.is_default.cmp(&a.is_default).then_with(|| a.name.cmp(&b.name)));
+    list.dedup_by(|a, b| a.name == b.name);
+    list
+}
+
+/// Abre la salida pedida; si ya no está conectada, cae a la predeterminada (los sonidos no se pierden).
+fn open_sink(wanted: Option<&str>) -> std::result::Result<rodio::MixerDeviceSink, String> {
+    use cpal::traits::HostTrait;
+    if let Some(name) = wanted {
+        let found = cpal::default_host()
+            .output_devices()
+            .ok()
+            .and_then(|mut it| it.find(|d| crate::mic::matches_device(d, name)));
+        match found {
+            Some(device) => {
+                match rodio::DeviceSinkBuilder::from_device(device).and_then(|b| b.open_sink_or_fallback()) {
+                    Ok(sink) => return Ok(sink),
+                    Err(e) => tracing::warn!(device = name, error = %e, "no se pudo abrir la salida elegida; se usa la predeterminada"),
+                }
+            }
+            None => tracing::warn!(device = name, "la salida elegida no está conectada; se usa la predeterminada"),
+        }
+    }
+    rodio::DeviceSinkBuilder::open_default_sink().map_err(|e| format!("no hay dispositivo de audio disponible: {e}"))
+}
+
+/// WAV de un tono corto (16 bits, mono) para probar una salida.
+pub fn tone_wav_bytes(secs: u32, hz: f64, amplitude: f64) -> Vec<u8> {
+    let rate = 16_000u32;
+    let n = rate * secs;
+    let mut b = Vec::with_capacity(44 + n as usize * 2);
+    b.extend_from_slice(b"RIFF");
+    b.extend_from_slice(&(36 + n * 2).to_le_bytes());
+    b.extend_from_slice(b"WAVEfmt ");
+    b.extend_from_slice(&16u32.to_le_bytes());
+    b.extend_from_slice(&1u16.to_le_bytes());
+    b.extend_from_slice(&1u16.to_le_bytes());
+    b.extend_from_slice(&rate.to_le_bytes());
+    b.extend_from_slice(&(rate * 2).to_le_bytes());
+    b.extend_from_slice(&2u16.to_le_bytes());
+    b.extend_from_slice(&16u16.to_le_bytes());
+    b.extend_from_slice(b"data");
+    b.extend_from_slice(&(n * 2).to_le_bytes());
+    for i in 0..n {
+        // Entrada y salida suaves para que no suene un clic.
+        let t = f64::from(i) / f64::from(rate);
+        let edge = (t / 0.03).min(1.0).min((f64::from(secs) - t) / 0.03).max(0.0);
+        #[allow(clippy::cast_possible_truncation)]
+        let v = ((t * hz * std::f64::consts::TAU).sin() * amplitude * edge) as i16;
+        b.extend_from_slice(&v.to_le_bytes());
+    }
+    b
 }
 
 enum Cmd {
@@ -46,6 +124,7 @@ enum Cmd {
     StopAll,
     PauseTag(Tag),
     ResumeTag(Tag, Duration),
+    SetOutput(Option<String>),
 }
 
 struct Active {
@@ -118,16 +197,21 @@ impl AudioBackend for RodioBackend {
     fn resume_tag(&self, tag: Tag, rewind: Duration) {
         let _ = self.tx.send(Cmd::ResumeTag(tag, rewind));
     }
+
+    fn set_output(&self, name: Option<String>) {
+        let _ = self.tx.send(Cmd::SetOutput(name));
+    }
 }
 
 fn audio_thread(rx: &mpsc::Receiver<Cmd>) {
     let mut device: Option<rodio::MixerDeviceSink> = None;
+    let mut output: Option<String> = None;
     let mut active: Vec<Active> = Vec::new();
 
     loop {
         match rx.recv_timeout(Duration::from_millis(40)) {
             Ok(Cmd::Play { path, volume, tag, done }) => {
-                match start_playback(&mut device, &path, volume) {
+                match start_playback(&mut device, output.as_deref(), &path, volume) {
                     Ok(player) => active.push(Active {
                         player,
                         tag,
@@ -160,6 +244,18 @@ fn audio_thread(rx: &mpsc::Receiver<Cmd>) {
                 }
                 // Se reabre el dispositivo en la próxima reproducción (p. ej. si cambió de salida).
                 device = None;
+            }
+            Ok(Cmd::SetOutput(name)) => {
+                if name != output {
+                    for mut a in active.drain(..) {
+                        a.player.stop();
+                        if let Some(d) = a.done.take() {
+                            let _ = d.send(Ok(()));
+                        }
+                    }
+                    device = None;
+                    output = name;
+                }
             }
             Ok(Cmd::PauseTag(tag)) => {
                 for a in active.iter().filter(|a| a.tag == tag) {
@@ -202,13 +298,12 @@ fn audio_thread(rx: &mpsc::Receiver<Cmd>) {
 
 fn start_playback(
     device: &mut Option<rodio::MixerDeviceSink>,
+    output: Option<&str>,
     path: &std::path::Path,
     volume: f32,
 ) -> std::result::Result<rodio::Player, String> {
     if device.is_none() {
-        let opened = rodio::DeviceSinkBuilder::open_default_sink()
-            .map_err(|e| format!("no hay dispositivo de audio disponible: {e}"))?;
-        *device = Some(opened);
+        *device = Some(open_sink(output)?);
     }
     let Some(dev) = device.as_ref() else {
         return Err("no hay dispositivo de audio disponible".into());
@@ -266,6 +361,10 @@ pub mod testing {
             let r = if rewind == Duration::MAX { "start".to_string() } else { rewind.as_millis().to_string() };
             self.stopped.lock().expect("lock").push(format!("resume:{tag}:{r}"));
         }
+
+        fn set_output(&self, name: Option<String>) {
+            self.stopped.lock().expect("lock").push(format!("output:{}", name.unwrap_or_default()));
+        }
     }
 }
 
@@ -275,29 +374,25 @@ mod tests {
 
     use super::*;
 
-    /// WAV de `secs` segundos con un tono (16 bits, mono, 16 kHz).
     fn tone_wav(path: &std::path::Path, secs: u32) {
-        let rate = 16_000u32;
-        let n = rate * secs;
-        let mut b = Vec::new();
-        b.extend_from_slice(b"RIFF");
-        b.extend_from_slice(&(36 + n * 2).to_le_bytes());
-        b.extend_from_slice(b"WAVEfmt ");
-        b.extend_from_slice(&16u32.to_le_bytes());
-        b.extend_from_slice(&1u16.to_le_bytes());
-        b.extend_from_slice(&1u16.to_le_bytes());
-        b.extend_from_slice(&rate.to_le_bytes());
-        b.extend_from_slice(&(rate * 2).to_le_bytes());
-        b.extend_from_slice(&2u16.to_le_bytes());
-        b.extend_from_slice(&16u16.to_le_bytes());
-        b.extend_from_slice(b"data");
-        b.extend_from_slice(&(n * 2).to_le_bytes());
-        for i in 0..n {
-            #[allow(clippy::cast_possible_truncation)]
-            let v = ((f64::from(i) * 440.0 * std::f64::consts::TAU / f64::from(rate)).sin() * 2_000.0) as i16;
-            b.extend_from_slice(&v.to_le_bytes());
-        }
-        std::fs::write(path, b).expect("wav");
+        std::fs::write(path, tone_wav_bytes(secs, 440.0, 2_000.0)).expect("wav");
+    }
+
+    #[test]
+    fn the_test_tone_is_a_valid_wav_that_rodio_can_decode() {
+        let cursor = std::io::Cursor::new(tone_wav_bytes(1, 880.0, 3_000.0));
+        assert!(rodio::Decoder::try_from(cursor).is_ok());
+    }
+
+    #[test]
+    fn output_devices_list_has_a_single_default_first() {
+        let list = output_devices(); // en CI puede estar vacía
+        assert!(list.iter().filter(|d| d.is_default).count() <= 1);
+        assert!(list.first().is_none_or(|d| d.is_default || list.iter().all(|x| !x.is_default)));
+        let mut names: Vec<_> = list.iter().map(|d| d.name.clone()).collect();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), list.len(), "sin repetidas");
     }
 
     /// Reproduce de verdad (necesita salida de audio): `cargo test audio_live -- --ignored`.
