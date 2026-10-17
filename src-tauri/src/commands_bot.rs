@@ -223,12 +223,13 @@ pub async fn tiktok_login_start(app: AppHandle) -> Result<()> {
 
 /// Guarda la sesión a partir de las dos cookies pegadas a mano (alternativa cuando la ventana de login no funciona).
 #[tauri::command]
-pub fn tiktok_login_manual(state: State<'_, AppState>, session_id: String, tt_target_idc: String) -> Result<()> {
+pub async fn tiktok_login_manual(state: State<'_, AppState>, session_id: String, tt_target_idc: String) -> Result<()> {
     let clean = |v: String| v.trim().trim_matches('"').to_string();
     crate::secrets::save_tiktok_session(
         state.secrets.as_ref(),
         &SessionPayload { session_id: clean(session_id), tt_target_idc: clean(tt_target_idc) },
-    )
+    )?;
+    crate::commands::reconnect_tiktok_if_active(&state).await
 }
 
 /// Lee las cookies de la ventana de inicio de sesión y, si hay sesión, la guarda y cierra la ventana.
@@ -247,6 +248,7 @@ pub async fn tiktok_login_finish(app: AppHandle, state: State<'_, AppState>) -> 
     };
     crate::secrets::save_tiktok_session(state.secrets.as_ref(), &SessionPayload { session_id, tt_target_idc })?;
     let _ = w.close();
+    crate::commands::reconnect_tiktok_if_active(&state).await?;
     Ok(true)
 }
 
@@ -254,6 +256,7 @@ pub async fn tiktok_login_finish(app: AppHandle, state: State<'_, AppState>) -> 
 #[tauri::command]
 pub async fn tiktok_logout(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     crate::secrets::clear_tiktok_session(state.secrets.as_ref())?;
+    crate::commands::reconnect_tiktok_if_active(&state).await?;
     if let Some(w) = app.get_webview_window(LOGIN_WINDOW) {
         let _ = w.clear_all_browsing_data();
         let _ = w.close();

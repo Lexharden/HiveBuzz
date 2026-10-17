@@ -204,7 +204,7 @@ export class Connector {
       this.deps.emit({ kind: "chatResult", requestId, ok, ...(error !== undefined ? { error } : {}) });
     const client = this.connectedClient;
     if (!client) return reply(false, "no hay conexión con el LIVE");
-    if (!client.sendChat) return reply(false, "falta iniciar sesión en TikTok y una API key de Euler Stream");
+    if (!client.sendChat) return reply(false, "esta conexión no tiene sesión de TikTok: inicia sesión (y pon la API key de Euler Stream) y se reconecta sola; si ya lo hiciste, la sesión caducó o TikTok la rechazó, así que vuelve a iniciarla");
     // Una sola línea y dentro del límite de TikTok (sin partir un emoji por la mitad).
     const clean = [...text.replace(/[\r\n]+/g, " ").trim()].slice(0, MAX_CHAT_CHARS).join("");
     if (clean === "") return reply(false, "mensaje vacío");

@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.3.4] - 2026-10-17
+
+### Corregido
+- **Sesión de TikTok y API key de Euler**: se leían solo al conectar, así que si las configurabas con la conexión ya abierta el bot seguía sin poder escribir. Ahora, si TikTok está conectado, al iniciar o cerrar sesión, pegar cookies o cambiar la API key se reconecta sola con lo nuevo.
+- **Mensaje del bot sin sesión**: ya no dice solo «falta iniciar sesión»; explica que esa conexión no tiene sesión y que, si ya la iniciaste, caducó o TikTok la rechazó.
+
 ## [0.3.3] - 2026-10-17
 
 ### Corregido

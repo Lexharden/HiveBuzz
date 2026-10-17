@@ -319,7 +319,7 @@ describe("escribir en el chat (bot)", () => {
     await w.clock.advance(0);
     await w.connector.sendChat("r1", "hola");
     expect(results(w)[0]).toMatchObject({ ok: false });
-    expect(results(w)[0]?.error).toContain("iniciar sesión");
+    expect(results(w)[0]?.error).toContain("sesión de TikTok");
     await w.connector.disconnect();
   });
 

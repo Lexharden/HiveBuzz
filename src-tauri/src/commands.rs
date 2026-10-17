@@ -57,6 +57,18 @@ pub struct AppInfo {
     pub has_euler_api_key: bool,
 }
 
+/// Si TikTok ya está conectado (o reintentando), vuelve a conectar con las credenciales guardadas ahora:
+/// la sesión y la API key solo se leen al conectar, así que sin esto un cambio no se aplicaría hasta reconectar a mano.
+pub async fn reconnect_tiktok_if_active(state: &AppState) -> Result<()> {
+    if state.conn.status().state == crate::source::protocol::ConnectionState::Disconnected {
+        return Ok(());
+    }
+    let Some(username) = state.db.get_setting(KEY_LAST_USERNAME).await? else { return Ok(()) };
+    let key = state.secrets.get(KEY_EULER_API)?;
+    let session = crate::secrets::load_tiktok_session(state.secrets.as_ref())?;
+    state.conn.connect(&username, key, session).await
+}
+
 /// Conecta una plataforma. `name` es el @usuario de TikTok o el canal de Twitch.
 #[tauri::command]
 pub async fn connect(state: State<'_, AppState>, platform: Platform, username: String) -> Result<()> {
@@ -114,11 +126,12 @@ pub async fn get_app_info(state: State<'_, AppState>) -> Result<AppInfo> {
 /// Guarda (o borra, si llega vacía) la API key propia de Euler Stream en el llavero.
 /// Nunca se devuelve a la UI.
 #[tauri::command]
-pub fn set_euler_api_key(state: State<'_, AppState>, key: Option<String>) -> Result<()> {
+pub async fn set_euler_api_key(state: State<'_, AppState>, key: Option<String>) -> Result<()> {
     match key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
-        Some(k) => state.secrets.set(KEY_EULER_API, &k),
-        None => state.secrets.delete(KEY_EULER_API),
+        Some(k) => state.secrets.set(KEY_EULER_API, &k)?,
+        None => state.secrets.delete(KEY_EULER_API)?,
     }
+    reconnect_tiktok_if_active(&state).await
 }
 
 /// El nuevo puerto se aplica al reiniciar la app.
