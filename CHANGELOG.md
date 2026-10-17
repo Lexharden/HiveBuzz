@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.3.2] - 2026-10-17
+
+### Novedades
+- **Jarrón con su propia cuenta**: ya no necesita una meta. Se llena con cada regalo, se guarda al cerrar la app y se controla desde Overlays → Jarrón de regalos: sumar 100/1.000/10.000, llenarlo o vaciarlo. Además puede vaciarse solo al llegar al objetivo y contar vueltas.
+- **Jarrón personalizable**: cinco formas (jarrón, botella, taza, corazón, cilindro), degradado de color, opacidad del cristal, tapa opcional, olas y burbujas, velocidad de subida, título, porcentaje, posición de los textos, qué cae al llegar un regalo (su imagen o una moneda) y su tamaño, y un efecto al llenarse (pulso o confeti).
+
+### Corregido
+- El jarrón quedaba vacío en las pruebas si no existía una meta de monedas.
+
 ## [0.3.1] - 2026-10-16
 
 ### Corregido

@@ -21,6 +21,7 @@ pub mod error;
 pub mod events;
 pub mod executors;
 pub mod goals;
+pub mod jar;
 pub mod interact;
 pub mod leaderboard;
 pub mod logs;
@@ -178,6 +179,10 @@ pub fn run() {
             commands::delete_goal,
             commands::adjust_goal,
             commands::reset_goal,
+            commands::jar_state,
+            commands::jar_add,
+            commands::jar_set,
+            commands::jar_reset,
             commands::list_timers,
             commands::save_timer,
             commands::delete_timer,

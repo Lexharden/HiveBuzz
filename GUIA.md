@@ -65,7 +65,7 @@ Cada pantalla trae una frase que explica para qué sirve.
 4. En OBS: *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080. TikTok LIVE Studio puede decir
    «enlace no válido» con estas direcciones locales: prueba el botón *Copiar (localhost)* o usa la cámara virtual de OBS.
 5. ⚠️ La URL lleva tu token: **no la compartas**.
-6. **Jarrón de regalos**: se llena con una meta de *monedas* (créala en «Metas y timers»; si hay varias, elige su ID).
+6. **Jarrón de regalos**: lleva su propia cuenta de monedas (no necesita meta). En Overlays → Jarrón de regalos fija el *objetivo*, suma, llena o vacía a mano, y personaliza forma, colores, olas, burbujas, textos y efecto al llenarse. Con «Una meta de monedas» como origen sigue una meta de «Metas y timers».
    Los dólares son una **estimación**: monedas × la tasa que pongas (0,005 por defecto, aprox. lo que recibe el creador
    tras la comisión de TikTok). No incluyen impuestos ni cambios del programa de pagos; no los uses como ingresos reales.
 

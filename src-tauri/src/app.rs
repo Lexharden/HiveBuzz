@@ -31,6 +31,7 @@ use crate::executors::internal::{GoalAdjustExecutor, TimerControlExecutor};
 use crate::executors::sound::PlaySoundExecutor;
 use crate::executors::tts::TtsExecutor;
 use crate::goals::service::{GoalService, GoalTiming};
+use crate::jar::JarService;
 use crate::leaderboard::{LeaderboardService, LeaderboardTiming};
 use crate::media::MediaLibrary;
 use crate::overlay::{OverlayHub, RecentEvents};
@@ -106,6 +107,7 @@ pub struct AppState {
     pub session: SessionService,
     pub overlay_cfg: OverlayConfigService,
     pub goals: Arc<GoalService>,
+    pub jar: Arc<JarService>,
     pub timers: Arc<TimerService>,
     pub leaderboard: Arc<LeaderboardService>,
     pub counters: Arc<CounterService>,
@@ -224,6 +226,10 @@ impl AppState {
         let goals = GoalService::new(db.clone(), hub.clone());
         if let Err(e) = goals.load().await {
             tracing::error!(error = %e, "no se pudieron cargar las metas");
+        }
+        let jar = JarService::new(db.clone(), hub.clone(), overlay_cfg.clone());
+        if let Err(e) = jar.load().await {
+            tracing::error!(error = %e, "no se pudo cargar el jarrón");
         }
         let timers = TimerService::new(db.clone(), hub.clone(), Arc::clone(&clock));
         if let Err(e) = timers.load().await {
@@ -347,6 +353,7 @@ impl AppState {
         rules.spawn(&bus);
         tts.spawn(&bus);
         goals.spawn(&bus, session.subscribe(), GoalTiming::default());
+        jar.spawn(&bus, Duration::from_secs(3));
         timers.spawn(&bus, TimerTiming::default());
         leaderboard.spawn(&bus, session.subscribe(), LeaderboardTiming::default());
         counters.spawn(&bus, total_viewers.clone(), session.subscribe(), Duration::from_millis(250));
@@ -405,6 +412,7 @@ impl AppState {
             session,
             overlay_cfg,
             goals,
+            jar,
             timers,
             leaderboard,
             counters,
@@ -441,6 +449,7 @@ impl AppState {
     pub async fn persist(&self) {
         let flush = async {
             self.goals.flush().await;
+            self.jar.flush().await;
             self.timers.flush().await;
             if let Err(e) = self.points.flush().await {
                 tracing::warn!(error = %e, "no se pudieron guardar los puntos pendientes");

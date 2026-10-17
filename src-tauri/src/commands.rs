@@ -507,6 +507,29 @@ pub async fn reset_goal(state: State<'_, AppState>, id: String) -> Result<()> {
     state.goals.reset(&id).await
 }
 
+// ---- Jarrón ----------------------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn jar_state(state: State<'_, AppState>) -> crate::jar::JarState {
+    state.jar.state()
+}
+
+#[tauri::command]
+pub async fn jar_add(state: State<'_, AppState>, delta: i64) -> Result<()> {
+    state.jar.add(delta).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn jar_set(state: State<'_, AppState>, coins: u64) {
+    state.jar.set(coins);
+}
+
+#[tauri::command]
+pub fn jar_reset(state: State<'_, AppState>) {
+    state.jar.reset();
+}
+
 // ---- Timers ----------------------------------------------------------------------------------------------------
 
 #[tauri::command]

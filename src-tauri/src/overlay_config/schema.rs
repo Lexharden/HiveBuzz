@@ -373,16 +373,40 @@ pub fn registry() -> Vec<OverlayDef> {
             id: "jar",
             name: "overlay.jar",
             fields: {
+                use Group::Style;
                 let mut f = common_style("bottom-left", false);
-                f.push(num("jarSize", "field.jarSize", Group::Style, 320.0, 120.0, 900.0, 10.0));
-                f.push(color("liquidColor", "field.liquidColor", Group::Style, "#ffc113"));
-                f.push(color("glassColor", "field.glassColor", Group::Style, "#ffffff"));
+                f.push(select(
+                    "shape",
+                    "field.jarShape",
+                    Style,
+                    "jar",
+                    &[("jar", "jarOpt.jar"), ("bottle", "jarOpt.bottle"), ("mug", "jarOpt.mug"), ("heart", "jarOpt.heart"), ("cylinder", "jarOpt.cylinder")],
+                ));
+                f.push(num("jarSize", "field.jarSize", Style, 320.0, 120.0, 900.0, 10.0));
+                f.push(color("liquidColor", "field.liquidColor", Style, "#ffc113"));
+                f.push(color("liquidColor2", "field.liquidColor2", Style, "#ff8a00"));
+                f.push(color("glassColor", "field.glassColor", Style, "#ffffff"));
+                f.push(num("glassOpacity", "field.glassOpacity", Style, 100.0, 0.0, 100.0, 5.0));
+                f.push(boolean("showLid", "field.showLid", Style, true));
+                f.push(color("lidColor", "field.lidColor", Style, "#ffffff"));
+                f.push(boolean("waves", "field.waves", Style, true));
+                f.push(boolean("bubbles", "field.bubbles", Style, true));
+                f.push(num("fillSpeed", "field.fillSpeed", Style, 0.9, 0.1, 5.0, 0.1));
+                f.push(text("title", "field.jarTitle", Style, "", 40));
+                f.push(select("labelPosition", "field.labelPosition", Style, "below", &[("below", "jarOpt.below"), ("above", "jarOpt.above")]));
+                f.push(boolean("showPercent", "field.showPercent", Style, false));
+                f.push(select("source", "field.jarSource", B, "own", &[("own", "jarOpt.own"), ("goal", "jarOpt.goal")]));
+                f.push(num("target", "field.jarTarget", B, 10_000.0, 1.0, 1_000_000_000.0, 1.0));
+                f.push(select("onFull", "field.onFull", B, "keep", &[("keep", "jarOpt.keep"), ("reset", "jarOpt.reset")]));
+                f.push(select("fullEffect", "field.fullEffect", B, "pulse", &[("pulse", "jarOpt.pulse"), ("confetti", "jarOpt.confetti"), ("none", "jarOpt.none")]));
                 f.push(text("goalId", "field.jarGoalId", B, "", 80));
                 f.push(boolean("showGoal", "field.showGoalNumbers", B, true));
                 f.push(boolean("showUsd", "field.showUsd", B, true));
                 f.push(num("usdPerCoin", "field.usdPerCoin", B, 0.005, 0.0, 1.0, 0.0005));
                 f.push(text("currencySymbol", "field.currencySymbol", B, "$", 4));
                 f.push(boolean("dropGifts", "field.dropGifts", B, true));
+                f.push(select("dropMode", "field.dropMode", B, "gift", &[("gift", "jarOpt.dropGift"), ("coin", "jarOpt.dropCoin")]));
+                f.push(num("dropSize", "field.dropSize", B, 15.0, 5.0, 40.0, 1.0));
                 f.push(num("minCoins", "field.minCoins", B, 1.0, 0.0, 1_000_000.0, 1.0));
                 f
             },

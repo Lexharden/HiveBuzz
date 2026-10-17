@@ -116,6 +116,10 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
               <p className="mt-2 text-xs text-zinc-500">{TESTABLE.has(def.id) ? t("overlays.previewHintTest") : t("overlays.previewHintLive")}</p>
             </Card>
 
+            {def.id === "jar" && (
+              <JarControls target={Number(config.target) || 0} onError={(e) => setError(errorMessage(e))} />
+            )}
+
             <Card>
               <SchemaForm fields={def.fields} config={config} onChange={change} />
             </Card>
@@ -124,5 +128,42 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Acciones del jarrón: ver cuánto lleva, sumar a mano, llenarlo o vaciarlo. */
+function JarControls({ target, onError }: { target: number; onError: (e: unknown) => void }) {
+  const { t } = useTranslation();
+  const [state, setState] = useState({ coins: 0, laps: 0 });
+
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => void api.jarState().then((s) => alive && setState(s)).catch(() => undefined);
+    refresh();
+    const id = setInterval(refresh, 1000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, []);
+
+  const run = (op: Promise<void>) => void op.catch(onError);
+
+  return (
+    <Card title={t("overlays.jarCoins")} hint={`${state.coins.toLocaleString()} / ${target.toLocaleString()} · ${t("overlays.jarLaps")}: ${state.laps}`}>
+      <div className="flex flex-wrap gap-2">
+        {[100, 1000, 10000].map((n) => (
+          <Btn key={n} onClick={() => run(api.jarAdd(n))}>+{n.toLocaleString()}</Btn>
+        ))}
+        <Btn onClick={() => run(api.jarSet(target))} disabled={target <= 0}>{t("overlays.jarFill")}</Btn>
+        <Btn
+          onClick={() => {
+            if (window.confirm(t("overlays.jarConfirmEmpty"))) run(api.jarReset());
+          }}
+        >
+          {t("overlays.jarEmpty")}
+        </Btn>
+      </div>
+    </Card>
   );
 }
