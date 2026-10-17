@@ -284,6 +284,14 @@ export class Connector {
             await this.sleep(this.cfg.liveCheckMs, signal);
             continue;
           }
+          // La sesión de TikTok (cookies) solo sirve para que el bot escriba; si caduca o TikTok no la acepta,
+          // rechaza también la conexión de lectura. Se reintenta ya mismo sin ella para no perder los eventos.
+          if (kind === "signature" && target.session) {
+            this.log("warn", "TikTok no aceptó la conexión con la sesión iniciada; se conecta sin ella (el bot no podrá escribir en el chat)");
+            const { session: _dropped, ...withoutSession } = target;
+            target = withoutSession;
+            continue;
+          }
           retryAfterMs = Number((err as { retryAfter?: unknown }).retryAfter) || 0;
           this.setState(kind === "signature" ? "signature_error" : "reconnecting", { detail: errMsg(err) });
         }

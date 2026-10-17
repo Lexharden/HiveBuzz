@@ -244,6 +244,16 @@ describe("recuperación", () => {
     await w.connector.disconnect();
   });
 
+  it("si TikTok rechaza la conexión con la sesión iniciada, reintenta de inmediato sin ella", async () => {
+    w.connects = [new SignatureRateLimitError("TikTok no aceptó la sesión")];
+    await w.connector.connect({ uniqueId: "ana", session: { sessionId: "SID", ttTargetIdc: "IDC" } });
+    await w.clock.advance(0);
+    expect(w.connector.state).toBe("connected");
+    expect(states(w)).not.toContain("signature_error");
+    expect(w.clients).toHaveLength(2);
+    await w.connector.disconnect();
+  });
+
   it("un @usuario inválido es fatal: no reintenta", async () => {
     w.live = [new InvalidUniqueIdError("usuario inválido")];
     await w.connector.connect({ uniqueId: "???" });

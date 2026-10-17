@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.3.3] - 2026-10-17
+
+### Corregido
+- **Conectar con la sesión de TikTok iniciada**: si TikTok no aceptaba la conexión estando la sesión puesta (cookies caducadas o rechazadas), no conectaba hasta cerrar la sesión. Ahora se reintenta al instante sin ella: sigues recibiendo todos los eventos, y solo el bot no podrá escribir en el chat hasta que vuelvas a iniciar sesión.
+
 ## [0.3.2] - 2026-10-17
 
 ### Novedades
