@@ -295,8 +295,15 @@ describe("robustez (mensajes desconocidos o malformados)", () => {
     expect(logs.some((l) => l.startsWith("error") && l.includes("boom"))).toBe(true);
   });
 
-  it("unknown() registra el mensaje", () => {
+  it("unknown() con detalle (fallo al decodificar) avisa", () => {
     n.unknown("WebcastFooMessage", { a: 1 });
     expect(logs[0]).toContain("WebcastFooMessage");
+    expect(logs[0]?.startsWith("warn")).toBe(true);
+  });
+
+  it("unknown() de un tipo que no usamos solo queda en depuración", () => {
+    n.unknown("tipo sin manejar: WebcastLiveIntroMessage");
+    expect(logs).toHaveLength(1);
+    expect(logs[0]?.startsWith("debug")).toBe(true);
   });
 });

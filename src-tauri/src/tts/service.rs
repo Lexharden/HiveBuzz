@@ -205,14 +205,25 @@ impl TtsService {
             .get(engine_id)
             .ok_or_else(|| AppError::Invalid(format!("motor de TTS desconocido: {engine_id}")))?;
 
-        let path = engine
-            .synthesize(&SynthRequest {
-                text: spoken,
-                voice: voice_name.to_string(),
-                rate: opts.rate.unwrap_or(cfg.rate).clamp(0.5, 2.0),
-                out_dir: self.cache_dir.clone(),
-            })
-            .await?;
+        let request = SynthRequest {
+            text: spoken,
+            voice: voice_name.to_string(),
+            rate: opts.rate.unwrap_or(cfg.rate).clamp(0.5, 2.0),
+            out_dir: self.cache_dir.clone(),
+        };
+        let path = match engine.synthesize(&request).await {
+            Ok(path) => path,
+            // Los motores de red (Edge) fallan sin culpa de nadie —sin internet, servicio caído—: si hay una voz
+            // local se lee con ella en vez de perder el mensaje.
+            Err(e) if engine_id == "edge" => match self.local_fallback(&voices) {
+                Some((fallback, voice)) => {
+                    tracing::warn!(error = %e, voz = %voice, "Edge-TTS falló; se lee con una voz local");
+                    fallback.synthesize(&SynthRequest { voice, ..request }).await?
+                }
+                None => return Err(e),
+            },
+            Err(e) => return Err(e),
+        };
 
         #[allow(clippy::cast_possible_truncation)]
         let volume = (f64::from(cfg.volume) / 100.0 * opts.volume.unwrap_or(100.0).clamp(0.0, 100.0) / 100.0) as f32;
@@ -220,6 +231,14 @@ impl TtsService {
         // El audio temporal se borra siempre, haya salido bien o no.
         let _ = tokio::fs::remove_file(&path).await;
         played
+    }
+
+    /// Primera voz local (Piper o SAPI) disponible, con su motor, para cuando falla un motor de red.
+    fn local_fallback(&self, voices: &[VoiceInfo]) -> Option<(Arc<dyn TtsEngine>, String)> {
+        voices.iter().filter(|v| v.engine != "edge").find_map(|v| {
+            let (engine_id, name) = split_voice_id(&v.id)?;
+            Some((Arc::clone(self.engines.get(engine_id)?), name.to_string()))
+        })
     }
 
     /// Reproduce sin hablar encima del streamer: espera a que calle para empezar y, si empieza a

@@ -254,9 +254,14 @@ export class Normalizer {
     return out;
   }
 
-  /** Registra un mensaje que la librería no pudo decodificar o que no conocemos. */
+  /**
+   * Registra un mensaje que la librería no pudo decodificar (con `detail`: es un problema, aviso) o un
+   * tipo de mensaje que no usamos (sin `detail`: TikTok manda decenas —intros, paneles de regalos…— y no
+   * son un fallo, así que solo queda en el nivel de depuración).
+   */
   unknown(what: string, detail?: unknown): void {
-    this.log("warn", `mensaje no manejado: ${what}${detail === undefined ? "" : ` (${describe(detail)})`}`);
+    if (detail === undefined) this.log("debug", `mensaje no manejado: ${what}`);
+    else this.log("warn", `mensaje no manejado: ${what} (${describe(detail)})`);
   }
 
   // ---- Internos -------------------------------------------------------------------------

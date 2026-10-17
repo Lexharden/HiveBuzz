@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.3.1] - 2026-10-16
+
+### Corregido
+- **Avisos de «mensaje no manejado»**: los tipos de mensaje de TikTok que HiveBuzz no usa (intros, paneles de regalos…) ya no salen como advertencias; quedan solo en depuración.
+- **Voz de Edge-TTS**: si un servidor no responde, se pasa al siguiente a los 12 s en lugar de agotar todo el tiempo; y si Edge falla del todo (sin internet, servicio caído) el mensaje se lee con una voz local (Piper o Windows) en vez de perderse.
+
 ## [0.3.0] - 2026-10-16
 
 ### Novedades

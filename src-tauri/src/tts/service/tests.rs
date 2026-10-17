@@ -430,3 +430,61 @@ mod mic_guard {
         assert!(log(&r).is_empty());
     }
 }
+
+/// Servicio con un motor «edge» (de red) además de Piper, para probar el respaldo local.
+async fn rig_with_edge(edge: FakeEngine) -> (Arc<TtsService>, Arc<FakeEngine>, Arc<FakeEngine>, Arc<FakeAudio>, tempfile::TempDir) {
+    let cache = tempfile::tempdir().expect("tmp");
+    let audio = Arc::new(FakeAudio::default());
+    let (edge, piper) = (Arc::new(edge), Arc::new(FakeEngine::new("piper", &["local"])));
+    let svc = TtsService::new(TtsDeps {
+        engines: vec![edge.clone(), piper.clone()],
+        audio: audio.clone(),
+        clock: Arc::new(AppClock::new()),
+        db: Db::open_memory().await.expect("db"),
+        cache_dir: cache.path().join("tts"),
+        piper_paths: Arc::new(RwLock::new(PiperPaths::default())),
+        default_piper: PiperPaths { exe: "/app/piper".into(), voices_dir: "/app/voices".into() },
+        mic: None,
+    })
+    .expect("svc");
+    (svc, edge, piper, audio, cache)
+}
+
+#[tokio::test]
+async fn a_failing_network_voice_falls_back_to_a_local_one() {
+    let mut edge = FakeEngine::new("edge", &["red"]);
+    edge.fail = true;
+    let (svc, edge, piper, audio, _cache) = rig_with_edge(edge).await;
+    svc.speak("hola", &Vars::new(), Some("edge:red"), SpeakOptions::default()).await.expect("debe leerse con la voz local");
+    assert_eq!(edge.calls.lock().expect("lock").len(), 1, "primero se intentó la de red");
+    assert_eq!(piper.calls.lock().expect("lock")[0].voice, "local");
+    assert_eq!(audio.played.lock().expect("lock").len(), 1);
+}
+
+#[tokio::test]
+async fn a_failing_network_voice_without_local_voices_reports_the_error() {
+    let cache = tempfile::tempdir().expect("tmp");
+    let mut edge = FakeEngine::new("edge", &["red"]);
+    edge.fail = true;
+    let svc = TtsService::new(TtsDeps {
+        engines: vec![Arc::new(edge)],
+        audio: Arc::new(FakeAudio::default()),
+        clock: Arc::new(AppClock::new()),
+        db: Db::open_memory().await.expect("db"),
+        cache_dir: cache.path().join("tts"),
+        piper_paths: Arc::new(RwLock::new(PiperPaths::default())),
+        default_piper: PiperPaths { exe: "/app/piper".into(), voices_dir: "/app/voices".into() },
+        mic: None,
+    })
+    .expect("svc");
+    let err = svc.speak("hola", &Vars::new(), Some("edge:red"), SpeakOptions::default()).await.unwrap_err();
+    assert!(err.to_string().contains("el motor falló"), "{err}");
+}
+
+#[tokio::test]
+async fn a_failing_local_voice_does_not_fall_back_to_the_network() {
+    let mut piper = FakeEngine::new("piper", &["a"]);
+    piper.fail = true;
+    let r = rig_with(piper, false).await;
+    assert!(r.svc.speak("hola", &Vars::new(), None, SpeakOptions::default()).await.is_err());
+}

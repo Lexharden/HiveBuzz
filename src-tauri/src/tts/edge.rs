@@ -33,7 +33,10 @@ const ENDPOINTS: &[(&str, &str)] = &[
     ("wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1", "TrustedClientToken"),
 ];
 const OUTPUT_FORMAT: &str = "audio-24khz-48kbitrate-mono-mp3";
-const TIMEOUT: Duration = Duration::from_secs(30);
+/// Tiempo máximo de toda la síntesis (todos los servidores y un reintento por desfase de reloj).
+const TIMEOUT: Duration = Duration::from_secs(40);
+/// Tiempo máximo por servidor: si el primero se cuelga, el segundo todavía tiene margen para probarse.
+const HOST_TIMEOUT: Duration = Duration::from_secs(12);
 
 /// Voces del servicio de lectura de Edge en español, inglés, portugués, francés, italiano, alemán, japonés y
 /// coreano (comprobadas contra su `voices/list` en octubre de 2026). Las «Multilingual» leen varios idiomas.
@@ -231,12 +234,12 @@ impl TtsEngine for EdgeEngine {
             let mut last = other("Edge-TTS no tiene ningún servidor configurado");
             let mut skew_known = 0;
             for &(host, key_param) in ENDPOINTS {
-                let mut result = fetch_audio(req, host, key_param, skew_known).await;
+                let mut result = within_host_limit(host, fetch_audio(req, host, key_param, skew_known)).await;
                 // 403 con cabecera `Date`: el reloj local está desfasado y el token GEC no vale.
                 if let Err(Fetch::Forbidden { skew_secs: Some(skew) }) = result {
                     if skew != 0 {
                         skew_known = skew;
-                        result = fetch_audio(req, host, key_param, skew).await;
+                        result = within_host_limit(host, fetch_audio(req, host, key_param, skew)).await;
                     }
                 }
                 match result {
@@ -255,6 +258,16 @@ impl TtsEngine for EdgeEngine {
         tokio::fs::write(&out, audio).await?;
         Ok(out)
     }
+}
+
+/// Corta un intento que no responde, para pasar al siguiente servidor en vez de agotar todo el tiempo.
+async fn within_host_limit<T>(
+    host: &str,
+    attempt: impl std::future::Future<Output = std::result::Result<T, Fetch>>,
+) -> std::result::Result<T, Fetch> {
+    tokio::time::timeout(HOST_TIMEOUT, attempt)
+        .await
+        .unwrap_or_else(|_| Err(other(format!("Edge-TTS: {} no respondió en {} s", host.split('/').nth(2).unwrap_or(host), HOST_TIMEOUT.as_secs()))))
 }
 
 /// Fallo de una conexión a Edge-TTS.
@@ -489,5 +502,16 @@ mod tests {
             .await
             .expect_err("voz desconocida");
         assert!(err.to_string().contains("desconocida"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_hanging_host_is_cut_off_so_the_next_one_can_be_tried() {
+        let hung = within_host_limit("wss://a.example/x", std::future::pending::<std::result::Result<(), Fetch>>()).await;
+        match hung {
+            Err(Fetch::Other(m)) => assert!(m.contains("a.example") && m.contains("12"), "{m}"),
+            _ => panic!("debía fallar por tiempo"),
+        }
+        let ok = within_host_limit("wss://b.example/x", async { Ok::<_, Fetch>(7) }).await;
+        assert!(matches!(ok, Ok(7)));
     }
 }

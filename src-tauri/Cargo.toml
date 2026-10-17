@@ -1,6 +1,6 @@
 [package]
 name = "hive-buzz"
-version = "0.3.0"
+version = "0.3.1"
 description = "HiveBuzz: alertas, TTS y automatización para TikTok LIVE"
 authors = ["HiveBuzz"]
 edition = "2021"
