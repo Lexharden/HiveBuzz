@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { ActionSpec, Conditions, Rule, Trigger } from "../../lib/types";
 import { defaultConditions } from "./ruleDefaults";
 
-export type PresetCategory = "thanks" | "chat" | "interaction";
+export type PresetCategory = "new" | "thanks" | "chat" | "interaction";
 
 export interface RulePreset {
   key: string;
@@ -22,6 +22,8 @@ const HOUR = 60 * MIN;
 
 const tts = (text: string): ActionSpec => ({ type: "tts", text });
 const bot = (text: string): ActionSpec => ({ type: "botMessage", text });
+/** Petición HTTP con un enlace de ejemplo que el streamer sustituye al personalizar la plantilla. */
+const hook = (extra: Record<string, unknown>): ActionSpec => ({ type: "webhook", url: "https://ejemplo.com/hook", method: "GET", ...extra });
 
 function preset(
   key: string,
@@ -52,6 +54,24 @@ function preset(
 
 /** Reglas habituales de un streamer, listas para añadir y ajustar. */
 export const RULE_PRESETS: RulePreset[] = [
+  // Novedades: lo último que se ha añadido a HiveBuzz.
+  preset("webhookGift", "new", { type: "gift", minCoins: 100 }, () => [
+    hook({ method: "POST", bodyJson: { user: "{nickname}", gift: "{gift}", coins: "{coins}" }, retries: 1 }),
+  ], { conditions: { globalCooldownMs: 1_000 }, needsEdit: true }),
+  preset("webhookFollow", "new", { type: "follow" }, () => [hook({ url: "https://ejemplo.com/hook?user={user}", retries: 1 })], {
+    conditions: { userCooldownMs: 6 * HOUR, globalCooldownMs: 1_000 },
+    needsEdit: true,
+  }),
+  preset("fanClub", "new", { type: "command", command: "fan" }, (t) => [bot(t("presets.fanClub.say"))], {
+    conditions: { userCooldownMs: 60_000, minTeamLevel: 1 },
+  }),
+  preset("gifterVoice", "new", { type: "command", command: "vozvip" }, (t) => [tts(t("presets.gifterVoice.say"))], {
+    conditions: { userCooldownMs: 30_000, minGifterLevel: 5 },
+  }),
+  preset("jarFull", "new", { type: "goalReached", goalId: "" }, (t) => [tts(t("presets.jarFull.say")), bot(t("presets.jarFull.chat"))], {
+    priority: 60,
+    needsEdit: true,
+  }),
   // Agradecimientos en voz alta.
   preset("thanksGift", "thanks", { type: "gift" }, (t) => [tts(t("presets.thanksGift.say"))]),
   preset("bigGift", "thanks", { type: "gift", minCoins: 100 }, (t) => [bot(t("presets.bigGift.say"))], { priority: 50 }),
@@ -101,4 +121,4 @@ export const RULE_PRESETS: RulePreset[] = [
   }),
 ];
 
-export const PRESET_CATEGORIES: PresetCategory[] = ["thanks", "chat", "interaction"];
+export const PRESET_CATEGORIES: PresetCategory[] = ["new", "thanks", "chat", "interaction"];

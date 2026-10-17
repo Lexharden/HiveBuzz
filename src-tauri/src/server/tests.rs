@@ -99,6 +99,7 @@ async fn every_overlay_page_is_served_with_security_headers() {
         ("wheel", "Ruleta"),
         ("poll", "Encuesta"),
         ("nowplaying", "Sonando ahora"),
+        ("jar", "Jarrón"),
     ];
     for (name, marker) in expected {
         let (status, raw) = http_get(r.handle.addr, &format!("/overlay/{name}?token={TOKEN}"), &host).await;

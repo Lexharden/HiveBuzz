@@ -43,8 +43,24 @@ pub fn clear_logs() {
     logs::global().clear();
 }
 
+/// Ruta recibida de la interfaz (viene de un diálogo del sistema): absoluta, sin `..` y con una de
+/// las extensiones esperadas, así un fallo en la interfaz no puede escribir o leer cualquier archivo.
+fn checked_path(path: &str, extensions: &[&str]) -> Result<std::path::PathBuf> {
+    use std::path::Component;
+    let p = std::path::PathBuf::from(path);
+    let ext = p.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).unwrap_or_default();
+    if !p.is_absolute() || p.components().any(|c| matches!(c, Component::ParentDir)) {
+        return Err(AppError::Invalid("ruta de archivo no válida".into()));
+    }
+    if !extensions.contains(&ext.as_str()) {
+        return Err(AppError::Invalid(format!("el archivo debe terminar en .{}", extensions.join(" o ."))));
+    }
+    Ok(p)
+}
+
 #[tauri::command]
 pub async fn export_logs(path: String) -> Result<()> {
+    let path = checked_path(&path, &["txt", "log"])?;
     tokio::fs::write(path, logs::global().to_text()).await?;
     Ok(())
 }
@@ -109,13 +125,14 @@ pub async fn export_config(state: State<'_, AppState>, path: String) -> Result<S
     // Lo que está en memoria (progreso de metas y timers) se vuelca antes para exportarlo al día.
     state.goals.flush().await;
     state.timers.flush().await;
-    backup::export(&state.db, &state.data_dir, std::path::Path::new(&path), env!("CARGO_PKG_VERSION"), state.clock.now_ms()).await
+    let dest = checked_path(&path, &["zip"])?;
+    backup::export(&state.db, &state.data_dir, &dest, env!("CARGO_PKG_VERSION"), state.clock.now_ms()).await
 }
 
 /// Valida el archivo y lo deja pendiente: se aplica al reiniciar.
 #[tauri::command]
 pub async fn import_config(state: State<'_, AppState>, path: String) -> Result<Summary> {
-    let (src, data_dir) = (std::path::PathBuf::from(path), state.data_dir.clone());
+    let (src, data_dir) = (checked_path(&path, &["zip"])?, state.data_dir.clone());
     tokio::task::spawn_blocking(move || backup::stage_import(&src, &data_dir))
         .await
         .map_err(|e| AppError::Invalid(format!("la importación falló: {e}")))?
@@ -168,4 +185,19 @@ pub async fn prepare_release(app: AppHandle, state: State<'_, AppState>, tag: St
 pub async fn install_update(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     // En Windows el instalador cierra el proceso sin pasar por `RunEvent::Exit`: se guarda antes.
     updater::install(&app, &state.pending_update, state.persist()).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::checked_path;
+
+    #[test]
+    fn checked_path_rejects_relative_traversal_and_bad_extensions() {
+        let abs = if cfg!(windows) { r"C:\datos\copia.zip" } else { "/datos/copia.zip" };
+        assert!(checked_path(abs, &["zip"]).is_ok());
+        assert!(checked_path(&abs.to_uppercase(), &["zip"]).is_ok(), "la extensión no distingue mayúsculas");
+        assert!(checked_path("copia.zip", &["zip"]).is_err());
+        assert!(checked_path(&abs.replace("datos", "datos/../x"), &["zip"]).is_err());
+        assert!(checked_path(&abs.replace(".zip", ".exe"), &["zip"]).is_err());
+    }
 }

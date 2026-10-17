@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { integrationsApi, type WebhookReport } from "../../lib/integrations";
 import type { ActionSpec } from "../../lib/types";
-import { Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
+import { Btn, Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
 import { amountValue, bool, listValue, num, set, str, toAmount, toList } from "./paramHelpers";
 
 interface P {
@@ -90,6 +91,21 @@ export function StartPollParams({ action, onChange }: P) {
 
 export function WebhookParams({ action, onChange }: P) {
   const { t } = useTranslation();
+  const [testing, setTesting] = useState(false);
+  const [report, setReport] = useState<WebhookReport | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+  const runTest = async () => {
+    setTesting(true);
+    setReport(null);
+    setTestError(null);
+    try {
+      setReport(await integrationsApi.testWebhook(action));
+    } catch (e) {
+      setTestError(String(e));
+    } finally {
+      setTesting(false);
+    }
+  };
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-4 gap-2">
@@ -106,6 +122,23 @@ export function WebhookParams({ action, onChange }: P) {
       </div>
       <JsonField label={t("action.webhookBodyJson")} hint={t("action.webhookBodyHint")} value={action.bodyJson} onValid={(v) => onChange(set(action, "bodyJson", v))} />
       <JsonField label={t("action.webhookHeaders")} hint={t("action.webhookHeadersHint")} value={action.headers} onValid={(v) => onChange(set(action, "headers", v))} />
+      <div className="grid grid-cols-4 gap-2">
+        <Field label={t("action.webhookRetries")} hint={t("action.webhookRetriesHint")} className="col-span-3">
+          <NumberInput value={num(action, "retries") ?? 0} min={0} max={3} onChange={(v) => onChange(set(action, "retries", v))} />
+        </Field>
+        <div className="flex items-end pb-1.5">
+          <Btn disabled={testing || str(action, "url").trim() === ""} onClick={() => void runTest()}>
+            {testing ? t("action.webhookTesting") : t("action.webhookTest")}
+          </Btn>
+        </div>
+      </div>
+      {report && (
+        <div className={`rounded-md border p-2 text-xs ${report.ok ? "border-emerald-500/40 text-emerald-300" : "border-rose-500/40 text-rose-300"}`}>
+          <p>{t("action.webhookResult", { status: report.status, ms: report.elapsedMs, attempts: report.attempts })}</p>
+          {report.body && <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all text-zinc-400">{report.body}</pre>}
+        </div>
+      )}
+      {testError && <p className="rounded-md border border-rose-500/40 p-2 text-xs text-rose-300">{testError}</p>}
     </div>
   );
 }

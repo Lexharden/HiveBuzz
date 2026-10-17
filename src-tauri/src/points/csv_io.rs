@@ -165,6 +165,8 @@ mod tests {
 
     fn viewer(unique: &str, nick: &str, points: u64) -> Viewer {
         Viewer {
+            team_level: 0,
+            gifter_level: 0,
             user_id: "1".into(),
             unique_id: unique.into(),
             nickname: nick.into(),

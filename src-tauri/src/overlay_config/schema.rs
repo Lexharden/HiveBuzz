@@ -369,6 +369,24 @@ pub fn registry() -> Vec<OverlayDef> {
                 f
             },
         },
+        OverlayDef {
+            id: "jar",
+            name: "overlay.jar",
+            fields: {
+                let mut f = common_style("bottom-left", false);
+                f.push(num("jarSize", "field.jarSize", Group::Style, 320.0, 120.0, 900.0, 10.0));
+                f.push(color("liquidColor", "field.liquidColor", Group::Style, "#ffc113"));
+                f.push(color("glassColor", "field.glassColor", Group::Style, "#ffffff"));
+                f.push(text("goalId", "field.jarGoalId", B, "", 80));
+                f.push(boolean("showGoal", "field.showGoalNumbers", B, true));
+                f.push(boolean("showUsd", "field.showUsd", B, true));
+                f.push(num("usdPerCoin", "field.usdPerCoin", B, 0.005, 0.0, 1.0, 0.0005));
+                f.push(text("currencySymbol", "field.currencySymbol", B, "$", 4));
+                f.push(boolean("dropGifts", "field.dropGifts", B, true));
+                f.push(num("minCoins", "field.minCoins", B, 1.0, 0.0, 1_000_000.0, 1.0));
+                f
+            },
+        },
     ]
 }
 
@@ -384,7 +402,7 @@ mod tests {
     #[test]
     fn registry_ids_are_unique_and_known() {
         let ids: Vec<_> = registry().iter().map(|d| d.id).collect();
-        assert_eq!(ids, ["alerts", "feed", "chat", "gifts", "leaderboard", "goals", "timer", "counters", "wheel", "poll", "nowplaying"]);
+        assert_eq!(ids, ["alerts", "feed", "chat", "gifts", "leaderboard", "goals", "timer", "counters", "wheel", "poll", "nowplaying", "jar"]);
         assert_eq!(ids.iter().collect::<HashSet<_>>().len(), ids.len());
     }
 

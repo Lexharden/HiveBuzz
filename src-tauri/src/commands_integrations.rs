@@ -4,7 +4,11 @@ use tauri::State;
 
 use crate::app::AppState;
 use crate::error::Result;
+use crate::actions::{ActionContext, ActionExecutor};
 use crate::executors::obs::{ObsConfig, ObsInfo};
+use crate::executors::webhook::{WebhookExecutor, WebhookReport};
+use crate::rules::template::event_vars;
+use crate::simulator::{build_event, SimKind};
 
 #[tauri::command]
 pub fn get_obs_config(state: State<'_, AppState>) -> ObsConfig {
@@ -30,4 +34,14 @@ pub fn set_obs_password(state: State<'_, AppState>, password: String) -> Result<
 #[tauri::command]
 pub async fn test_obs(state: State<'_, AppState>) -> Result<ObsInfo> {
     state.obs.test().await
+}
+
+/// Lanza el webhook de verdad (con los datos de un regalo de ejemplo) y cuenta qué respondió el
+/// servidor, para probar la URL, las cabeceras y el cuerpo sin esperar a un evento en vivo.
+#[tauri::command]
+pub async fn test_webhook(action: serde_json::Map<String, serde_json::Value>) -> Result<WebhookReport> {
+    let executor = WebhookExecutor::new()?;
+    executor.validate(&action)?;
+    let ctx = ActionContext { rule_id: "prueba".into(), vars: event_vars(&build_event(SimKind::BigGift)) };
+    executor.send(&ctx, &action, true).await
 }

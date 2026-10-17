@@ -38,6 +38,6 @@ jobs:
       - run: bun run build
       - run: bunx vitest run
       - run: cd sidecar && bun run test
-      - run: cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml
+      - run: cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: bun scripts/set-version.mjs --show # las tres versiones deben coincidir

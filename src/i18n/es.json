@@ -136,8 +136,10 @@
     "probability": "Probabilidad (%)",
     "roles": "Roles permitidos",
     "rolesHint": "Basta con uno. Sin marcar = todos.",
-    "minTeam": "Nivel de equipo mínimo",
-    "minGifter": "Nivel de donador mínimo",
+    "minTeam": "Nivel mínimo de club de fans",
+    "minTeamHint": "El nivel de la insignia de fan (Team / Fan Club) que el espectador tiene en TU canal. 0 o vacío = sin requisito. Si TikTok no lo envía, cuenta como 0.",
+    "minGifter": "Nivel mínimo de donador",
+    "minGifterHint": "El nivel de regalos de TikTok del espectador (el que sube al regalar monedas, en cualquier canal). 0 o vacío = sin requisito.",
     "schedule": "Solo en cierto horario",
     "from": "Desde",
     "to": "Hasta",
@@ -271,6 +273,11 @@
     "webhookBodyHint": "Los textos admiten variables y se escapan solos.",
     "webhookHeaders": "Cabeceras (JSON)",
     "webhookHeadersHint": "Ej.: {\"Authorization\": \"Bearer …\"}. Se guardan con la regla, no en el llavero.",
+    "webhookRetries": "Reintentos",
+    "webhookRetriesHint": "0 a 3. Reintenta ante fallos de red, 429 y 5xx. Déjalo en 0 si repetir la petición duplicaría el efecto.",
+    "webhookTest": "Probar",
+    "webhookTesting": "Probando…",
+    "webhookResult": "Respondió {{status}} en {{ms}} ms ({{attempts}} intento(s))",
     "host": "Host",
     "port": "Puerto",
     "newline": "Añadir salto de línea",
@@ -425,7 +432,8 @@
     "counters": "Contadores",
     "wheel": "Ruleta",
     "poll": "Encuesta",
-    "nowplaying": "Sonando ahora"
+    "nowplaying": "Sonando ahora",
+    "jar": "Jarrón de regalos"
   },
   "overlays": {
     "groupStyle": "Estilo",
@@ -485,6 +493,15 @@
     "showLabel": "Mostrar nombre",
     "showNumbers": "Mostrar cifras",
     "showPercent": "Mostrar porcentaje",
+    "jarSize": "Tamaño del jarrón (px)",
+    "liquidColor": "Color del relleno",
+    "glassColor": "Color del cristal y la tapa",
+    "jarGoalId": "ID de la meta (vacío = la primera de monedas)",
+    "showGoalNumbers": "Mostrar monedas y meta",
+    "showUsd": "Mostrar dólares estimados",
+    "usdPerCoin": "Dólares por moneda (estimado)",
+    "currencySymbol": "Símbolo de moneda",
+    "dropGifts": "Dejar caer la imagen de cada regalo",
     "digitSize": "Tamaño de los dígitos (px)",
     "lowColor": "Color cuando queda poco",
     "timerId": "ID del timer (vacío = el primero)",
@@ -657,6 +674,7 @@
       "minInterval": "Tiempo mínimo entre mensajes (ms)",
       "commands": "Comandos",
       "noCommands": "Aún no hay comandos.",
+      "permissions": "Permisos, niveles de fan y enfriamiento",
       "names": "Nombres (separados por coma)",
       "response": "Respuesta (admite {user}, {nickname}, {points}…)",
       "timed": "Mensajes temporizados",
@@ -707,6 +725,7 @@
       "search": "Buscar…",
       "user": "Usuario",
       "coins": "Monedas",
+      "levels": "Fans / regalos",
       "sort": {
         "points": "Más puntos",
         "name": "Nombre",
@@ -786,6 +805,7 @@
     "pick": "Elige una transmisión de la lista.",
     "delete": "Borrar",
     "coins": "Monedas",
+    "usdEstimated": "(estimado)",
     "peak": "Pico de espectadores",
     "gifts": "Regalos",
     "chats": "Comentarios",
@@ -926,6 +946,7 @@
       "import": "Importar configuración",
       "exported": "Exportado.",
       "summary": "{{rules}} reglas · {{goals}} metas · {{timers}} timers · {{overlays}} overlays · {{sounds}} sonidos · {{media}} imágenes · {{profiles}} perfiles",
+      "risky": "Este archivo contiene acciones que salen de tu equipo o lo controlan: {{list}}. Impórtalo solo si confías en quien te lo dio; revisa las reglas antes de abrir el LIVE.",
       "skipped": "{{n}} elementos descartados",
       "pending": "Importación lista. Se aplicará al reiniciar y SUSTITUIRÁ tus reglas, metas, timers, overlays, bibliotecas y perfiles.",
       "restart": "Reiniciar ahora",
@@ -1279,9 +1300,37 @@
     "needsBot": "usa el bot de chat",
     "needsEdit": "pon tu enlace",
     "category": {
+      "new": "Novedades",
       "thanks": "Agradecimientos",
       "chat": "Bot de chat",
       "interaction": "Interacción"
+    },
+    "webhookGift": {
+      "name": "Avisar a un servicio de los regalos grandes",
+      "desc": "NUEVO. Hace una petición HTTP (POST con JSON) cada vez que llega un regalo de 100 monedas o más: sirve para luces, Home Assistant, Discord, Streamer.bot… Reintenta una vez si falla.",
+      "edit": "pon tu enlace y usa «Probar»"
+    },
+    "webhookFollow": {
+      "name": "Avisar a un servicio de cada follow",
+      "desc": "NUEVO. Hace una petición HTTP (GET) por cada follow nuevo, como máximo una vez cada 6 h por persona. Con «Probar» ves lo que responde el servidor.",
+      "edit": "pon tu enlace y usa «Probar»"
+    },
+    "fanClub": {
+      "name": "!fan solo para el club de fans",
+      "desc": "NUEVO. Solo responde a quien tiene la insignia del club de fans de tu canal (nivel 1 o más). Cámbiale el nivel para hacer comandos más exclusivos.",
+      "say": "{nickname}, gracias por ser parte del club de fans 💛"
+    },
+    "gifterVoice": {
+      "name": "!vozvip para donadores",
+      "desc": "NUEVO. La voz lee lo que escriba tras !vozvip, solo a quien tenga nivel de donador 5 o más en TikTok.",
+      "say": "{nickname} dice: {args}"
+    },
+    "jarFull": {
+      "name": "¡Se llenó el jarrón!",
+      "desc": "NUEVO. Celebra con voz y chat cuando se completa una meta (por ejemplo la del jarrón de regalos). Al personalizarla eliges la meta.",
+      "say": "¡Se llenó el jarrón! Gracias a todos",
+      "chat": "🎉 ¡Meta cumplida! Gracias por llenar el jarrón.",
+      "edit": "pon tu meta"
     },
     "thanksGift": {
       "name": "Gracias por el regalo",

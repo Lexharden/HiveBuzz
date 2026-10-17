@@ -30,7 +30,9 @@ window.HB = (function () {
       "np.paused": "En pausa",
       "np.requestedBy": "Pedida por {user}",
       "poll.votes": "{n} votos",
-      "poll.ended": "Finalizada"
+      "poll.ended": "Finalizada",
+      "jar.estimate": "estimado",
+      "jar.needGoal": "Crea una meta de monedas para llenar el jarrón."
     },
     en: {
       "ev.gift": "sent {count}× {name}",
@@ -49,7 +51,9 @@ window.HB = (function () {
       "np.paused": "Paused",
       "np.requestedBy": "Requested by {user}",
       "poll.votes": "{n} votes",
-      "poll.ended": "Finished"
+      "poll.ended": "Finished",
+      "jar.estimate": "estimated",
+      "jar.needGoal": "Create a coins goal to fill the jar."
     }
   };
   var lang = dictionaries[params.get("lang")] ? params.get("lang") : "es";

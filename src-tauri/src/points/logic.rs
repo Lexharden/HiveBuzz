@@ -17,6 +17,9 @@ pub struct Who {
     pub nickname: String,
     pub avatar: String,
     pub is_subscriber: bool,
+    /// Niveles de TikTok (0 = el evento no los traía).
+    pub team_level: u32,
+    pub gifter_level: u32,
 }
 
 impl Who {
@@ -31,6 +34,8 @@ impl Who {
             nickname: if u.nickname.is_empty() { u.unique_id.clone() } else { u.nickname.clone() },
             avatar: u.avatar.clone(),
             is_subscriber: u.is_subscriber,
+            team_level: u.team_level.unwrap_or(0),
+            gifter_level: u.gifter_level.unwrap_or(0),
         })
     }
 }

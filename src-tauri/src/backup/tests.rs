@@ -288,3 +288,35 @@ async fn cancel_pending_removes_the_staged_file() {
     assert!(!has_pending(dst.dir.path()));
     cancel_pending(dst.dir.path()).unwrap();
 }
+
+#[test]
+fn risky_actions_are_counted_across_rules_and_profiles() {
+    let mut bundle = Bundle {
+        format: FORMAT,
+        app: APP.into(),
+        version: "0".into(),
+        exported_ms: 0,
+        settings: BTreeMap::new(),
+        rules: vec![rule("a"), rule("b")],
+        goals: vec![],
+        timers: vec![],
+        overlays: Map::new(),
+        sounds: vec![],
+        media: vec![],
+        profiles: vec![],
+    };
+    assert!(risky_actions(&bundle).is_empty(), "noop no es una acción de riesgo");
+    let with = |kind: &str| {
+        let mut r = rule("x");
+        r.plan.steps = vec![Step { delay_ms: 0, action: ActionSpec::new(kind, json!({})) }];
+        r
+    };
+    bundle.rules = vec![with("webhook"), with("webhook"), with("tcpSend"), with("playSound")];
+    bundle.profiles = vec![ProfileBundle {
+        id: "p".into(),
+        name: "P".into(),
+        updated_ms: 0,
+        data: ProfileData { rules: vec![with("webhook"), with("pressKeys")], overlays: Map::new() },
+    }];
+    assert_eq!(risky_actions(&bundle), vec!["pressKeys × 1", "tcpSend × 1", "webhook × 3"]);
+}

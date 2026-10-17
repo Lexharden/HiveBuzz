@@ -26,7 +26,7 @@ pub struct ImportReport {
 }
 
 const COLUMNS: &str = "user_id, unique_id, nickname, avatar, points, total_earned, total_spent, coins_gifted, \
-                       comments, likes, shares, watch_minutes, first_seen_ms, last_seen_ms";
+                       comments, likes, shares, watch_minutes, first_seen_ms, last_seen_ms, team_level, gifter_level";
 
 fn to_u64(v: i64) -> u64 {
     u64::try_from(v).unwrap_or(0)
@@ -52,6 +52,8 @@ fn viewer_from_row(r: &SqliteRow) -> Viewer {
         watch_minutes: to_u64(r.get("watch_minutes")),
         first_seen_ms: r.get("first_seen_ms"),
         last_seen_ms: r.get("last_seen_ms"),
+        team_level: u32::try_from(r.get::<i64, _>("team_level")).unwrap_or(0),
+        gifter_level: u32::try_from(r.get::<i64, _>("gifter_level")).unwrap_or(0),
     }
 }
 
@@ -292,15 +294,17 @@ async fn upsert_award(tx: &mut Transaction<'_, Sqlite>, a: &Award) -> Result<()>
     let s = &a.stats;
     sqlx::query(
         "INSERT INTO viewers (user_id, unique_id, nickname, avatar, points, total_earned, total_spent, coins_gifted, \
-                              comments, likes, shares, watch_minutes, first_seen_ms, last_seen_ms) \
-         VALUES (?1, ?2, ?3, ?4, MAX(?5, 0), MAX(?5, 0), 0, ?6, ?7, ?8, ?9, ?10, ?11, ?11) \
+                              comments, likes, shares, watch_minutes, first_seen_ms, last_seen_ms, team_level, gifter_level) \
+         VALUES (?1, ?2, ?3, ?4, MAX(?5, 0), MAX(?5, 0), 0, ?6, ?7, ?8, ?9, ?10, ?11, ?11, ?12, ?13) \
          ON CONFLICT(user_id) DO UPDATE SET \
            unique_id = excluded.unique_id, nickname = excluded.nickname, avatar = excluded.avatar, \
            points = MAX(points + ?5, 0), \
            total_earned = total_earned + MAX(?5, 0), total_spent = total_spent + MAX(-?5, 0), \
            coins_gifted = coins_gifted + excluded.coins_gifted, comments = comments + excluded.comments, \
            likes = likes + excluded.likes, shares = shares + excluded.shares, \
-           watch_minutes = watch_minutes + excluded.watch_minutes, last_seen_ms = MAX(last_seen_ms, excluded.last_seen_ms)",
+           watch_minutes = watch_minutes + excluded.watch_minutes, last_seen_ms = MAX(last_seen_ms, excluded.last_seen_ms), \
+           team_level = CASE WHEN excluded.team_level > 0 THEN excluded.team_level ELSE team_level END, \
+           gifter_level = CASE WHEN excluded.gifter_level > 0 THEN excluded.gifter_level ELSE gifter_level END",
     )
     .bind(&a.who.user_id)
     .bind(&a.who.unique_id)
@@ -313,6 +317,8 @@ async fn upsert_award(tx: &mut Transaction<'_, Sqlite>, a: &Award) -> Result<()>
     .bind(to_i64(s.shares))
     .bind(to_i64(s.watch_minutes))
     .bind(a.ts)
+    .bind(i64::from(a.who.team_level))
+    .bind(i64::from(a.who.gifter_level))
     .execute(&mut **tx)
     .await?;
     if a.delta != 0 {

@@ -269,3 +269,24 @@ fn render_with_fills_currency() {
     let vars: Vars = [("user".to_string(), "ana".to_string())].into();
     assert_eq!(b.render_with("@{user}: {currency}", vars, "abejas"), "@ana: abejas");
 }
+
+#[test]
+fn commands_can_require_fan_club_and_gifter_levels() {
+    let mut cmd = command("v", &["vip"], &["Hola VIP"]);
+    cmd.conditions.min_team_level = Some(3);
+    cmd.conditions.min_gifter_level = Some(10);
+    let cfg = cfg_with(vec![cmd]);
+    let mut b = BotEngine::default();
+
+    let mut e = chat("!vip");
+    e.user.team_level = None;
+    e.user.gifter_level = None;
+    assert!(run(&mut b, &cfg, &e, 0).is_empty(), "sin nivel conocido no pasa");
+
+    e.user.team_level = Some(3);
+    e.user.gifter_level = Some(9);
+    assert!(run(&mut b, &cfg, &e, 1_000_000).is_empty(), "le falta nivel de regalos");
+
+    e.user.gifter_level = Some(10);
+    assert_eq!(run(&mut b, &cfg, &e, 2_000_000).len(), 1);
+}

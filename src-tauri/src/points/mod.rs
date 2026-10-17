@@ -27,6 +27,9 @@ pub struct Viewer {
     pub watch_minutes: u64,
     pub first_seen_ms: i64,
     pub last_seen_ms: i64,
+    /// Último nivel conocido de club de fans y de regalos (0 = desconocido).
+    pub team_level: u32,
+    pub gifter_level: u32,
 }
 
 /// Movimiento del historial de puntos.

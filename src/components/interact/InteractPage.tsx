@@ -10,6 +10,7 @@ import {
   type Viewer,
   type WheelConfig,
 } from "../../lib/interact";
+import { ConditionFields } from "../rules/RuleEditor";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, TextInput, useAction } from "../ui";
 
 const SECTIONS = ["bot", "points", "wheel", "poll", "login"] as const;
@@ -118,7 +119,8 @@ function BotSection() {
           {cfg.commands.map((c, i) => {
             const set = (patch: Partial<typeof c>) => update({ commands: cfg.commands.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
             return (
-              <div key={c.id} className="grid grid-cols-[1fr_2fr_auto] items-end gap-2">
+              <div key={c.id} className="space-y-1">
+              <div className="grid grid-cols-[1fr_2fr_auto] items-end gap-2">
                 <Field label={t("interact.bot.names")}>
                   <TextInput value={c.names.join(", ")} placeholder="discord, ds" onChange={(v) => set({ names: v.split(",").map((s) => s.trim()) })} />
                 </Field>
@@ -131,6 +133,13 @@ function BotSection() {
                     ✕
                   </Btn>
                 </div>
+              </div>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-zinc-400">{t("interact.bot.permissions")}</summary>
+                <div className="mt-2 rounded-md border border-zinc-800 p-2">
+                  <ConditionFields c={c.conditions} onChange={(patch) => set({ conditions: { ...c.conditions, ...patch } })} />
+                </div>
+              </details>
               </div>
             );
           })}
@@ -325,6 +334,7 @@ function PointsSection() {
               <th>{t("interact.points.user")}</th>
               <th>{cfg.currencyName}</th>
               <th>{t("interact.points.coins")}</th>
+              <th>{t("interact.points.levels")}</th>
               <th />
             </tr>
           </thead>
@@ -334,6 +344,7 @@ function PointsSection() {
                 <td className="py-1">{v.nickname || v.uniqueId} <span className="text-zinc-500">@{v.uniqueId}</span></td>
                 <td>{v.points}</td>
                 <td>{v.coinsGifted}</td>
+                <td className="text-zinc-400">{v.teamLevel > 0 || v.gifterLevel > 0 ? `${v.teamLevel} / ${v.gifterLevel}` : "—"}</td>
                 <td className="flex justify-end gap-1 py-1">
                   <Btn onClick={() => void run(async () => { await api.adjustViewerPoints(v.userId, 100); load(); })}>+100</Btn>
                   <Btn onClick={() => void run(async () => { await api.adjustViewerPoints(v.userId, -100); load(); })}>−100</Btn>

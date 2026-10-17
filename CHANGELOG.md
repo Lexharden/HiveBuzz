@@ -4,6 +4,24 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.3.0] - 2026-10-16
+
+### Novedades
+- **Jarrón de regalos**: un overlay nuevo que se llena con tu meta de monedas, deja caer la imagen de cada regalo y muestra los dólares estimados (tasa que tú eliges; es una estimación, no tus ingresos reales). Las estadísticas de cada LIVE muestran lo mismo.
+- **Peticiones HTTP más cómodas**: el webhook ahora tiene botón «Probar» (te enseña el estado, el tiempo y la respuesta) y reintentos opcionales si el servidor falla.
+- **Niveles de fan**: HiveBuzz recuerda el nivel de club de fans y de donador de cada espectador y lo muestra en la lista de puntos. Los comandos del bot pueden exigir nivel, rol o enfriamiento («Permisos, niveles de fan y enfriamiento»).
+- **Plantillas «Novedades»** (Reglas → Plantillas): avisar a un servicio de los regalos grandes o de los follows, `!fan` solo para el club de fans, `!vozvip` para donadores nivel 5+ y una celebración cuando se llena la meta del jarrón.
+
+### Mejorado
+- **Importar configuración** te avisa de las acciones que salen de tu equipo o lo controlan (webhook, red, teclas, OBS) antes de aplicar un archivo ajeno.
+- **Registro en archivo**: `hivebuzz.log` en la carpeta de datos, con copia rotada, para poder revisar qué pasó tras un cierre inesperado.
+- Las etiquetas de nivel ahora dicen «club de fans» y «donador», con una pista de qué significa cada una.
+- Exportar, importar y guardar logs comprueban la ruta del archivo.
+
+### Interno
+- El CI ejecuta `clippy` con `-D warnings`.
+- Las notas del release salen de este archivo (`scripts/changelog-notes.mjs`) en vez de un texto fijo.
+
 ## [0.2.4] - 2026-10-14
 
 ### Añadido

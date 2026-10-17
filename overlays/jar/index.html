@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Jarrón de regalos</title>
+<!--HB_COMMON-->
+<style>
+  #hb-root { align-items: center; gap: 8px; }
+  .jar-wrap { position: relative; }
+  .jar-wrap svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .liquid { transition: transform 0.9s ease-out; }
+  .drop { position: absolute; left: 50%; top: 0; width: 15%; margin-left: -7.5%; object-fit: contain; pointer-events: none; opacity: 0; animation: jar-fall 1.1s ease-in forwards; }
+  @keyframes jar-fall {
+    0% { transform: translateY(-40%); opacity: 0; }
+    15% { opacity: 1; }
+    100% { transform: translateY(var(--end, 60%)); opacity: 0; }
+  }
+  .jar-wrap.full svg { animation: hb-pulse 1.4s ease-in-out infinite; }
+  .totals { text-align: center; line-height: 1.2; }
+  .usd { font-size: 1.9em; font-weight: 800; }
+  .nums { opacity: 0.85; font-weight: 600; }
+  .est { opacity: 0.6; font-size: 0.75em; }
+  .hint { opacity: 0.7; font-size: 0.8em; max-width: 240px; text-align: center; }
+</style>
+</head>
+<body data-anchor="bottom-left">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = {
+    jarSize: 320, liquidColor: "#ffc113", glassColor: "#ffffff", goalId: "", showGoal: true, showUsd: true,
+    usdPerCoin: 0.005, currencySymbol: "$", dropGifts: true, minCoins: 1
+  };
+  var SVG = "http://www.w3.org/2000/svg";
+  // Altura interior del jarrón en unidades del viewBox (de y=56 a y=246).
+  var INTERIOR = 190;
+  var JAR = "M62 32 V52 C62 56 30 62 30 90 V220 C30 236 42 246 58 246 H142 C158 246 170 236 170 220 V90 C170 62 138 56 138 52 V32 Z";
+
+  var goals = [];
+  var eventCoins = 0;   // Monedas vistas en los eventos: solo se usan si no hay una meta de monedas.
+  var root = document.getElementById("hb-root");
+
+  function svg(tag, attrs) {
+    var n = document.createElementNS(SVG, tag);
+    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    return n;
+  }
+
+  // Estructura fija: se crea una vez y solo se actualizan valores, así el líquido se anima.
+  var wrap = HB.el("div", "jar-wrap");
+  var s = svg("svg", { viewBox: "0 0 200 260" });
+  var defs = svg("defs");
+  var clip = svg("clipPath", { id: "jar-clip" });
+  clip.appendChild(svg("path", { d: JAR }));
+  defs.appendChild(clip);
+  s.appendChild(defs);
+  s.appendChild(svg("path", { d: JAR, fill: "rgba(255,255,255,0.08)" }));
+  var clipped = svg("g", { "clip-path": "url(#jar-clip)" });
+  var liquid = svg("g", { "class": "liquid" });
+  var liquidRect = svg("rect", { x: "0", y: "56", width: "200", height: "200" });
+  var surface = svg("ellipse", { cx: "100", cy: "56", rx: "70", ry: "5", opacity: "0.5", fill: "#ffffff" });
+  liquid.appendChild(liquidRect);
+  liquid.appendChild(surface);
+  clipped.appendChild(liquid);
+  s.appendChild(clipped);
+  var glass = svg("path", { d: JAR, fill: "none", "stroke-width": "4", "stroke-linejoin": "round" });
+  var shine = svg("path", { d: "M44 100 V210", fill: "none", "stroke-width": "5", "stroke-linecap": "round", opacity: "0.35" });
+  var lid = svg("rect", { x: "55", y: "12", width: "90", height: "20", rx: "5" });
+  s.appendChild(glass); s.appendChild(shine); s.appendChild(lid);
+  wrap.appendChild(s);
+
+  var totals = HB.el("div", "totals");
+  var usd = HB.el("div", "usd");
+  var nums = HB.el("div", "nums");
+  var est = HB.el("div", "est");
+  var hint = HB.el("div", "hint");
+  totals.appendChild(usd); totals.appendChild(nums); totals.appendChild(est); totals.appendChild(hint);
+  root.appendChild(wrap); root.appendChild(totals);
+
+  function pickGoal() {
+    if (cfg.goalId) {
+      for (var i = 0; i < goals.length; i++) if (goals[i].id === cfg.goalId) return goals[i];
+      return null;
+    }
+    for (var j = 0; j < goals.length; j++) if (goals[j].kind === "coins") return goals[j];
+    return null;
+  }
+
+  function percent() {
+    var g = pickGoal();
+    return g ? HB.clamp(Number(g.percent) || 0, 0, 100) : 0;
+  }
+
+  function money(coins) {
+    var amount = coins * cfg.usdPerCoin;
+    return cfg.currencySymbol + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
+  }
+
+  function render() {
+    var g = pickGoal();
+    var pct = percent();
+    var coins = g ? Number(g.current) || 0 : eventCoins;
+    wrap.style.width = cfg.jarSize + "px";
+    liquidRect.setAttribute("fill", cfg.liquidColor);
+    glass.setAttribute("stroke", cfg.glassColor);
+    shine.setAttribute("stroke", cfg.glassColor);
+    lid.setAttribute("fill", cfg.glassColor);
+    liquid.style.transform = "translateY(" + ((1 - pct / 100) * INTERIOR) + "px)";
+    wrap.classList.toggle("full", pct >= 100);
+
+    usd.style.display = cfg.showUsd ? "" : "none";
+    est.style.display = cfg.showUsd ? "" : "none";
+    usd.textContent = "≈ " + money(coins);
+    est.textContent = HB.t("jar.estimate");
+    nums.style.display = cfg.showGoal ? "" : "none";
+    nums.textContent = g ? HB.fmt(g.current) + " / " + HB.fmt(g.target) + " " + HB.t("coins") : HB.fmt(coins) + " " + HB.t("coins");
+    hint.style.display = !g && HB.preview ? "" : "none";
+    hint.textContent = HB.t("jar.needGoal");
+  }
+
+  function drop(ev) {
+    var gift = ev.gift;
+    var img = HB.img(gift.image, "drop");
+    if (!img) return;
+    // Cae hasta la superficie actual del líquido.
+    var surfaceY = (56 + (1 - percent() / 100) * INTERIOR) / 260;
+    img.style.setProperty("--end", Math.round(surfaceY * wrap.offsetHeight) + "px");
+    wrap.appendChild(img);
+    setTimeout(function () { img.remove(); }, 1300);
+  }
+
+  function onEvent(ev, replay) {
+    if (ev.type !== "gift" || !ev.gift) return;
+    // `coins` ya es el valor total del regalo (unidad × cantidad).
+    eventCoins += Number(ev.gift.coins) || 0;
+    render();
+    if (!replay && cfg.dropGifts && ev.gift.coins >= cfg.minCoins) drop(ev);
+  }
+
+  render();
+  HB.start({
+    id: "jar",
+    onConfig: function (c) { cfg = c; render(); },
+    onEvent: onEvent,
+    onOverlay: function (channel, d) { if (channel === "goals" && d && Array.isArray(d.goals)) { goals = d.goals; render(); } }
+  });
+})();
+</script>
+</body>
+</html>

@@ -190,7 +190,7 @@ impl PointsService {
         let user_id = match found {
             Some(v) => v.user_id,
             None => {
-                let who = Who { user_id: format!("{}{uid}", super::PROVISIONAL_PREFIX), unique_id: uid.clone(), nickname: uid.clone(), avatar: String::new(), is_subscriber: false };
+                let who = Who { user_id: format!("{}{uid}", super::PROVISIONAL_PREFIX), unique_id: uid.clone(), nickname: uid.clone(), avatar: String::new(), is_subscriber: false, team_level: 0, gifter_level: 0 };
                 self.db.apply_awards(&[Award { who: who.clone(), delta: 0, reason: Reason::Manual, stats: Stats::default(), ts: self.clock.now_ms() }]).await?;
                 who.user_id
             }

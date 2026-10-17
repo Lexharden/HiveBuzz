@@ -101,6 +101,8 @@ pub fn run() {
                 Some(dir) => std::path::PathBuf::from(dir),
                 None => app.path().app_data_dir()?,
             };
+            let _ = std::fs::create_dir_all(&data_dir);
+            logs::global().enable_file(data_dir.join("hivebuzz.log"));
             let handle = app.handle().clone();
             let state = tauri::async_runtime::block_on(AppState::init(handle, &data_dir))?;
             let prefs = state.prefs.get();
@@ -216,6 +218,7 @@ pub fn run() {
             commands_integrations::has_obs_password,
             commands_integrations::set_obs_password,
             commands_integrations::test_obs,
+            commands_integrations::test_webhook,
             commands_app::get_app_prefs,
             commands_app::set_app_prefs,
             commands_app::get_autostart,

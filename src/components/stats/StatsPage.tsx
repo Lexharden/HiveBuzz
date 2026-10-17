@@ -1,15 +1,25 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { api as appApi } from "../../lib/api";
 import { systemApi as api, type StreamStats, type StreamSummary } from "../../lib/system";
 import { Btn, Card, ErrorText, useAction } from "../ui";
 
 const fmt = (n: number) => new Intl.NumberFormat().format(n);
 
-function Stat({ label, value }: { label: string; value: number }) {
+/** Tasa de dólares por moneda y símbolo: los mismos ajustes que el overlay del jarrón. */
+interface Rate {
+  usdPerCoin: number;
+  symbol: string;
+}
+const DEFAULT_RATE: Rate = { usdPerCoin: 0.005, symbol: "$" };
+const usd = (coins: number, r: Rate) => `≈ ${r.symbol}${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(coins * r.usdPerCoin)}`;
+
+function Stat({ label, value, note }: { label: string; value: number; note?: string }) {
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
       <div className="text-xs text-zinc-500">{label}</div>
       <div className="text-xl font-bold text-amber-400">{fmt(value)}</div>
+      {note && <div className="text-xs text-zinc-400">{note}</div>}
     </div>
   );
 }
@@ -18,7 +28,18 @@ export function StatsPage() {
   const { t } = useTranslation();
   const [streams, setStreams] = useState<StreamSummary[]>([]);
   const [selected, setSelected] = useState<StreamStats | null>(null);
+  const [rate, setRate] = useState<Rate>(DEFAULT_RATE);
   const { run, error, busy } = useAction();
+
+  useEffect(() => {
+    void appApi
+      .getOverlayConfig("jar")
+      .then((c) => {
+        const per = Number(c.usdPerCoin);
+        setRate({ usdPerCoin: Number.isFinite(per) ? per : DEFAULT_RATE.usdPerCoin, symbol: typeof c.currencySymbol === "string" ? c.currencySymbol : DEFAULT_RATE.symbol });
+      })
+      .catch(() => undefined);
+  }, []);
 
   const refresh = useCallback(() => void run(async () => setStreams(await api.listStreams())), [run]);
   useEffect(refresh, [refresh]);
@@ -39,7 +60,7 @@ export function StatsPage() {
             >
               <div className="font-semibold">{when(s.id)}</div>
               <div className="text-zinc-400">
-                🪙 {fmt(s.coins)} · 👁 {fmt(s.peakViewers)}
+                🪙 {fmt(s.coins)} ({usd(s.coins, rate)}) · 👁 {fmt(s.peakViewers)}
               </div>
             </button>
           ))}
@@ -69,7 +90,7 @@ export function StatsPage() {
               }
             >
               <div className="grid grid-cols-4 gap-2">
-                <Stat label={t("stats.coins")} value={selected.coins} />
+                <Stat label={t("stats.coins")} value={selected.coins} note={`${usd(selected.coins, rate)} ${t("stats.usdEstimated")}`} />
                 <Stat label={t("stats.peak")} value={selected.peakViewers} />
                 <Stat label={t("stats.gifts")} value={selected.giftsTotal} />
                 <Stat label={t("stats.chats")} value={selected.chats} />

@@ -225,6 +225,9 @@ function SummaryText({ s }: { s: BackupSummary }) {
   return (
     <div className="text-xs text-zinc-400">
       <p>{t("system.backup.summary", { rules: s.rules, goals: s.goals, timers: s.timers, overlays: s.overlays, sounds: s.sounds, media: s.media, profiles: s.profiles })}</p>
+      {s.risky.length > 0 && (
+        <p className="mt-1 rounded-md border border-rose-500/40 p-2 text-rose-300">{t("system.backup.risky", { list: s.risky.join(", ") })}</p>
+      )}
       {s.skipped.length > 0 && (
         <details className="mt-1">
           <summary className="cursor-pointer text-amber-300">{t("system.backup.skipped", { n: s.skipped.length })}</summary>

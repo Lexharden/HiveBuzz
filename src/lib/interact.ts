@@ -30,6 +30,8 @@ export interface Viewer {
   totalEarned: number;
   totalSpent: number;
   coinsGifted: number;
+  teamLevel: number;
+  gifterLevel: number;
   comments: number;
   lastSeenMs: number;
 }

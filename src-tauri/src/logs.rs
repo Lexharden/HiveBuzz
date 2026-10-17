@@ -4,6 +4,9 @@
 
 use std::collections::VecDeque;
 use std::fmt::Write as _;
+use std::fs::{File, OpenOptions};
+use std::io::Write as _;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -30,6 +33,43 @@ pub struct LogEntry {
 pub struct LogBuffer {
     inner: Arc<Mutex<VecDeque<LogEntry>>>,
     capacity: usize,
+    file: Arc<Mutex<Option<FileSink>>>,
+}
+
+/// Tamaño a partir del cual `hivebuzz.log` pasa a `hivebuzz.log.1` (solo se conserva una copia).
+const MAX_LOG_FILE_BYTES: u64 = 2 * 1024 * 1024;
+
+/// Archivo de registro en disco: lo que queda tras un cierre inesperado o un reinicio, para soporte.
+struct FileSink {
+    path: PathBuf,
+    file: File,
+    written: u64,
+}
+
+impl FileSink {
+    fn open(path: PathBuf) -> std::io::Result<Self> {
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
+        let written = file.metadata().map_or(0, |m| m.len());
+        Ok(Self { path, file, written })
+    }
+
+    fn write_line(&mut self, line: &str) {
+        if self.written >= MAX_LOG_FILE_BYTES {
+            let mut old = self.path.as_os_str().to_owned();
+            old.push(".1");
+            let _ = std::fs::rename(&self.path, PathBuf::from(old));
+            match OpenOptions::new().create(true).append(true).open(&self.path) {
+                Ok(f) => {
+                    self.file = f;
+                    self.written = 0;
+                }
+                Err(_) => return,
+            }
+        }
+        if self.file.write_all(line.as_bytes()).is_ok() {
+            self.written += line.len() as u64;
+        }
+    }
 }
 
 /// Gravedad como número (mayor = más grave) para filtrar por «nivel mínimo».
@@ -45,10 +85,25 @@ fn severity(level: &str) -> u8 {
 
 impl LogBuffer {
     pub fn new(capacity: usize) -> Self {
-        Self { inner: Arc::new(Mutex::new(VecDeque::with_capacity(capacity.min(CAPACITY)))), capacity: capacity.max(1) }
+        Self { inner: Arc::new(Mutex::new(VecDeque::with_capacity(capacity.min(CAPACITY)))), capacity: capacity.max(1), file: Arc::default() }
+    }
+
+    /// Empieza a guardar también en `path` (INFO o más grave). Un fallo al abrir no es grave: se
+    /// sigue con el anillo en memoria.
+    pub fn enable_file(&self, path: PathBuf) {
+        match FileSink::open(path) {
+            Ok(sink) => *self.file.lock().unwrap_or_else(PoisonError::into_inner) = Some(sink),
+            Err(e) => tracing::warn!(error = %e, "no se pudo abrir el archivo de registro"),
+        }
     }
 
     pub fn push(&self, entry: LogEntry) {
+        if severity(&entry.level) >= severity("INFO") {
+            if let Some(sink) = self.file.lock().unwrap_or_else(PoisonError::into_inner).as_mut() {
+                sink.write_line(&format!("{} {:5} {}: {}
+", entry.ts_ms, entry.level, entry.target, entry.message));
+            }
+        }
         let mut q = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
         if q.len() >= self.capacity {
             q.pop_front();
@@ -187,5 +242,25 @@ mod tests {
         let logs = capture(|| tracing::info!("{}", "x".repeat(5_000)));
         assert!(logs[0].message.chars().count() <= MAX_MESSAGE_CHARS + 1);
         assert!(logs[0].message.ends_with('…'));
+    }
+
+    #[test]
+    fn file_sink_keeps_info_and_above_and_rotates() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hivebuzz.log");
+        let buf = LogBuffer::new(10);
+        buf.enable_file(path.clone());
+        let entry = |level: &str, message: &str| LogEntry { ts_ms: 1, level: level.into(), target: "t".into(), message: message.into() };
+        buf.push(entry("DEBUG", "ruido"));
+        buf.push(entry("INFO", "hola"));
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(text.contains("hola") && !text.contains("ruido"), "{text}");
+
+        // Pasado el límite, el archivo viejo se aparta y se empieza otro.
+        buf.push(entry("WARN", &"x".repeat(usize::try_from(MAX_LOG_FILE_BYTES).unwrap())));
+        buf.push(entry("ERROR", "nuevo"));
+        let fresh = std::fs::read_to_string(&path).unwrap();
+        assert!(fresh.contains("nuevo") && !fresh.contains("hola"), "{fresh}");
+        assert!(dir.path().join("hivebuzz.log.1").is_file());
     }
 }

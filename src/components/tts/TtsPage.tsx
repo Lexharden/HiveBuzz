@@ -219,10 +219,10 @@ export function TtsPage() {
             </div>
           </Field>
           <div className="grid grid-cols-4 gap-3">
-            <Field label={t("cond.minTeam")}>
+            <Field label={t("cond.minTeam")} hint={t("cond.minTeamHint")}>
               <NumberInput value={config.minTeamLevel} min={0} onChange={(v) => patch({ minTeamLevel: v })} />
             </Field>
-            <Field label={t("cond.minGifter")}>
+            <Field label={t("cond.minGifter")} hint={t("cond.minGifterHint")}>
               <NumberInput value={config.minGifterLevel} min={0} onChange={(v) => patch({ minGifterLevel: v })} />
             </Field>
             <Field label={t("tts.recentDonors")} hint={t("tts.recentDonorsHint")}>

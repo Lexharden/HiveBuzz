@@ -58,13 +58,16 @@ Cada pantalla trae una frase que explica para qué sirve.
 ## 4. Overlays (lo que se ve en pantalla)
 
 1. Pestaña **Overlays**: elige uno (Alertas, Feed, Chat, Regalos recientes, Top donadores, Metas, Timer,
-   Contadores, Ruleta, Encuesta, Sonando ahora).
+   Contadores, Ruleta, Encuesta, Sonando ahora, Jarrón de regalos).
 2. Cambia colores, fuente, posición, tamaño… la **vista previa** se actualiza al instante. Botón ▶ *Probar* manda ejemplos.
    **Alertas** funciona sin reglas: regalos, follows y suscripciones salen solos (ajústalo en *Comportamiento*).
 3. En **Ajustes → Overlays** copia la URL del overlay.
 4. En OBS: *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080. TikTok LIVE Studio puede decir
    «enlace no válido» con estas direcciones locales: prueba el botón *Copiar (localhost)* o usa la cámara virtual de OBS.
 5. ⚠️ La URL lleva tu token: **no la compartas**.
+6. **Jarrón de regalos**: se llena con una meta de *monedas* (créala en «Metas y timers»; si hay varias, elige su ID).
+   Los dólares son una **estimación**: monedas × la tasa que pongas (0,005 por defecto, aprox. lo que recibe el creador
+   tras la comisión de TikTok). No incluyen impuestos ni cambios del programa de pagos; no los uses como ingresos reales.
 
 ---
 
@@ -150,7 +153,7 @@ Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; 
   Si la ventana activa no coincide, **no envía nada**. No dejes "cualquier ventana" salvo que sepas lo que haces.
 
 ### Webhook y comandos de red
-- Webhook: URL, método, cuerpo JSON (los textos con variables se escapan solos).
+- Webhook: URL, método, cuerpo JSON (los textos con variables se escapan solos). El botón **Probar** lanza la petición con datos de ejemplo y enseña el estado, el tiempo y la respuesta. «Reintentos» (0 a 3) repite ante fallos de red, 429 y 5xx; déjalo en 0 si repetir la petición duplicaría su efecto.
 - TCP/WebSocket: host+puerto o URL y un mensaje con variables.
 
 ### API local (para scripts, Streamer.bot, mods)

@@ -58,6 +58,8 @@ export interface BackupSummary {
   media: number;
   profiles: number;
   skipped: string[];
+  /** Acciones que tocan red, teclado u OBS, p. ej. "webhook × 3". */
+  risky: string[];
 }
 
 export interface UpdateInfo {

@@ -21,6 +21,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("wheel", include_str!("../../../overlays/wheel/index.html")),
     ("poll", include_str!("../../../overlays/poll/index.html")),
     ("nowplaying", include_str!("../../../overlays/nowplaying/index.html")),
+    ("jar", include_str!("../../../overlays/jar/index.html")),
 ];
 
 static RENDERED: LazyLock<HashMap<&'static str, String>> = LazyLock::new(|| {

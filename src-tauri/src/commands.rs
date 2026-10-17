@@ -459,7 +459,7 @@ pub fn test_overlay(state: State<'_, AppState>, id: String) -> Result<()> {
                 state.sim.emit(kind);
             }
         }
-        "gifts" => {
+        "gifts" | "jar" => {
             state.sim.emit(SimKind::Gift);
             state.sim.emit(SimKind::BigGift);
         }

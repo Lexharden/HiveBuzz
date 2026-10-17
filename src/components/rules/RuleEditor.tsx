@@ -291,7 +291,7 @@ function omit<T extends object, K extends keyof T>(obj: T, key: K): Omit<T, K> {
   return rest;
 }
 
-function ConditionFields({ c, onChange }: { c: Conditions; onChange: (p: Partial<Conditions>) => void }) {
+export function ConditionFields({ c, onChange }: { c: Conditions; onChange: (p: Partial<Conditions>) => void }) {
   const { t } = useTranslation();
   const toggleRole = (r: Role, on: boolean) => onChange({ rolesAny: on ? [...c.rolesAny, r] : c.rolesAny.filter((x) => x !== r) });
   const sched = c.schedule;
@@ -323,10 +323,10 @@ function ConditionFields({ c, onChange }: { c: Conditions; onChange: (p: Partial
       </Field>
 
       <div className="grid grid-cols-2 gap-2">
-        <Field label={t("cond.minTeam")}>
+        <Field label={t("cond.minTeam")} hint={t("cond.minTeamHint")}>
           <NumberInput value={c.minTeamLevel ?? null} min={0} onChange={(v) => onChange({ minTeamLevel: v ?? undefined })} />
         </Field>
-        <Field label={t("cond.minGifter")}>
+        <Field label={t("cond.minGifter")} hint={t("cond.minGifterHint")}>
           <NumberInput value={c.minGifterLevel ?? null} min={0} onChange={(v) => onChange({ minGifterLevel: v ?? undefined })} />
         </Field>
       </div>

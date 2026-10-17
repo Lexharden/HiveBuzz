@@ -7,7 +7,7 @@ import { Preview } from "./Preview";
 import { SchemaForm } from "./SchemaForm";
 
 /** Overlays que tienen botón «probar» (los demás muestran datos reales). */
-const TESTABLE = new Set(["alerts", "chat", "feed", "gifts", "nowplaying"]);
+const TESTABLE = new Set(["alerts", "chat", "feed", "gifts", "nowplaying", "jar"]);
 /** Cuánto se espera antes de enviar un cambio (mientras se arrastra un color o se teclea). */
 const SEND_DELAY_MS = 120;
 

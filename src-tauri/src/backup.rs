@@ -88,6 +88,24 @@ pub struct Summary {
     pub profiles: usize,
     /// Cosas del archivo que se descartaron y por qué.
     pub skipped: Vec<String>,
+    /// Acciones que tocan la red, el teclado u OBS, con su número (`["webhook × 3"]`): quien importa
+    /// debe verlas antes de aplicar un archivo ajeno.
+    pub risky: Vec<String>,
+}
+
+/// Tipos de acción que salen del programa (red local o remota, teclado, OBS).
+const RISKY_ACTIONS: [&str; 5] = ["webhook", "tcpSend", "wsSend", "pressKeys", "obs"];
+
+/// Cuenta las acciones de riesgo de las reglas (también las de los perfiles guardados).
+fn risky_actions(b: &Bundle) -> Vec<String> {
+    let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+    let rules = b.rules.iter().chain(b.profiles.iter().flat_map(|p| p.data.rules.iter()));
+    for step in rules.flat_map(|r| r.plan.steps.iter()) {
+        if let Some(k) = RISKY_ACTIONS.iter().find(|k| **k == step.action.kind) {
+            *counts.entry(k).or_default() += 1;
+        }
+    }
+    counts.into_iter().map(|(k, n)| format!("{k} × {n}")).collect()
 }
 
 impl Summary {
@@ -101,6 +119,7 @@ impl Summary {
             media: b.media.len(),
             profiles: b.profiles.len(),
             skipped,
+            risky: risky_actions(b),
         }
     }
 }

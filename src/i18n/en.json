@@ -136,8 +136,10 @@
     "probability": "Probability (%)",
     "roles": "Allowed roles",
     "rolesHint": "One is enough. None checked = everyone.",
-    "minTeam": "Minimum team level",
+    "minTeam": "Minimum fan club level",
+    "minTeamHint": "The level of the fan badge (Team / Fan Club) the viewer has in YOUR channel. 0 or empty = no requirement. If TikTok does not send it, it counts as 0.",
     "minGifter": "Minimum gifter level",
+    "minGifterHint": "The viewer's TikTok gifter level (it grows by gifting coins, on any channel). 0 or empty = no requirement.",
     "schedule": "Only during certain hours",
     "from": "From",
     "to": "To",
@@ -271,6 +273,11 @@
     "webhookBodyHint": "Texts accept variables and are escaped automatically.",
     "webhookHeaders": "Headers (JSON)",
     "webhookHeadersHint": "E.g.: {\"Authorization\": \"Bearer …\"}. Stored with the rule, not in the keyring.",
+    "webhookRetries": "Retries",
+    "webhookRetriesHint": "0 to 3. Retries on network errors, 429 and 5xx. Keep 0 if repeating the request would duplicate its effect.",
+    "webhookTest": "Test",
+    "webhookTesting": "Testing…",
+    "webhookResult": "Replied {{status}} in {{ms}} ms ({{attempts}} attempt(s))",
     "host": "Host",
     "port": "Port",
     "newline": "Append a newline",
@@ -425,7 +432,8 @@
     "counters": "Counters",
     "wheel": "Wheel",
     "poll": "Poll",
-    "nowplaying": "Now playing"
+    "nowplaying": "Now playing",
+    "jar": "Gift jar"
   },
   "overlays": {
     "groupStyle": "Style",
@@ -485,6 +493,15 @@
     "showLabel": "Show name",
     "showNumbers": "Show figures",
     "showPercent": "Show percentage",
+    "jarSize": "Jar size (px)",
+    "liquidColor": "Fill color",
+    "glassColor": "Glass and lid color",
+    "jarGoalId": "Goal ID (empty = the first coins goal)",
+    "showGoalNumbers": "Show coins and goal",
+    "showUsd": "Show estimated dollars",
+    "usdPerCoin": "Dollars per coin (estimate)",
+    "currencySymbol": "Currency symbol",
+    "dropGifts": "Drop each gift image into the jar",
     "digitSize": "Digit size (px)",
     "lowColor": "Color when time is low",
     "timerId": "Timer ID (empty = the first one)",
@@ -657,6 +674,7 @@
       "minInterval": "Minimum time between messages (ms)",
       "commands": "Commands",
       "noCommands": "No commands yet.",
+      "permissions": "Permissions, fan levels and cooldown",
       "names": "Names (comma-separated)",
       "response": "Reply (accepts {user}, {nickname}, {points}…)",
       "timed": "Timed messages",
@@ -707,6 +725,7 @@
       "search": "Search…",
       "user": "User",
       "coins": "Coins",
+      "levels": "Fan club / gifter",
       "sort": {
         "points": "Most points",
         "name": "Name",
@@ -786,6 +805,7 @@
     "pick": "Pick a stream from the list.",
     "delete": "Delete",
     "coins": "Coins",
+    "usdEstimated": "(estimated)",
     "peak": "Peak viewers",
     "gifts": "Gifts",
     "chats": "Comments",
@@ -926,6 +946,7 @@
       "import": "Import configuration",
       "exported": "Exported.",
       "summary": "{{rules}} rules · {{goals}} goals · {{timers}} timers · {{overlays}} overlays · {{sounds}} sounds · {{media}} images · {{profiles}} profiles",
+      "risky": "This file has actions that reach outside your PC or control it: {{list}}. Import it only if you trust its author, and review the rules before going live.",
       "skipped": "{{n}} items discarded",
       "pending": "Import ready. It will be applied on restart and will REPLACE your rules, goals, timers, overlays, libraries and profiles.",
       "restart": "Restart now",
@@ -1279,9 +1300,37 @@
     "needsBot": "uses the chat bot",
     "needsEdit": "add your link",
     "category": {
+      "new": "What's new",
       "thanks": "Thank-yous",
       "chat": "Chat bot",
       "interaction": "Interaction"
+    },
+    "webhookGift": {
+      "name": "Notify a service about big gifts",
+      "desc": "NEW. Sends an HTTP request (POST with JSON) for every gift worth 100 coins or more: use it for lights, Home Assistant, Discord, Streamer.bot… Retries once on failure.",
+      "edit": "set your link and use \"Test\""
+    },
+    "webhookFollow": {
+      "name": "Notify a service about every follow",
+      "desc": "NEW. Sends an HTTP request (GET) for each new follow, at most once every 6 h per person. Use \"Test\" to see what the server answers.",
+      "edit": "set your link and use \"Test\""
+    },
+    "fanClub": {
+      "name": "!fan for fan club members only",
+      "desc": "NEW. Only answers viewers with the fan club badge of your channel (level 1 or more). Raise the level for more exclusive commands.",
+      "say": "{nickname}, thanks for being part of the fan club 💛"
+    },
+    "gifterVoice": {
+      "name": "!vozvip for gifters",
+      "desc": "NEW. The voice reads what is typed after !vozvip, only for viewers with TikTok gifter level 5 or more.",
+      "say": "{nickname} says: {args}"
+    },
+    "jarFull": {
+      "name": "The jar is full!",
+      "desc": "NEW. Celebrates with voice and chat when a goal is completed (for example the gift jar one). When you customize it you pick the goal.",
+      "say": "The jar is full! Thank you all",
+      "chat": "🎉 Goal reached! Thanks for filling the jar.",
+      "edit": "pick your goal"
     },
     "thanksGift": {
       "name": "Thanks for the gift",

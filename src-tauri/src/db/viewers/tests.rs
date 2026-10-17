@@ -2,7 +2,7 @@ use super::*;
 use crate::points::logic::{Reason, Stats, Who};
 
 fn who(id: &str, unique: &str, nick: &str) -> Who {
-    Who { user_id: id.into(), unique_id: unique.into(), nickname: nick.into(), avatar: String::new(), is_subscriber: false }
+    Who { user_id: id.into(), unique_id: unique.into(), nickname: nick.into(), avatar: String::new(), is_subscriber: false, team_level: 0, gifter_level: 0 }
 }
 
 fn award(id: &str, unique: &str, delta: i64, reason: Reason, stats: Stats, ts: i64) -> Award {
@@ -237,4 +237,26 @@ async fn total_points(db: &Db) -> i64 {
         sum += i64::try_from(db.balance(&format!("u{i}")).await.expect("balance")).expect("i64");
     }
     sum
+}
+
+#[tokio::test]
+async fn levels_are_kept_and_an_event_without_levels_never_resets_them() {
+    let db = db().await;
+    let with_levels = |team, gifter, ts| {
+        let mut a = award("1", "ana", 0, Reason::Activity, Stats::default(), ts);
+        a.who.team_level = team;
+        a.who.gifter_level = gifter;
+        a
+    };
+    db.apply_awards(&[with_levels(3, 12, 1)]).await.expect("a");
+    let v = db.get_viewer("1").await.expect("get").expect("existe");
+    assert_eq!((v.team_level, v.gifter_level), (3, 12));
+    // Un evento que no trae niveles (0) conserva los conocidos...
+    db.apply_awards(&[with_levels(0, 0, 2)]).await.expect("b");
+    let v = db.get_viewer("1").await.expect("get").expect("existe");
+    assert_eq!((v.team_level, v.gifter_level), (3, 12));
+    // ...y uno que sí los trae los actualiza, también si bajan (el club de fans caduca).
+    db.apply_awards(&[with_levels(1, 15, 3)]).await.expect("c");
+    let v = db.get_viewer("1").await.expect("get").expect("existe");
+    assert_eq!((v.team_level, v.gifter_level), (1, 15));
 }
