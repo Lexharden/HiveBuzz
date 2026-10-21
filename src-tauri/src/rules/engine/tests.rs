@@ -97,6 +97,7 @@ fn rule(id: &str, trigger: Trigger, conditions: Conditions, label: &str) -> Rule
         priority: None,
         ttl_ms: 60_000,
             cost_points: None,
+            replaces_general: false,
     }
 }
 
@@ -149,6 +150,63 @@ async fn user_cooldown_applies_per_user_through_the_engine() {
     let mut got = wait_for(&r.out, 2).await;
     got.sort();
     assert_eq!(got, ["ana", "bob"]);
+}
+
+async fn vip_group(r: &Rig, handles: &[&str]) -> String {
+    use crate::viewer_groups::{Member, ViewerGroup, ViewerGroups};
+    let groups = Arc::new(ViewerGroups::new(r.db.clone()));
+    r.engine.attach_groups(Arc::clone(&groups));
+    let members = handles.iter().map(|h| Member { handle: (*h).into(), platform: None }).collect();
+    groups.save(ViewerGroup { id: String::new(), name: "VIPs".into(), members }).await.expect("group").id
+}
+
+#[tokio::test]
+async fn a_group_rule_replaces_the_general_one_only_for_its_members() {
+    let r = rig().await;
+    let vip = vip_group(&r, &["ana"]).await;
+    let exclusive = Rule {
+        replaces_general: true,
+        ..rule("vip", Trigger::Follow, Conditions { groups_any: vec![vip], ..Default::default() }, "animación VIP")
+    };
+    r.engine.upsert(exclusive).await.expect("upsert");
+    r.engine.upsert(rule("general", Trigger::Follow, Conditions::default(), "animación general")).await.expect("upsert");
+
+    r.bus.publish(follow_ev("1", "u1")); // ana: está en el grupo
+    assert_eq!(wait_for(&r.out, 2).await, ["animación VIP"]);
+
+    let mut bob = follow_ev("2", "u2");
+    bob.user.unique_id = "bob".into();
+    r.bus.publish(bob);
+    assert_eq!(wait_for(&r.out, 2).await, ["animación VIP", "animación general"]);
+}
+
+#[tokio::test]
+async fn without_the_switch_both_rules_fire() {
+    let r = rig().await;
+    let vip = vip_group(&r, &["ana"]).await;
+    r.engine.upsert(rule("vip", Trigger::Follow, Conditions { groups_any: vec![vip], ..Default::default() }, "VIP")).await.expect("upsert");
+    r.engine.upsert(rule("general", Trigger::Follow, Conditions::default(), "general")).await.expect("upsert");
+    r.bus.publish(follow_ev("1", "u1"));
+    let mut got = wait_for(&r.out, 2).await;
+    got.sort();
+    assert_eq!(got, ["VIP", "general"]);
+}
+
+#[tokio::test]
+async fn the_general_rule_keeps_its_cooldown_when_an_exclusive_rule_replaces_it() {
+    let r = rig().await;
+    let vip = vip_group(&r, &["ana"]).await;
+    let exclusive = Rule { replaces_general: true, ..rule("vip", Trigger::Follow, Conditions { groups_any: vec![vip], ..Default::default() }, "VIP") };
+    r.engine.upsert(exclusive).await.expect("upsert");
+    let general = Conditions { global_cooldown_ms: 3_600_000, ..Default::default() };
+    r.engine.upsert(rule("general", Trigger::Follow, general, "general")).await.expect("upsert");
+
+    r.bus.publish(follow_ev("1", "u1")); // VIP: sustituye a la general sin gastar su cooldown
+    wait_for(&r.out, 1).await;
+    let mut bob = follow_ev("2", "u2");
+    bob.user.unique_id = "bob".into();
+    r.bus.publish(bob);
+    assert_eq!(wait_for(&r.out, 2).await, ["VIP", "general"]);
 }
 
 #[tokio::test]
@@ -300,7 +358,7 @@ fn bigger_gifts_get_higher_priority() {
 
 // ---- Recompensas con coste en puntos ----
 
-use super::{DeniedReport, PointsGate};
+use super::PointsGate;
 use std::collections::HashMap;
 
 #[derive(Default)]
@@ -376,16 +434,13 @@ async fn redeeming_a_reward_charges_points_runs_the_action_and_reports_it() {
 }
 
 #[tokio::test]
-async fn not_enough_points_means_no_action_no_charge_and_a_denial() {
+async fn not_enough_points_means_no_action_and_no_charge() {
     let r = rig().await;
     let gate = FakeGate::with("7", 40);
     r.engine.attach_points(gate.clone());
     r.engine.upsert(reward("a", "sonido", 60, "no debe sonar")).await.expect("upsert");
-    let mut denied = r.engine.subscribe_denied();
 
     r.bus.publish(say("7", "!sonido"));
-    let d: DeniedReport = tokio::time::timeout(Duration::from_secs(2), denied.recv()).await.expect("a tiempo").expect("recv");
-    assert_eq!((d.cost, d.have, d.user.as_str(), d.rule_name.as_str()), (60, 40, "u7", "regla a"));
     assert!(wait_for(&r.out, 1).await.is_empty());
     assert_eq!(gate.balance_of("7"), 40, "no se cobra nada");
 }
@@ -407,13 +462,11 @@ async fn a_failed_attempt_does_not_burn_the_cooldown() {
 }
 
 #[tokio::test]
-async fn without_a_points_system_costly_rules_never_fire_and_nobody_is_told_off() {
+async fn without_a_points_system_costly_rules_never_fire() {
     let r = rig().await;
     r.engine.upsert(reward("a", "sonido", 60, "no")).await.expect("upsert");
-    let mut denied = r.engine.subscribe_denied();
     r.bus.publish(say("7", "!sonido"));
     assert!(wait_for(&r.out, 1).await.is_empty());
-    assert!(denied.try_recv().is_err());
 }
 
 #[tokio::test]
@@ -510,4 +563,35 @@ async fn api_rules_never_fire_from_live_events_and_validate_the_name() {
         assert_eq!(r.engine.handle(live(&ev)).await, 0);
     }
     assert!(r.engine.test_rule("a").await.is_ok(), "probar una regla de API usa un evento de prueba");
+}
+
+#[tokio::test]
+async fn rules_saved_with_the_removed_bot_action_are_cleaned_on_load() {
+    let r = rig().await;
+    // Lo que dejó una versión anterior: una regla mixta y otra que solo escribía en el chat.
+    let mut mixed = rule("mixta", Trigger::Follow, Conditions::default(), "voz");
+    mixed.plan.steps.push(Step { delay_ms: 0, action: ActionSpec::new("botMessage", json!({ "text": "hola" })) });
+    let only_bot = Rule {
+        plan: ActionPlan { mode: PlanMode::Sequence, steps: vec![Step { delay_ms: 0, action: ActionSpec::new("botMessage", json!({ "text": "hola" })) }] },
+        ..rule("solo-bot", Trigger::Share, Conditions::default(), "x")
+    };
+    r.db.save_rule(&mixed, 1).await.expect("save");
+    r.db.save_rule(&only_bot, 2).await.expect("save");
+
+    assert_eq!(r.engine.load().await.expect("load"), 1);
+    assert_eq!(r.engine.list().len(), 1);
+    assert_eq!(r.engine.get("mixta").expect("mixta").plan.steps.len(), 1);
+    // Y la limpieza quedó guardada: al reiniciar ya no vuelven.
+    let stored = r.db.list_rules().await.expect("list");
+    assert_eq!(stored.len(), 1);
+    assert_eq!(stored[0].plan.steps.len(), 1);
+}
+
+#[tokio::test]
+async fn applying_a_profile_or_backup_with_the_removed_action_does_not_fail() {
+    let r = rig().await;
+    let mut mixed = rule("mixta", Trigger::Follow, Conditions::default(), "voz");
+    mixed.plan.steps.push(Step { delay_ms: 0, action: ActionSpec::new("botMessage", json!({ "text": "hola" })) });
+    r.engine.replace_all(vec![mixed]).await.expect("replace_all");
+    assert_eq!(r.engine.get("mixta").expect("mixta").plan.steps.len(), 1);
 }

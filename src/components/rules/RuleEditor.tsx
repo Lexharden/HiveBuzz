@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import type { Conditions, Goal, Media, Role, Rule, Sound, Step, TimerView, Trigger, TriggerType, VoiceInfo } from "../../lib/types";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
 import { api } from "../../lib/api";
+import { GroupPicker } from "../groups/GroupPicker";
+import { useViewerGroups } from "../groups/useViewerGroups";
 import { ActionParams } from "./ActionParams";
 import { defaultAction, defaultTrigger, TRIGGER_TYPES } from "./ruleDefaults";
 
@@ -135,12 +137,23 @@ export function RuleEditor({ initial, isNew, actionTypes, sounds, media, voices,
             <NumberInput value={Math.round(rule.ttlMs / 1000)} min={1} max={3600} onChange={(v) => patch({ ttlMs: Math.max(1, v ?? 60) * 1000 })} />
           </Field>
         </div>
+        <div className="mt-3">
+          <Checkbox
+            checked={rule.replacesGeneral === true}
+            onChange={(on) => setRule((r) => {
+              const { replacesGeneral: _x, ...rest } = r;
+              return on ? { ...rest, replacesGeneral: true } : rest;
+            })}
+            label={t("editor.replacesGeneral")}
+          />
+          <p className="mt-1 text-xs text-zinc-500">{t("editor.replacesGeneralHint")}</p>
+        </div>
       </Card>
 
       <div className="flex items-center justify-end gap-2">
         <ErrorText error={error} />
         <Btn onClick={onCancel}>{t("editor.cancel")}</Btn>
-        <Btn variant="primary" disabled={busy} onClick={() => void run(() => onSave(rule))}>
+        <Btn variant="primary" disabled={busy} onClick={() => run(() => onSave(rule))}>
           {t("editor.save")}
         </Btn>
       </div>
@@ -293,6 +306,7 @@ function omit<T extends object, K extends keyof T>(obj: T, key: K): Omit<T, K> {
 
 export function ConditionFields({ c, onChange }: { c: Conditions; onChange: (p: Partial<Conditions>) => void }) {
   const { t } = useTranslation();
+  const { groups } = useViewerGroups();
   const toggleRole = (r: Role, on: boolean) => onChange({ rolesAny: on ? [...c.rolesAny, r] : c.rolesAny.filter((x) => x !== r) });
   const sched = c.schedule;
   const toggleDay = (d: number, on: boolean) => {
@@ -321,6 +335,11 @@ export function ConditionFields({ c, onChange }: { c: Conditions; onChange: (p: 
           ))}
         </div>
       </Field>
+
+      <div className="grid grid-cols-2 gap-2">
+        <GroupPicker label={t("cond.groupsAny")} hint={t("cond.groupsAnyHint")} groups={groups} value={c.groupsAny ?? []} onChange={(ids) => onChange({ groupsAny: ids })} />
+        <GroupPicker label={t("cond.groupsNone")} hint={t("cond.groupsNoneHint")} groups={groups} value={c.groupsNone ?? []} onChange={(ids) => onChange({ groupsNone: ids })} />
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("cond.minTeam")} hint={t("cond.minTeamHint")}>

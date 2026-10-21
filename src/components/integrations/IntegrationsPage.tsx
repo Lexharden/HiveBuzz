@@ -66,7 +66,7 @@ function ObsSection() {
           <Btn
             disabled={busy}
             onClick={() =>
-              void run(async () => {
+              run(async () => {
                 const v = await api.testObs();
                 setMsg(t("integrations.obs.ok", { obs: v.obsVersion, ws: v.websocketVersion }));
               })

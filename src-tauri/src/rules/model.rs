@@ -24,6 +24,10 @@ pub struct Rule {
     /// Se comprueba el saldo antes de consumir cooldowns y se descuenta de forma atómica.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_points: Option<u64>,
+    /// Regla exclusiva: si se dispara, las demás reglas (las que no tienen esto activado) no se
+    /// disparan para ese mismo evento. Sirve para que la animación de un VIP sustituya a la general.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub replaces_general: bool,
 }
 
 fn default_true() -> bool {
@@ -104,6 +108,12 @@ pub struct Conditions {
     pub min_team_level: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub min_gifter_level: Option<u32>,
+    /// Debe estar en alguno de estos grupos de espectadores (ids). Vacío = cualquiera.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups_any: Vec<String>,
+    /// No debe estar en ninguno de estos grupos (ids).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups_none: Vec<String>,
     /// Probabilidad de ejecución, 0–100.
     #[serde(default = "default_probability")]
     pub probability: f64,
@@ -123,6 +133,8 @@ impl Default for Conditions {
             roles_any: Vec::new(),
             min_team_level: None,
             min_gifter_level: None,
+            groups_any: Vec::new(),
+            groups_none: Vec::new(),
             probability: 100.0,
             schedule: None,
         }
@@ -251,6 +263,7 @@ mod tests {
             priority: Some(3),
             ttl_ms: 1000,
             cost_points: None,
+            replaces_general: false,
         };
         let back: Rule = serde_json::from_str(&serde_json::to_string(&rule).expect("ser")).expect("de");
         assert_eq!(back, rule);

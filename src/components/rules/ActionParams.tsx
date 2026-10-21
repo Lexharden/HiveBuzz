@@ -4,7 +4,7 @@ import type { ActionSpec, Goal, Media, Sound, TimerView, VoiceInfo } from "../..
 import { voiceLabel } from "../../lib/voices";
 import { Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
 import { amountValue, bool, num, set, str, toAmount } from "./paramHelpers";
-import { BotMessageParams, ObsParams, PointsAdjustParams, PressKeysParams, StartPollParams, TcpSendParams, WebhookParams, WsSendParams } from "./IntegrationParams";
+import { ObsParams, PointsAdjustParams, PressKeysParams, StartPollParams, TcpSendParams, WebhookParams, WsSendParams } from "./IntegrationParams";
 
 interface Props {
   action: ActionSpec;
@@ -21,15 +21,13 @@ export function ActionParams({ action, onChange, sounds, media, voices, goals, t
     case "playSound":
       return <PlaySoundParams {...{ action, onChange, sounds }} />;
     case "overlayAlert":
-      return <AlertParams {...{ action, onChange, media }} />;
+      return <AlertParams {...{ action, onChange, media, sounds }} />;
     case "tts":
       return <TtsParams {...{ action, onChange, voices }} />;
     case "goalAdjust":
       return <GoalAdjustParams {...{ action, onChange, goals }} />;
     case "timerControl":
       return <TimerControlParams {...{ action, onChange, timers }} />;
-    case "botMessage":
-      return <BotMessageParams {...{ action, onChange }} />;
     case "pointsAdjust":
       return <PointsAdjustParams {...{ action, onChange }} />;
     case "startPoll":
@@ -147,7 +145,7 @@ function PlaySoundParams({ action, onChange, sounds }: Pick<Props, "action" | "o
   );
 }
 
-function AlertParams({ action, onChange, media }: Pick<Props, "action" | "onChange" | "media">) {
+function AlertParams({ action, onChange, media, sounds }: Pick<Props, "action" | "onChange" | "media" | "sounds">) {
   const { t } = useTranslation();
   return (
     <div className="space-y-2">
@@ -169,6 +167,18 @@ function AlertParams({ action, onChange, media }: Pick<Props, "action" | "onChan
         </Field>
         <Field label={t("action.imageUrl")} hint={t("action.imageUrlHint")}>
           <TextInput value={str(action, "imageUrl")} onChange={(v) => onChange(set(action, "imageUrl", v))} placeholder="{giftimage}" />
+        </Field>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label={t("action.alertSound")} hint={t("action.alertSoundHint")}>
+          <Select
+            value={str(action, "soundId")}
+            onChange={(v) => onChange(set(set(action, "soundIds", null), "soundId", v || null))}
+            options={[{ value: "", label: t("action.noSound") }, ...sounds.map((s) => ({ value: s.id, label: `🔊 ${s.name}` }))]}
+          />
+        </Field>
+        <Field label={t("action.volume")}>
+          <NumberInput value={num(action, "soundVolume") ?? 100} min={0} max={100} onChange={(v) => onChange(set(action, "soundVolume", v))} />
         </Field>
       </div>
       <div className="grid grid-cols-3 gap-2">

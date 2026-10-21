@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { errorMessage } from "../lib/api";
 
 const inputCls =
@@ -107,17 +107,121 @@ const btnCls: Record<BtnVariant, string> = {
   accent: "bg-ember-500 text-white hover:bg-ember-400 font-semibold",
 };
 
+/** Rueda giratoria: hereda el color del texto. */
+export function Spinner({ className = "h-3 w-3" }: { className?: string }) {
+  return (
+    <svg className={`inline-block animate-spin align-[-2px] ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Botón. Si `onClick` devuelve una promesa (o se pasa `busy`), muestra una rueda y se bloquea hasta que termine. */
 export function Btn({
   variant = "ghost",
   className = "",
+  busy = false,
+  onClick,
+  disabled,
+  children,
   ...rest
-}: { variant?: BtnVariant } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+}: { variant?: BtnVariant; busy?: boolean; onClick?: (e: React.MouseEvent<HTMLButtonElement>) => unknown } & Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "onClick"
+>) {
+  const [pending, setPending] = useState(false);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const working = busy || pending;
   return (
     <button
       type="button"
       {...rest}
-      className={`rounded-md px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${btnCls[variant]} ${className}`}
-    />
+      aria-busy={working || undefined}
+      disabled={disabled || working}
+      onClick={(e) => {
+        const result = onClick?.(e);
+        if (result instanceof Promise) {
+          setPending(true);
+          void result.then(
+            () => alive.current && setPending(false),
+            () => alive.current && setPending(false),
+          );
+        }
+      }}
+      className={`rounded-md px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50 ${working ? "cursor-progress" : ""} ${btnCls[variant]} ${className}`}
+    >
+      {working && <Spinner className="mr-1.5 h-3 w-3" />}
+      {children}
+    </button>
+  );
+}
+
+/** Barra de progreso; sin `percent` es indeterminada (animada). */
+export function ProgressBar({ percent, label }: { percent?: number | null; label?: string }) {
+  const known = typeof percent === "number";
+  return (
+    <div className="space-y-1">
+      <div className="relative h-2 overflow-hidden rounded-full bg-zinc-800" role="progressbar" aria-valuenow={known ? Math.round(percent) : undefined}>
+        {known ? (
+          <div className="h-full rounded-full bg-amber-400 transition-[width] duration-300" style={{ width: `${Math.min(100, Math.max(0, percent))}%` }} />
+        ) : (
+          <div className="absolute inset-y-0 w-1/3 animate-[hb-slide_1.2s_ease-in-out_infinite] rounded-full bg-amber-400" />
+        )}
+      </div>
+      {label && <p className="text-xs text-zinc-400">{label}</p>}
+    </div>
+  );
+}
+
+// ---- Avisos flotantes ------------------------------------------------------------------------------
+
+type ToastKind = "ok" | "error" | "info";
+interface ToastItem {
+  id: number;
+  kind: ToastKind;
+  text: string;
+}
+const toastListeners = new Set<(t: ToastItem) => void>();
+let toastSeq = 0;
+
+/** Muestra un aviso breve en la esquina (hace falta que `ToastHost` esté montado). */
+export function toast(text: string, kind: ToastKind = "ok") {
+  const item = { id: ++toastSeq, kind, text };
+  toastListeners.forEach((l) => l(item));
+}
+
+const toastCls: Record<ToastKind, string> = {
+  ok: "border-emerald-500/40 bg-emerald-950 text-emerald-200",
+  error: "border-rose-500/40 bg-rose-950 text-rose-200",
+  info: "border-amber-400/40 bg-brand-900 text-amber-200",
+};
+
+export function ToastHost() {
+  const [items, setItems] = useState<ToastItem[]>([]);
+  useEffect(() => {
+    const on = (item: ToastItem) => {
+      setItems((cur) => [...cur.slice(-3), item]);
+      setTimeout(() => setItems((cur) => cur.filter((x) => x.id !== item.id)), item.kind === "error" ? 6000 : 3000);
+    };
+    toastListeners.add(on);
+    return () => void toastListeners.delete(on);
+  }, []);
+  return (
+    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-72 flex-col gap-2" role="status" aria-live="polite">
+      {items.map((i) => (
+        <div key={i.id} className={`animate-[hb-pop_0.2s_ease-out] rounded-lg border px-3 py-2 text-xs shadow-lg ${toastCls[i.kind]}`}>
+          {i.kind === "ok" ? "✓ " : i.kind === "error" ? "✕ " : ""}
+          {i.text}
+        </div>
+      ))}
+    </div>
   );
 }
 

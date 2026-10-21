@@ -67,12 +67,12 @@ async fn each_connection_stamps_its_own_platform_on_every_event() {
 async fn each_platform_normalizes_names_its_own_way() {
     let r = rig();
     // «Pokimane» es un canal de Twitch válido; «mi-canal» no es un usuario de TikTok.
-    r.manager.service(Platform::Twitch).connect("https://twitch.tv/Pokimane", None, None).await.unwrap();
-    assert!(r.manager.service(Platform::Tiktok).connect("mi-canal", None, None).await.is_err());
-    r.manager.service(Platform::Tiktok).connect("@ana_99", None, None).await.unwrap();
+    r.manager.service(Platform::Twitch).connect("https://twitch.tv/Pokimane", None).await.unwrap();
+    assert!(r.manager.service(Platform::Tiktok).connect("mi-canal", None).await.is_err());
+    r.manager.service(Platform::Tiktok).connect("@ana_99", None).await.unwrap();
     assert_eq!(*r.twitch_src.connected.lock().unwrap(), ["pokimane"]);
     assert_eq!(*r.tiktok_src.connected.lock().unwrap(), ["ana_99"]);
-    assert!(r.manager.service(Platform::Twitch).connect("a b", None, None).await.is_err());
+    assert!(r.manager.service(Platform::Twitch).connect("a b", None).await.is_err());
 }
 
 #[tokio::test]

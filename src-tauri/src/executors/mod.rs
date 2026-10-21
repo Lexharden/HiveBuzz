@@ -2,12 +2,12 @@
 //! `ExecutorRegistry`; el núcleo (reglas y cola) no conoce ninguno en concreto.
 
 pub mod alert;
-pub mod bot;
 pub mod interact;
 pub mod internal;
 pub mod keys;
 pub mod netcmd;
 pub mod obs;
+pub mod points;
 pub mod sound;
 pub mod tts;
 pub mod webhook;

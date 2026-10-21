@@ -64,8 +64,6 @@ pub struct SongConfig {
     pub enabled: bool,
     /// Comandos para pedir (sin `!`).
     pub commands: Vec<String>,
-    /// Comandos que responden qué suena ahora.
-    pub now_playing_commands: Vec<String>,
     pub min_role: MinRole,
     /// Puntos que cuesta pedir una canción (0 = gratis).
     pub cost_points: u64,
@@ -77,8 +75,6 @@ pub struct SongConfig {
     pub blocked_terms: Vec<String>,
     /// `@usuario` que no pueden pedir.
     pub blocked_users: Vec<String>,
-    /// Responder en el chat (necesita la sesión de TikTok).
-    pub reply: bool,
 }
 
 impl Default for SongConfig {
@@ -86,7 +82,6 @@ impl Default for SongConfig {
         Self {
             enabled: false,
             commands: vec!["sr".into(), "pedir".into()],
-            now_playing_commands: vec!["song".into(), "cancion".into()],
             min_role: MinRole::Everyone,
             cost_points: 0,
             per_user_limit: 2,
@@ -94,7 +89,6 @@ impl Default for SongConfig {
             max_duration_s: 600,
             blocked_terms: Vec::new(),
             blocked_users: Vec::new(),
-            reply: true,
         }
     }
 }
@@ -144,7 +138,6 @@ impl SpotifyConfig {
         self.client_id = self.client_id.trim().to_string();
         let s = &mut self.song;
         s.commands = clean_list(&s.commands, &['!'], true, 24);
-        s.now_playing_commands = clean_list(&s.now_playing_commands, &['!'], true, 24);
         s.blocked_terms = clean_list(&s.blocked_terms, &[], true, 80);
         s.blocked_users = clean_list(&s.blocked_users, &['@'], true, 40);
         s.per_user_limit = s.per_user_limit.clamp(1, 50);

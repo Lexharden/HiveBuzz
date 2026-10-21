@@ -83,6 +83,10 @@ export interface Conditions {
   rolesAny: Role[];
   minTeamLevel?: number;
   minGifterLevel?: number;
+  /** Debe estar en alguno de estos grupos de espectadores (ids). Vacío o ausente = cualquiera. */
+  groupsAny?: string[];
+  /** No debe estar en ninguno de estos grupos (ids). */
+  groupsNone?: string[];
   probability: number;
   schedule?: Schedule;
 }
@@ -109,6 +113,21 @@ export interface Rule {
   ttlMs: number;
   /** Puntos que paga el espectador que la dispara (la regla se vuelve una recompensa canjeable). */
   costPoints?: number;
+  /** Exclusiva: si se dispara, las reglas que no lo son no se disparan para ese mismo evento. */
+  replacesGeneral?: boolean;
+}
+
+/** Un usuario de un grupo; sin `platform` vale en cualquier plataforma. */
+export interface Member {
+  handle: string;
+  platform?: "tiktok" | "twitch";
+}
+
+/** Grupo de espectadores (VIPs, Amigos…) que reglas y comandos pueden exigir o excluir. */
+export interface ViewerGroup {
+  id: string;
+  name: string;
+  members: Member[];
 }
 
 export interface FiredReport {
@@ -125,6 +144,14 @@ export interface QueueInfo {
 }
 
 // ---- Bibliotecas ----
+
+/** Un sonido de MyInstants (aún no está en la biblioteca). */
+export interface Instant {
+  slug: string;
+  name: string;
+  /** Ruta del audio dentro de MyInstants. */
+  file: string;
+}
 
 export interface Sound {
   id: string;

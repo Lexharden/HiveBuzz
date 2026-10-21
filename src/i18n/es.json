@@ -12,7 +12,7 @@
     "settings": "Ajustes",
     "overlays": "Overlays",
     "goals": "Metas y timers",
-    "interact": "Bot y puntos",
+    "interact": "Puntos y grupos",
     "integrations": "Integraciones",
     "stats": "Estadísticas",
     "help": "Ayuda",
@@ -72,7 +72,7 @@
     "copy": "Copiar URL",
     "copied": "Copiada",
     "euler": "API key de Euler Stream",
-    "eulerHint": "Opcional. Sin ella se usa el tier gratuito. Se guarda en el llavero del sistema, no en la base de datos.",
+    "eulerHint": "Opcional: solo para conectar al LIVE con más margen de firmas. Sin ella se usa el tier gratuito. Se guarda en el llavero del sistema, no en la base de datos.",
     "eulerSaved": "Hay una API key guardada",
     "eulerPlaceholder": "Pega tu API key",
     "save": "Guardar",
@@ -143,7 +143,11 @@
     "schedule": "Solo en cierto horario",
     "from": "Desde",
     "to": "Hasta",
-    "daysHint": "Sin días marcados = todos"
+    "daysHint": "Sin días marcados = todos",
+    "groupsAny": "Solo para estos grupos",
+    "groupsAnyHint": "Solo los usuarios de estos grupos la disparan. Sin elegir: cualquiera.",
+    "groupsNone": "Excluir estos grupos",
+    "groupsNoneHint": "Los usuarios de estos grupos no la disparan (útil para la regla general)."
   },
   "rules": {
     "title": "Reglas",
@@ -195,7 +199,10 @@
     "save": "Guardar",
     "cancel": "Cancelar",
     "costPoints": "Coste en puntos",
-    "costPointsHint": "Puntos que paga quien la dispara (0 = gratis)"
+    "costPointsHint": "Puntos que paga quien la dispara (0 = gratis)",
+    "replacesGeneral": "Reemplaza a las reglas generales",
+    "replacesGeneralHint": "Si esta regla se dispara, las demás reglas (las que no tienen esto activado) no se disparan para ese mismo evento. Así la animación de un VIP sustituye a la normal.",
+    "replacesBadge": "reemplaza a las generales"
   },
   "actionType": {
     "playSound": "Reproducir sonido",
@@ -203,7 +210,6 @@
     "tts": "Texto a voz",
     "goalAdjust": "Modificar meta",
     "timerControl": "Controlar timer",
-    "botMessage": "Mensaje del bot",
     "pointsAdjust": "Sumar/restar puntos",
     "spinWheel": "Girar la ruleta",
     "startPoll": "Lanzar encuesta",
@@ -218,6 +224,9 @@
     "soundsHint": "Si marcas varios, se elige uno al azar.",
     "noSounds": "No hay sonidos. Impórtalos en la pestaña Biblioteca.",
     "volume": "Volumen (%)",
+    "alertSound": "Sonido (suena a la vez que se ve)",
+    "alertSoundHint": "Empieza justo cuando el overlay muestra la alerta, también si hay otras en cola. Es mejor que una acción «Reproducir sonido» aparte, que suena antes de que aparezca el vídeo.",
+    "noSound": "Sin sonido",
     "wait": "Esperar a que termine",
     "alertTitle": "Título",
     "alertText": "Texto",
@@ -255,9 +264,7 @@
       "add": "Sumar / restar tiempo"
     },
     "jsonInvalid": "JSON no válido (no se aplica hasta que lo sea)",
-    "spinWheelHint": "Gira la ruleta configurada en «Bot y puntos». No tiene parámetros.",
-    "botText": "Mensaje",
-    "botTextHint": "Lo escribe el bot en el chat (necesita la sesión de TikTok). Admite variables.",
+    "spinWheelHint": "Gira la ruleta configurada en «Puntos y grupos». No tiene parámetros.",
     "pointsAmount": "Cantidad",
     "pointsAmountHint": "Entero con signo o variable, p. ej. -50 o {coins}",
     "pointsTarget": "A quién",
@@ -306,6 +313,21 @@
     "obsEnabled": "Activar (desmarcado = desactivar)",
     "obsRevert": "Revertir tras (ms)",
     "obsRevertHint": "Vacío = se queda así"
+  },
+  "myinstants": {
+    "title": "Buscar en MyInstants",
+    "hint": "Escucha sonidos de myinstants.com sin descargarlos y, si te gustan, pulsa Descargar para guardarlos en tu biblioteca.",
+    "placeholder": "Busca un sonido (magic, bruh, aplausos…)",
+    "search": "Buscar",
+    "trending": "En tendencia",
+    "resultsFor": "Resultados para «{{term}}»",
+    "none": "No se encontró nada.",
+    "listen": "Escuchar sin descargar",
+    "download": "Descargar",
+    "downloading": "Descargando…",
+    "saved": "En tu biblioteca",
+    "more": "Cargar más",
+    "loading": "Cargando…"
   },
   "library": {
     "sounds": "Sonidos",
@@ -452,7 +474,8 @@
     "noServer": "El servidor local no está disponible.",
     "copyFailed": "No se pudo copiar al portapapeles.",
     "previewHintTest": "Vista previa a 1920×1080. Usa «Probar» para mandarle contenido de ejemplo.",
-    "previewHintLive": "Vista previa a 1920×1080. Este overlay muestra datos reales."
+    "previewHintLive": "Vista previa a 1920×1080. Este overlay muestra datos reales.",
+    "testSent": "Prueba enviada al overlay"
   },
   "field": {
     "fontFamily": "Fuente",
@@ -700,44 +723,10 @@
     "saved": "Guardado",
     "add": "Añadir",
     "sections": {
-      "bot": "Chatbot",
       "points": "Puntos",
       "wheel": "Ruleta",
       "poll": "Encuestas",
-      "login": "Sesión de TikTok"
-    },
-    "bot": {
-      "title": "Chatbot",
-      "hint": "Escribe en tu chat. Necesita iniciar sesión en TikTok (pestaña Sesión de TikTok).",
-      "enabled": "Activar el bot",
-      "minInterval": "Tiempo mínimo entre mensajes (ms)",
-      "commands": "Comandos",
-      "noCommands": "Aún no hay comandos.",
-      "permissions": "Permisos, niveles de fan y enfriamiento",
-      "names": "Nombres (separados por coma)",
-      "response": "Respuesta (admite {user}, {nickname}, {points}…)",
-      "timed": "Mensajes temporizados",
-      "text": "Texto",
-      "everyMinutes": "Cada (min)",
-      "minChat": "Mín. mensajes de chat",
-      "thanks": "Agradecimientos automáticos",
-      "thanksHint": "Variables: {nickname}, {gift}, {count}, {coins}.",
-      "thanksKinds": {
-        "gift": "Regalos",
-        "follow": "Follows",
-        "share": "Shares",
-        "subscribe": "Suscripciones"
-      },
-      "log": "Registro del bot",
-      "clearLog": "Limpiar",
-      "emptyLog": "Sin mensajes todavía.",
-      "testMessage": "Mensaje de prueba",
-      "send": "Enviar",
-      "state": {
-        "sent": "enviado",
-        "failed": "falló",
-        "dropped": "descartado"
-      }
+      "groups": "Grupos"
     },
     "points": {
       "title": "Sistema de puntos",
@@ -754,10 +743,7 @@
       "subscribe": "Por suscribirse",
       "perCoin": "Por moneda regalada",
       "subMultiplier": "Multiplicador suscriptores",
-      "topSize": "Tamaño del !top",
-      "pointsCommand": "Comando de saldo",
-      "topCommand": "Comando de ranking",
-      "rewardsHint": "Las recompensas se crean en Reglas: ponle un coste en puntos a una regla de comando de chat.",
+      "rewardsHint": "Las recompensas se crean en Reglas: ponle un coste en puntos a una regla de comando de chat. Los puntos se ven en la app y en los overlays; HiveBuzz no puede escribir en el chat de TikTok.",
       "viewers": "Espectadores",
       "export": "Exportar CSV",
       "import": "Importar CSV",
@@ -776,7 +762,6 @@
       "title": "Ruleta de premios",
       "hint": "Lánzala con una regla (acción «spinWheel») o con el botón de prueba.",
       "test": "Girar (prueba)",
-      "announce": "Mensaje del bot al ganar",
       "prize": "Premio",
       "weight": "Peso",
       "actionHint": "Para que un premio ejecute acciones, edita su plan en la configuración avanzada."
@@ -792,22 +777,6 @@
       "stop": "Terminar ya",
       "clear": "Quitar del overlay",
       "ended": "terminada"
-    },
-    "login": {
-      "title": "Sesión de TikTok",
-      "hint": "Opcional: solo para que el bot escriba en el chat. Además de la sesión hace falta una API key de Euler Stream (puede exigir un plan de pago: revisa tu plan). La contraseña se escribe en la web de TikTok; HiveBuzz solo guarda las cookies de sesión en el llavero del sistema.",
-      "active": "Sesión guardada.",
-      "none": "Sin sesión: modo solo lectura.",
-      "start": "Abrir login de TikTok",
-      "finish": "Ya inicié sesión",
-      "logout": "Cerrar sesión",
-      "opened": "Inicia sesión en la ventana y pulsa «Ya inicié sesión».",
-      "saved": "Sesión guardada.",
-      "notYet": "Aún no se detecta la sesión.",
-      "reconnect": "Vuelve a conectar al LIVE para aplicar la sesión.",
-      "manualToggle": "¿No se abre la ventana? Pegar las cookies a mano",
-      "manualHint": "Inicia sesión en tiktok.com con tu navegador, abre las herramientas de desarrollo (F12) → Aplicación/Almacenamiento → Cookies → tiktok.com y copia el valor de «sessionid» y de «tt-target-idc».",
-      "manualSave": "Guardar sesión"
     }
   },
   "integrations": {
@@ -872,7 +841,6 @@
     "enabled": "Activar peticiones de canciones",
     "commands": "Comandos para pedir",
     "commandsHint": "Sin «!», separados por comas",
-    "nowCommands": "Comandos «qué suena»",
     "minRole": "Quién puede pedir",
     "roles": {
       "everyone": "Cualquiera",
@@ -888,7 +856,6 @@
     "blockedTerms": "Bloquear si el título o artista contiene",
     "blockedTermsHint": "Separados por comas",
     "blockedUsers": "Usuarios bloqueados (@)",
-    "reply": "Responder en el chat",
     "test": "Probar una petición",
     "testHint": "Busca y añade a tu cola real de Spotify, sin pasar por roles ni puntos.",
     "queueIt": "Añadir a la cola",
@@ -958,11 +925,16 @@
       "confirmOlder": "¿Instalar la v{{version}}, anterior a la tuya? Los ajustes de funciones nuevas que no existían en esa versión pueden ignorarse.",
       "install": "Instalar v{{version}} y reiniciar",
       "banner": "Hay una versión nueva de HiveBuzz: v{{version}}.",
-      "progress": "Descargando… {{done}} / {{total}} KB"
+      "progress": "Descargando… {{done}} / {{total}} KB",
+      "preparing": "Preparando la actualización…",
+      "checking": "Buscando versiones…",
+      "finishing": "Instalando… la app se cerrará y volverá a abrirse sola",
+      "downloadingMb": "Descargando… {{done}} / {{total}} MB{{percent}}",
+      "restartNote": "No cierres HiveBuzz: se reiniciará automáticamente al terminar."
     },
     "profiles": {
       "title": "Perfiles",
-      "hint": "Guarda tus reglas y la configuración de tus overlays con un nombre («Minecraft», «Charla»…) y cámbialas de un golpe. No incluyen metas, timers, puntos, bot ni ruleta.",
+      "hint": "Guarda tus reglas y la configuración de tus overlays con un nombre («Minecraft», «Charla»…) y cámbialas de un golpe. No incluyen metas, timers, puntos ni ruleta.",
       "namePlaceholder": "Nombre del perfil",
       "saveCurrent": "Guardar lo actual como perfil",
       "empty": "Aún no hay perfiles.",
@@ -1017,7 +989,7 @@
     "dashboard": "Conecta tus directos y mira qué está pasando en tiempo real.",
     "rules": "Dile a HiveBuzz qué hacer cuando alguien regala, comenta o te sigue.",
     "goals": "Barras de progreso y cuentas atrás que tu comunidad puede llenar.",
-    "interact": "El bot de tu chat, los puntos de tus espectadores, la ruleta y las encuestas.",
+    "interact": "Los puntos de tus espectadores, sus grupos (VIPs…), la ruleta y las encuestas.",
     "stats": "Un resumen de cada directo: monedas, espectadores y quién te apoyó.",
     "overlays": "Lo que se ve en pantalla (alertas, chat, metas…). Cópialo a OBS con un clic.",
     "library": "Tus sonidos, imágenes y videos para las alertas.",
@@ -1197,8 +1169,8 @@
       "rules": {
         "what": "Aquí decides qué pasa cuando ocurre algo en tu directo: «cuando pasa X, haz Y».",
         "i1": "Disparadores: regalos, follows, comandos del chat, palabras clave, likes y más.",
-        "i2": "Acciones: sonido, alerta en pantalla, voz, mensaje del bot, tecla, OBS, webhook…",
-        "i3": "Condiciones: tiempo de espera, roles, probabilidad y horario.",
+        "i2": "Acciones: sonido, alerta en pantalla (con su sonido sincronizado), voz, tecla, OBS, webhook…",
+        "i3": "Condiciones: tiempo de espera, roles, grupos de espectadores (solo VIPs, por ejemplo), probabilidad y horario.",
         "i4": "Botón «Probar» para ver una regla en acción sin esperar a que ocurra."
       },
       "goals": {
@@ -1209,11 +1181,11 @@
         "i4": "Se guardan solas: no pierdes el progreso al cerrar la app."
       },
       "interact": {
-        "what": "Todo lo que hace tu chat más divertido.",
-        "i1": "Chatbot: comandos como !discord, respuestas automáticas y agradecimientos.",
-        "i2": "Puntos: tus espectadores los ganan y los canjean por recompensas.",
-        "i3": "Ruleta de premios y encuestas que se votan escribiendo un número.",
-        "i4": "Sesión de TikTok: solo hace falta si quieres que el bot escriba en tu chat."
+        "what": "Todo lo que hace tu comunidad más divertida.",
+        "i1": "Puntos: tus espectadores los ganan y los canjean por recompensas.",
+        "i2": "Grupos de espectadores (VIPs, amigos…) para comandos y animaciones exclusivas.",
+        "i3": "Ruleta de premios que gira desde una regla o con el botón de prueba.",
+        "i4": "Encuestas que tu público vota escribiendo un número en el chat."
       },
       "stats": {
         "what": "Un resumen de cada directo, para saber cómo te fue.",
@@ -1231,7 +1203,7 @@
       },
       "library": {
         "what": "Tus archivos para las alertas.",
-        "i1": "Sonidos (mp3, wav, ogg, flac) con volumen propio y botón para escucharlos.",
+        "i1": "Sonidos (mp3, wav, ogg, flac) con volumen propio y botón para escucharlos, y un buscador de MyInstants para probar y descargar sonidos.",
         "i2": "Imágenes, GIF y videos para las alertas.",
         "i3": "Los archivos se copian a la carpeta de HiveBuzz.",
         "i4": "Viajan contigo cuando exportas tu configuración."
@@ -1255,7 +1227,7 @@
         "i1": "Idioma, iniciar con Windows y bandeja del sistema.",
         "i2": "Perfiles: cambia todas tus reglas y overlays de golpe («Minecraft», «Charla»).",
         "i3": "Exportar e importar tu configuración completa.",
-        "i4": "Actualizaciones, registro (logs) y clave de Euler Stream."
+        "i4": "Actualizaciones, registro (logs) y clave de Euler Stream (opcional)."
       }
     },
     "glossary": {
@@ -1296,6 +1268,10 @@
       "cooldown": {
         "term": "Cooldown",
         "def": "El tiempo de espera antes de que una regla pueda repetirse."
+      },
+      "group": {
+        "term": "Grupo de espectadores",
+        "def": "Una lista de usuarios (VIPs, amigos…) que puedes exigir o excluir en una regla o comando para que sea solo para ellos."
       }
     },
     "faq": {
@@ -1303,10 +1279,6 @@
       "obs": {
         "q": "¿Cómo pongo una alerta en OBS?",
         "a": "Ve a Overlays, elige «Alertas» y pulsa Copiar. En OBS añade una fuente «Navegador», pega la dirección y pon 1920×1080."
-      },
-      "bot": {
-        "q": "¿Por qué mi bot no escribe?",
-        "a": "Nace apagado: actívalo en «Bot y puntos» e inicia sesión de TikTok en esa misma pantalla. En Twitch el bot no escribe (solo lee)."
       },
       "spotify": {
         "q": "¿Necesito Spotify Premium?",
@@ -1323,6 +1295,22 @@
       "update": {
         "q": "¿Pierdo mis cosas si actualizo?",
         "a": "No: tus datos están en una carpeta aparte. Aun así, en Ajustes puedes exportar una copia de seguridad antes de actualizar."
+      },
+      "vip": {
+        "q": "¿Cómo hago algo solo para ciertos usuarios?",
+        "a": "En Puntos y grupos → Grupos crea una lista (por ejemplo «VIPs») con sus @. Luego, en la regla, en Condiciones elige «Solo para estos grupos». Si quieres que su animación sustituya a la normal, activa «Reemplaza a las reglas generales»."
+      },
+      "sound": {
+        "q": "El sonido y el vídeo de una alerta no salen a la vez",
+        "a": "No uses una acción «Reproducir sonido» aparte: elige el sonido dentro de la acción «Alerta en overlay». Así empieza justo cuando el vídeo se ve, también con alertas en cola."
+      },
+      "busy": {
+        "q": "¿Cómo sé si la app está trabajando?",
+        "a": "Los botones muestran una rueda y se bloquean mientras ejecutan algo, y las pruebas avisan con un mensaje abajo a la derecha. Al actualizar ves las etapas: preparando, descargando e instalando."
+      },
+      "chatWrite": {
+        "q": "¿Puede HiveBuzz escribir en mi chat de TikTok?",
+        "a": "No. TikTok solo deja enviar mensajes a través de un servicio de pago de terceros (Euler Stream) y no existe una forma gratuita, así que HiveBuzz no incluye bot de chat. Lee tu chat y responde con alertas en pantalla, voz y sonidos."
       }
     }
   },
@@ -1336,12 +1324,10 @@
     "added": "Añadida",
     "addedNote": "Se añadieron {{count}} reglas.",
     "customize": "Personalizar",
-    "needsBot": "usa el bot de chat",
     "needsEdit": "pon tu enlace",
     "category": {
       "new": "Novedades",
       "thanks": "Agradecimientos",
-      "chat": "Bot de chat",
       "interaction": "Interacción"
     },
     "webhookGift": {
@@ -1356,7 +1342,7 @@
     },
     "fanClub": {
       "name": "!fan solo para el club de fans",
-      "desc": "NUEVO. Solo responde a quien tiene la insignia del club de fans de tu canal (nivel 1 o más). Cámbiale el nivel para hacer comandos más exclusivos.",
+      "desc": "NUEVO. Muestra una alerta en pantalla solo a quien tiene la insignia del club de fans de tu canal (nivel 1 o más). Cámbiale el nivel para hacer comandos más exclusivos.",
       "say": "{nickname}, gracias por ser parte del club de fans 💛"
     },
     "gifterVoice": {
@@ -1366,9 +1352,8 @@
     },
     "jarFull": {
       "name": "¡Se llenó el jarrón!",
-      "desc": "NUEVO. Celebra con voz y chat cuando se completa una meta (por ejemplo la del jarrón de regalos). Al personalizarla eliges la meta.",
+      "desc": "NUEVO. Celebra con la voz cuando se completa una meta (por ejemplo la del jarrón de regalos). Al personalizarla eliges la meta.",
       "say": "¡Se llenó el jarrón! Gracias a todos",
-      "chat": "🎉 ¡Meta cumplida! Gracias por llenar el jarrón.",
       "edit": "pon tu meta"
     },
     "thanksGift": {
@@ -1378,7 +1363,7 @@
     },
     "bigGift": {
       "name": "Regalo grande (100+ monedas)",
-      "desc": "El bot celebra en el chat los regalos de 100 monedas o más.",
+      "desc": "Muestra una alerta en pantalla con los regalos de 100 monedas o más.",
       "say": "🔥 ¡{nickname} envió {gift}! ¡Muchísimas gracias!"
     },
     "thanksFollow": {
@@ -1393,34 +1378,8 @@
     },
     "thanksSub": {
       "name": "Gracias por suscribirte",
-      "desc": "La voz y el bot agradecen cada suscripción.",
-      "say": "¡{nickname}, gracias por suscribirte!",
-      "chat": "¡Bienvenido al club, {nickname}! 💜"
-    },
-    "welcome": {
-      "name": "Bienvenida a seguidores",
-      "desc": "El bot saluda a tus seguidores al entrar (una vez cada 12 h).",
-      "say": "¡Bienvenido de vuelta, {nickname}! 👋"
-    },
-    "hello": {
-      "name": "Responder saludos",
-      "desc": "Si alguien escribe «hola» o «buenas», el bot le saluda.",
-      "say": "¡Hola {nickname}! 😊"
-    },
-    "cmdDiscord": {
-      "name": "!discord",
-      "desc": "El bot responde con el enlace a tu Discord.",
-      "say": "Únete a mi Discord: (pon aquí tu enlace)"
-    },
-    "cmdSocials": {
-      "name": "!redes",
-      "desc": "El bot responde con tus redes sociales.",
-      "say": "Sígueme en mis redes: (pon aquí tus enlaces)"
-    },
-    "cmdCommands": {
-      "name": "!comandos",
-      "desc": "El bot lista los comandos disponibles.",
-      "say": "Comandos: !discord !redes !puntos !top !di <mensaje>"
+      "desc": "La voz agradece cada suscripción.",
+      "say": "¡{nickname}, gracias por suscribirte!"
     },
     "likes": {
       "name": "Meta de likes",
@@ -1441,11 +1400,23 @@
       "name": "!anuncio de moderador",
       "desc": "Los moderadores hacen que la voz lea un anuncio.",
       "say": "Anuncio: {args}"
+    },
+    "vipGift": {
+      "name": "Animación exclusiva de un VIP al regalar una ballena",
+      "desc": "NUEVO. Solo para los usuarios del grupo que elijas: al regalar una ballena se lanza su propia alerta (elige su vídeo y sonido) y NO se dispara la regla general de la ballena. Crea antes el grupo en Puntos y grupos → Grupos.",
+      "title": "👑 {nickname}",
+      "edit": "elige el grupo, el vídeo y el sonido"
+    },
+    "vipCommand": {
+      "name": "!vip solo para un grupo",
+      "desc": "NUEVO. Un comando que muestra una alerta solo a los usuarios del grupo que elijas (VIPs, amigos…). Crea antes el grupo en Puntos y grupos → Grupos.",
+      "say": "{nickname}, ¡bienvenido, VIP! 👑",
+      "edit": "elige el grupo"
     }
   },
   "about": {
     "version": "Versión {{version}}",
-    "what": "HiveBuzz conecta tus directos de TikTok y Twitch con tu stream: regalos, chat y follows se convierten en alertas, voz, sonidos, overlays y respuestas del bot.",
+    "what": "HiveBuzz conecta tus directos de TikTok y Twitch con tu stream: regalos, chat y follows se convierten en alertas, voz, sonidos y overlays.",
     "community": {
       "title": "Comunidad",
       "body": "Únete al Discord para pedir ayuda, compartir tus reglas y overlays y enterarte antes de las novedades. En YouTube hay tutoriales y demostraciones.",
@@ -1474,5 +1445,31 @@
       "kofi": "Invitar un café"
     },
     "footer": "Windows, macOS y Linux · tu live → alertas, voz y overlays."
+  },
+  "groups": {
+    "title": "Grupos de espectadores",
+    "hint": "Crea listas (VIPs, amigos…) y úsalas en las reglas para que solo ellos las activen: un comando propio, o una animación distinta cuando regalan algo.",
+    "newPlaceholder": "Nombre del grupo (VIPs, Amigos…)",
+    "create": "Crear grupo",
+    "created": "Grupo creado",
+    "renameWarning": "Los usuarios se reconocen por su @. Si alguien cambia de @ en TikTok, actualízalo aquí.",
+    "empty": "Aún no hay grupos.",
+    "name": "Nombre",
+    "count": "{{n}} usuarios",
+    "noMembers": "Sin usuarios todavía.",
+    "remove": "Quitar del grupo",
+    "add": "Añadir usuarios",
+    "addHint": "Uno o varios @, separados por coma o espacio.",
+    "platform": "Plataforma",
+    "anyPlatform": "Todas",
+    "addBtn": "Añadir",
+    "fromViewers": "Buscar entre tus espectadores",
+    "fromViewersHint": "Escribe al menos 2 letras para ver espectadores que ya han pasado por tu directo.",
+    "searchViewers": "Buscar espectador…",
+    "confirmDelete": "¿Eliminar el grupo «{{name}}»?",
+    "confirmDeleteUsed": "El grupo «{{name}}» lo usan {{n}} reglas. Si lo eliminas, las que exigían ese grupo dejarán de dispararse para todos. ¿Eliminar?",
+    "noneYet": "Aún no hay grupos: créalos en Puntos y grupos → Grupos.",
+    "deleted": "grupo eliminado",
+    "deletedHint": "Este grupo ya no existe; pulsa para quitarlo de la regla."
   }
 }

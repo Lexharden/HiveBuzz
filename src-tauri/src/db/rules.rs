@@ -146,6 +146,7 @@ mod tests {
             priority: None,
             ttl_ms: 1000,
             cost_points: None,
+            replaces_general: false,
         }
     }
 

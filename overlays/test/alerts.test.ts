@@ -7,6 +7,29 @@ const cfg = { titleSize: 40, textSize: 30, mediaMaxWidth: 60, animation: "pop" }
 const alert = (extra: Record<string, unknown> = {}) => ({ id: "x", title: "Ana", text: "envió una rosa", durationMs: 500, ...extra });
 
 describe("alertas", () => {
+  it("avisa al servidor cuando una alerta con sonido ya se ve, para que suene a la vez", () => {
+    const p = load("alerts");
+    p.send(config("alerts", cfg));
+    p.send(overlayMsg("alerts", alert({ id: "con-sonido", sync: true })));
+    // Sin vídeo, el aviso sale en el siguiente fotograma.
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        expect(p.socket.sent.map((m) => JSON.parse(m))).toEqual([{ type: "shown", id: "con-sonido" }]);
+        p.win.close();
+        resolve();
+      }, 100);
+    });
+  });
+
+  it("no avisa si la alerta no lleva sonido", async () => {
+    const p = load("alerts");
+    p.send(config("alerts", cfg));
+    p.send(overlayMsg("alerts", alert({ id: "sin-sonido" })));
+    await sleep(100);
+    expect(p.socket.sent).toEqual([]);
+    p.win.close();
+  });
+
   it("muestra título y texto con el tamaño configurado", () => {
     const p = load("alerts");
     p.send(config("alerts", cfg));

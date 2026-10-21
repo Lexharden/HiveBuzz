@@ -8,8 +8,6 @@ use crate::actions::clock::{AppClock, Clock};
 use crate::actions::queue::QueueConfig;
 use crate::actions::store::MemoryJobStore;
 use crate::actions::{ActionContext, ActionExecutor, ExecutorRegistry};
-use crate::bot::outbox::{ChatSender, Outbox, OutboxLimits};
-use crate::points::service::PointsService;
 use crate::rules::model::{PlanMode, Step};
 
 fn seg(id: &str, weight: u32) -> Segment {
@@ -71,7 +69,7 @@ fn sanitizing_fixes_what_it_can() {
     let mut s = seg("a", 99_999);
     s.label = format!("  {}  ", "x".repeat(100));
     s.color = "rojo".into();
-    let c = WheelConfig { segments: vec![s], spin_ms: 1, announce: String::new() }.sanitized();
+    let c = WheelConfig { segments: vec![s], spin_ms: 1 }.sanitized();
     assert_eq!(c.segments[0].label.chars().count(), 60);
     assert_eq!(c.segments[0].weight, MAX_WEIGHT);
     assert_eq!(c.segments[0].color, "#f59e0b");
@@ -94,20 +92,10 @@ impl ActionExecutor for Recorder {
     }
 }
 
-struct Mute;
-
-#[async_trait]
-impl ChatSender for Mute {
-    async fn send_chat(&self, _text: String) -> Result<()> {
-        Ok(())
-    }
-}
-
 struct Rig {
     wheel: Arc<WheelService>,
     hub: OverlayHub,
     ran: Arc<Mutex<Vec<String>>>,
-    bot: Arc<BotService>,
 }
 
 fn prize(label: &str) -> ActionPlan {
@@ -125,12 +113,9 @@ async fn rig(roll: f64) -> Rig {
     let queue = Arc::new(ActionQueue::start(registry, Arc::new(MemoryJobStore::default()), clock.clone(), QueueConfig::default()));
     let db = Db::open_memory().await.expect("db");
     let hub = OverlayHub::new(16);
-    let points = PointsService::new(db.clone(), clock.clone());
-    let outbox = Outbox::start(Arc::new(Mute), clock.clone(), Duration::from_millis(1_000), OutboxLimits::default());
-    let bot = BotService::new(db.clone(), clock, points, outbox);
-    let wheel = WheelService::with_rand(db, hub.clone(), bot.clone(), Arc::new(move || roll), Duration::from_millis(30));
+    let wheel = WheelService::with_rand(db, hub.clone(), Arc::new(move || roll), Duration::from_millis(30));
     wheel.attach_queue(queue);
-    Rig { wheel, hub, ran, bot }
+    Rig { wheel, hub, ran }
 }
 
 /// Pone una duración de giro corta saltándose el mínimo de 1 s que impone set_config.
@@ -143,7 +128,7 @@ fn config() -> WheelConfig {
     a.plan = prize("ganó A para {nickname}: {prize}");
     let mut b = seg("b", 1);
     b.plan = prize("ganó B");
-    WheelConfig { segments: vec![a, b], spin_ms: 2_000, announce: "🎡 {nickname}: {prize}".into() }
+    WheelConfig { segments: vec![a, b], spin_ms: 2_000 }
 }
 
 fn vars() -> Vars {
@@ -174,7 +159,6 @@ async fn spinning_publishes_the_result_waits_and_then_runs_the_prize() {
     assert_eq!((res.index, res.label.as_str()), (0, "Premio a"));
     tokio::time::sleep(Duration::from_millis(50)).await;
     assert_eq!(r.ran.lock().expect("lock").as_slice(), ["ganó A para Ana: Premio a"]);
-    assert!(r.bot.log().is_empty() || r.bot.log().iter().all(|e| e.source == "ruleta"));
 }
 
 #[tokio::test]
@@ -209,16 +193,4 @@ async fn saving_the_config_publishes_an_idle_wheel_and_persists_it() {
     r.wheel.cfg.write().expect("lock").segments.clear();
     r.wheel.load().await.expect("load");
     assert_eq!(r.wheel.config().segments.len(), 2);
-}
-
-#[tokio::test]
-async fn without_an_announcement_template_the_bot_stays_quiet() {
-    let r = rig(0.1).await;
-    let mut cfg = config();
-    cfg.announce = String::new();
-    r.wheel.set_config(cfg).await.expect("config");
-    fast(&r, 10);
-    r.wheel.spin(vars()).await.expect("spin");
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    assert!(r.bot.log().is_empty());
 }

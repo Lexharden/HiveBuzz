@@ -25,8 +25,14 @@ export class FakeSocket {
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
   closed = false;
+  readyState = 1;
+  /** Lo que el overlay ha enviado al servidor. */
+  sent: string[] = [];
   constructor(public url: string) {
     FakeSocket.instances.push(this);
+  }
+  send(text: string): void {
+    this.sent.push(text);
   }
   close(): void {
     this.closed = true;

@@ -113,9 +113,9 @@ export function GoalsPage() {
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <Btn onClick={() => void act(() => api.adjustGoal(g.id, delta))} disabled={delta === 0}>+{delta}</Btn>
-                  <Btn onClick={() => void act(() => api.adjustGoal(g.id, -delta))} disabled={delta === 0}>−{delta}</Btn>
-                  <Btn onClick={() => void act(() => api.resetGoal(g.id))}>{t("goals.resetProgress")}</Btn>
+                  <Btn onClick={() => act(() => api.adjustGoal(g.id, delta))} disabled={delta === 0}>+{delta}</Btn>
+                  <Btn onClick={() => act(() => api.adjustGoal(g.id, -delta))} disabled={delta === 0}>−{delta}</Btn>
+                  <Btn onClick={() => act(() => api.resetGoal(g.id))}>{t("goals.resetProgress")}</Btn>
                   <Btn onClick={() => setEditGoal({ goal: structuredClone(g), isNew: false })}>{t("rules.edit")}</Btn>
                   <Btn
                     variant="danger"
@@ -160,13 +160,13 @@ export function GoalsPage() {
                 <div className={`font-mono text-3xl font-bold tabular-nums ${tm.status === "running" ? "text-amber-300" : "text-zinc-400"}`}>{clock(tm.remainingMs)}</div>
                 <div className="flex flex-wrap gap-2">
                   {tm.status === "running" ? (
-                    <Btn onClick={() => void act(() => api.controlTimer(id, "pause"))}>⏸ {t("timers.pause")}</Btn>
+                    <Btn onClick={() => act(() => api.controlTimer(id, "pause"))}>⏸ {t("timers.pause")}</Btn>
                   ) : (
-                    <Btn variant="primary" onClick={() => void act(() => api.controlTimer(id, tm.status === "paused" ? "resume" : "start"))}>▶ {tm.status === "paused" ? t("timers.resume") : t("timers.start")}</Btn>
+                    <Btn variant="primary" onClick={() => act(() => api.controlTimer(id, tm.status === "paused" ? "resume" : "start"))}>▶ {tm.status === "paused" ? t("timers.resume") : t("timers.start")}</Btn>
                   )}
-                  <Btn onClick={() => void act(() => api.controlTimer(id, "add", 60))}>+1 min</Btn>
-                  <Btn onClick={() => void act(() => api.controlTimer(id, "add", -60))}>−1 min</Btn>
-                  <Btn onClick={() => void act(() => api.controlTimer(id, "reset"))}>{t("timers.reset")}</Btn>
+                  <Btn onClick={() => act(() => api.controlTimer(id, "add", 60))}>+1 min</Btn>
+                  <Btn onClick={() => act(() => api.controlTimer(id, "add", -60))}>−1 min</Btn>
+                  <Btn onClick={() => act(() => api.controlTimer(id, "reset"))}>{t("timers.reset")}</Btn>
                   <Btn onClick={() => setEditTimer({ cfg: structuredClone(tm.config), isNew: false })}>{t("rules.edit")}</Btn>
                   <Btn variant="danger" onClick={() => window.confirm(t("goals.confirmDelete", { name: tm.config.name })) && void act(() => api.deleteTimer(id))}>
                     {t("rules.delete")}

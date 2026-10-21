@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::error::Result;
 use crate::events::LiveEvent;
-use protocol::{ConnectionState, LogLevel, SessionPayload};
+use protocol::{ConnectionState, LogLevel};
 
 /// A qué LIVE conectarse.
 #[derive(Clone, PartialEq, Eq)]
@@ -19,23 +19,20 @@ pub struct ConnectTarget {
     pub unique_id: String,
     /// API key propia de Euler Stream (opcional; sale del llavero del sistema).
     pub euler_api_key: Option<String>,
-    /// Sesión de TikTok (opcional; solo hace falta para que el bot escriba en el chat).
-    pub session: Option<SessionPayload>,
 }
 
 impl ConnectTarget {
     pub fn new(unique_id: impl Into<String>) -> Self {
-        Self { unique_id: unique_id.into(), euler_api_key: None, session: None }
+        Self { unique_id: unique_id.into(), euler_api_key: None }
     }
 }
 
-// `Debug` manual: contiene secretos (API key, cookies de sesión) que no deben acabar en un log.
+// `Debug` manual: contiene un secreto (la API key) que no debe acabar en un log.
 impl std::fmt::Debug for ConnectTarget {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ConnectTarget")
             .field("unique_id", &self.unique_id)
             .field("euler_api_key", &self.euler_api_key.as_ref().map(|_| "***"))
-            .field("session", &self.session.as_ref().map(|_| "***"))
             .finish()
     }
 }
@@ -77,14 +74,4 @@ pub trait LiveSource: Send + Sync {
     /// el progreso llega como `SourceMessage::Status`.
     async fn connect(&self, target: ConnectTarget) -> Result<()>;
     async fn disconnect(&self) -> Result<()>;
-
-    /// Escribe en el chat del LIVE (lo usa el bot). Solo funciona con sesión de TikTok iniciada;
-    /// espera la confirmación de TikTok o devuelve el motivo del fallo.
-    async fn send_chat(&self, _text: String) -> Result<()> {
-        Err(crate::error::AppError::Invalid("esta fuente no permite escribir en el chat".into()))
-    }
 }
-
-/// Mensajes de TikTok que `SourceMessage` no necesita llevar: el resultado de un `send_chat`
-/// se entrega directamente a quien lo pidió.
-pub type ChatReply = std::result::Result<(), String>;

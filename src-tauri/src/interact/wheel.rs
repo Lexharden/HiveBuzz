@@ -8,12 +8,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::actions::queue::{ActionQueue, NewJob};
-use crate::bot::service::BotService;
 use crate::db::Db;
 use crate::error::{AppError, Result};
 use crate::overlay::OverlayHub;
 use crate::rules::model::ActionPlan;
-use crate::rules::template::{render, Vars};
+use crate::rules::template::Vars;
 
 pub const KEY_WHEEL_CONFIG: &str = "wheel_config";
 pub const CHANNEL: &str = "wheel";
@@ -58,21 +57,15 @@ pub struct WheelConfig {
     /// Duración de la animación del giro.
     #[serde(default = "default_spin_ms")]
     pub spin_ms: u64,
-    /// Mensaje del bot al salir un premio (vacío = no anuncia). Variables: {user}, {nickname}, {prize}.
-    #[serde(default = "default_announce")]
-    pub announce: String,
 }
 
 fn default_spin_ms() -> u64 {
     6_000
 }
-fn default_announce() -> String {
-    "🎡 {nickname} giró la ruleta y salió: {prize}".into()
-}
 
 impl Default for WheelConfig {
     fn default() -> Self {
-        Self { segments: Vec::new(), spin_ms: default_spin_ms(), announce: default_announce() }
+        Self { segments: Vec::new(), spin_ms: default_spin_ms() }
     }
 }
 
@@ -80,6 +73,7 @@ impl WheelConfig {
     pub fn sanitized(mut self) -> Self {
         self.spin_ms = self.spin_ms.clamp(1_000, 30_000);
         for s in &mut self.segments {
+            crate::rules::strip_removed_steps(&mut s.plan);
             s.label = s.label.trim().chars().take(60).collect();
             s.weight = s.weight.min(MAX_WEIGHT);
             if !is_hex(&s.color) {
@@ -144,7 +138,6 @@ pub struct WheelService {
     hub: OverlayHub,
     /// La cola se conecta después de crear el servicio (el ejecutor de la ruleta debe existir antes que la cola).
     queue: OnceLock<Arc<ActionQueue>>,
-    bot: Arc<BotService>,
     db: Db,
     rand: RandFn,
     reveal_pause: Duration,
@@ -152,12 +145,12 @@ pub struct WheelService {
 }
 
 impl WheelService {
-    pub fn new(db: Db, hub: OverlayHub, bot: Arc<BotService>) -> Arc<Self> {
-        Self::with_rand(db, hub, bot, Arc::new(rand::random::<f64>), REVEAL_PAUSE)
+    pub fn new(db: Db, hub: OverlayHub) -> Arc<Self> {
+        Self::with_rand(db, hub, Arc::new(rand::random::<f64>), REVEAL_PAUSE)
     }
 
-    pub fn with_rand(db: Db, hub: OverlayHub, bot: Arc<BotService>, rand: RandFn, reveal_pause: Duration) -> Arc<Self> {
-        Arc::new(Self { cfg: RwLock::new(WheelConfig::default()), hub, queue: OnceLock::new(), bot, db, rand, reveal_pause, spins: Mutex::new(0) })
+    pub fn with_rand(db: Db, hub: OverlayHub, rand: RandFn, reveal_pause: Duration) -> Arc<Self> {
+        Arc::new(Self { cfg: RwLock::new(WheelConfig::default()), hub, queue: OnceLock::new(), db, rand, reveal_pause, spins: Mutex::new(0) })
     }
 
     pub fn attach_queue(&self, queue: Arc<ActionQueue>) {
@@ -230,9 +223,6 @@ impl WheelService {
 
         let mut vars = vars;
         vars.insert("prize".into(), winner.label.clone());
-        if !cfg.announce.trim().is_empty() {
-            self.bot.say(&render(&cfg.announce, &vars), "ruleta");
-        }
         if !winner.plan.steps.is_empty() {
             let job = NewJob {
                 rule_id: format!("wheel:{}", winner.id),

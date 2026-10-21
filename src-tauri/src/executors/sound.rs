@@ -26,7 +26,7 @@ impl PlaySoundExecutor {
     }
 }
 
-fn sound_ids(params: &Map<String, Value>) -> Vec<String> {
+pub(super) fn sound_ids(params: &Map<String, Value>) -> Vec<String> {
     let mut ids: Vec<String> = params
         .get("soundIds")
         .and_then(Value::as_array)
@@ -37,6 +37,23 @@ fn sound_ids(params: &Map<String, Value>) -> Vec<String> {
     }
     ids.retain(|s| !s.trim().is_empty());
     ids
+}
+
+/// Elige uno de los sonidos de la acción (al azar si hay varios) y calcula su ruta y volumen final.
+/// `volume_key` es el parámetro del volumen de la acción (0–100, por defecto 100).
+pub(super) async fn resolve(library: &SoundLibrary, params: &Map<String, Value>, volume_key: &str) -> Result<(std::path::PathBuf, f32)> {
+    let ids = sound_ids(params);
+    let id = ids
+        .get(rand::random_range(0..ids.len().max(1)))
+        .ok_or_else(|| AppError::Invalid("la acción no tiene sonido".into()))?;
+    let sound = library
+        .get(id)
+        .await?
+        .ok_or_else(|| AppError::Invalid(format!("el sonido «{id}» ya no existe en la biblioteca")))?;
+    let action_volume = opt_number(params, volume_key, 0.0, 100.0)?.unwrap_or(100.0);
+    #[allow(clippy::cast_possible_truncation)]
+    let volume = (f64::from(sound.volume) / 100.0 * action_volume / 100.0) as f32;
+    Ok((library.path_of(&sound), volume))
 }
 
 #[async_trait]
@@ -60,20 +77,7 @@ impl ActionExecutor for PlaySoundExecutor {
     }
 
     async fn execute(&self, _ctx: &ActionContext, params: &Map<String, Value>) -> Result<()> {
-        let ids = sound_ids(params);
-        let id = ids
-            .get(rand::random_range(0..ids.len().max(1)))
-            .ok_or_else(|| AppError::Invalid("la acción no tiene sonido".into()))?;
-        let sound = self
-            .library
-            .get(id)
-            .await?
-            .ok_or_else(|| AppError::Invalid(format!("el sonido «{id}» ya no existe en la biblioteca")))?;
-
-        let action_volume = opt_number(params, "volume", 0.0, 100.0)?.unwrap_or(100.0);
-        #[allow(clippy::cast_possible_truncation)]
-        let volume = (f64::from(sound.volume) / 100.0 * action_volume / 100.0) as f32;
-        let path = self.library.path_of(&sound);
+        let (path, volume) = resolve(&self.library, params, "volume").await?;
 
         if opt_bool(params, "wait", true)? {
             self.audio.play(path, volume, TAG_SOUND).await

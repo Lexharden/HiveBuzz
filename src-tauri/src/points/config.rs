@@ -45,15 +45,6 @@ pub struct PointsConfig {
     /// Multiplicador para suscriptores (1.0 = sin bonus, 2.0 = el doble).
     #[serde(default = "default_sub_multiplier")]
     pub subscriber_multiplier: f64,
-    /// Comando para consultar los puntos propios (con o sin `!`).
-    #[serde(default = "default_points_command")]
-    pub points_command: String,
-    /// Comando para ver el top.
-    #[serde(default = "default_top_command")]
-    pub top_command: String,
-    /// Cuántos puestos muestra el comando del top.
-    #[serde(default = "default_top_size")]
-    pub top_size: u32,
     /// Contar también los eventos del simulador (solo para probar; por defecto no, para que no
     /// llenen la base de datos de espectadores con usuarios falsos).
     #[serde(default)]
@@ -99,16 +90,6 @@ fn default_per_coin() -> f64 {
 fn default_sub_multiplier() -> f64 {
     1.0
 }
-fn default_points_command() -> String {
-    "puntos".into()
-}
-fn default_top_command() -> String {
-    "top".into()
-}
-fn default_top_size() -> u32 {
-    5
-}
-
 impl Default for PointsConfig {
     fn default() -> Self {
         // Una sola fuente de verdad para los valores por defecto: los de serde.
@@ -127,26 +108,7 @@ impl PointsConfig {
         self.like_every = self.like_every.max(1);
         self.points_per_coin = if self.points_per_coin.is_finite() { self.points_per_coin.clamp(0.0, 1000.0) } else { 1.0 };
         self.subscriber_multiplier = if self.subscriber_multiplier.is_finite() { self.subscriber_multiplier.clamp(1.0, 10.0) } else { 1.0 };
-        self.points_command = clean_command(&self.points_command, "puntos");
-        self.top_command = clean_command(&self.top_command, "top");
-        self.top_size = self.top_size.clamp(1, 15);
         self
-    }
-}
-
-/// Comando sin `!`, en minúsculas y sin espacios; si queda vacío, el valor por defecto.
-fn clean_command(raw: &str, default: &str) -> String {
-    let c: String = raw
-        .trim()
-        .trim_start_matches('!')
-        .to_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_')
-        .collect();
-    if c.is_empty() {
-        default.to_string()
-    } else {
-        c
     }
 }
 
@@ -159,7 +121,6 @@ mod tests {
         let c = PointsConfig::default();
         assert!(c.enabled);
         assert_eq!((c.watch_points, c.watch_interval_minutes, c.comment_points), (5, 5, 2));
-        assert_eq!(c.points_command, "puntos");
         let partial: PointsConfig = serde_json::from_str(r#"{"commentPoints": 9}"#).expect("parsea");
         assert_eq!((partial.comment_points, partial.like_every), (9, 50));
     }
@@ -172,17 +133,12 @@ mod tests {
             like_every: 0,
             points_per_coin: f64::NAN,
             subscriber_multiplier: 0.2,
-            points_command: " !PUNTOS ya ".into(),
-            top_command: "!".into(),
-            top_size: 99,
             ..Default::default()
         }
         .sanitized();
         assert_eq!(c.currency_name, "puntos");
         assert_eq!((c.watch_interval_minutes, c.like_every), (1, 1));
         assert_eq!((c.points_per_coin, c.subscriber_multiplier), (1.0, 1.0));
-        assert_eq!(c.points_command, "puntosya");
-        assert_eq!((c.top_command.as_str(), c.top_size), ("top", 15));
         assert_eq!(PointsConfig { currency_name: "x".repeat(99), ..Default::default() }.sanitized().currency_name.chars().count(), 30);
     }
 }

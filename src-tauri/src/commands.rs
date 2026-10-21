@@ -25,6 +25,7 @@ use crate::rules::model::Rule;
 use crate::secrets::KEY_EULER_API;
 use crate::simulator::SimKind;
 use crate::sounds::Sound;
+use crate::viewer_groups::ViewerGroup;
 use crate::connections::PlatformStatus;
 use crate::timers::service::{Control, TimerView};
 use crate::timers::TimerConfig;
@@ -57,16 +58,15 @@ pub struct AppInfo {
     pub has_euler_api_key: bool,
 }
 
-/// Si TikTok ya está conectado (o reintentando), vuelve a conectar con las credenciales guardadas ahora:
-/// la sesión y la API key solo se leen al conectar, así que sin esto un cambio no se aplicaría hasta reconectar a mano.
+/// Si TikTok ya está conectado (o reintentando), vuelve a conectar con la API key guardada ahora:
+/// solo se lee al conectar, así que sin esto un cambio no se aplicaría hasta reconectar a mano.
 pub async fn reconnect_tiktok_if_active(state: &AppState) -> Result<()> {
     if state.conn.status().state == crate::source::protocol::ConnectionState::Disconnected {
         return Ok(());
     }
     let Some(username) = state.db.get_setting(KEY_LAST_USERNAME).await? else { return Ok(()) };
     let key = state.secrets.get(KEY_EULER_API)?;
-    let session = crate::secrets::load_tiktok_session(state.secrets.as_ref())?;
-    state.conn.connect(&username, key, session).await
+    state.conn.connect(&username, key).await
 }
 
 /// Conecta una plataforma. `name` es el @usuario de TikTok o el canal de Twitch.
@@ -75,14 +75,13 @@ pub async fn connect(state: State<'_, AppState>, platform: Platform, username: S
     match platform {
         Platform::Tiktok => {
             let key = state.secrets.get(KEY_EULER_API)?;
-            let session = crate::secrets::load_tiktok_session(state.secrets.as_ref())?;
-            state.conn.connect(&username, key, session).await?;
+            state.conn.connect(&username, key).await?;
             // Solo se guarda si la validación del nombre pasó (connect devuelve error si no).
             let clean = crate::connection::normalize_username(&username)?;
             state.db.set_setting(KEY_LAST_USERNAME, &clean).await
         }
         Platform::Twitch => {
-            state.connections.service(Platform::Twitch).connect(&username, None, None).await?;
+            state.connections.service(Platform::Twitch).connect(&username, None).await?;
             let clean = crate::twitch::normalize_channel(&username)?;
             state.db.set_setting(KEY_LAST_TWITCH_CHANNEL, &clean).await
         }
@@ -255,6 +254,56 @@ pub async fn preview_sound(state: State<'_, AppState>, id: String) -> Result<()>
         .await?
         .ok_or_else(|| AppError::Invalid("el sonido no existe".into()))?;
     state.audio.play(state.sounds.path_of(&sound), f32::from(sound.volume) / 100.0, TAG_SOUND).await
+}
+
+// ---- Grupos de espectadores -------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn list_viewer_groups(state: State<'_, AppState>) -> Result<Vec<ViewerGroup>> {
+    Ok(state.viewer_groups.list().await)
+}
+
+#[tauri::command]
+pub async fn save_viewer_group(state: State<'_, AppState>, group: ViewerGroup) -> Result<ViewerGroup> {
+    state.viewer_groups.save(group).await
+}
+
+#[tauri::command]
+pub async fn delete_viewer_group(state: State<'_, AppState>, id: String) -> Result<()> {
+    state.viewer_groups.delete(&id).await
+}
+
+/// Cuántas reglas usan el grupo (para avisar antes de borrarlo).
+#[tauri::command]
+pub async fn viewer_group_usage(state: State<'_, AppState>, id: String) -> Result<usize> {
+    let uses = |c: &crate::rules::model::Conditions| c.groups_any.contains(&id) || c.groups_none.contains(&id);
+    Ok(state.rules.list().iter().filter(|r| uses(&r.conditions)).count())
+}
+
+// ---- MyInstants: buscar, escuchar sin guardar y descargar a la biblioteca ---------------------------------
+
+fn myinstants_dir() -> PathBuf {
+    std::env::temp_dir().join("hivebuzz-myinstants")
+}
+
+#[tauri::command]
+pub async fn myinstants_search(query: String, page: u32) -> Result<Vec<crate::myinstants::Instant>> {
+    crate::myinstants::search(&query, page).await
+}
+
+/// Escucha un sonido de MyInstants sin añadirlo a la biblioteca (queda en una carpeta temporal).
+#[tauri::command]
+pub async fn myinstants_preview(state: State<'_, AppState>, file: String) -> Result<()> {
+    let path = crate::myinstants::fetch(&file, &myinstants_dir()).await?;
+    state.audio.stop_tag(TAG_SOUND);
+    state.audio.play(path, 1.0, TAG_SOUND).await
+}
+
+/// Descarga un sonido de MyInstants a la biblioteca para usarlo siempre.
+#[tauri::command]
+pub async fn myinstants_download(state: State<'_, AppState>, file: String, name: String) -> Result<Sound> {
+    let path = crate::myinstants::fetch(&file, &myinstants_dir()).await?;
+    state.sounds.import(&path, Some(name)).await
 }
 
 #[tauri::command]

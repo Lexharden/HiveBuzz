@@ -18,6 +18,7 @@ fn rule(id: &str) -> Rule {
         priority: None,
         ttl_ms: 60_000,
         cost_points: None,
+        replaces_general: false,
     }
 }
 
@@ -69,7 +70,7 @@ async fn populated() -> Install {
     std::fs::write(i.path("media/m1.png"), b"PNGimage").unwrap();
     i.db.insert_media(&Media { id: "m1".into(), name: "Logo".into(), file: "m1.png".into(), kind: MediaKind::Image, created_ms: 1 }).await.unwrap();
     i.db.set_overlay_config("alerts", r#"{"fontSize":40}"#).await.unwrap();
-    i.db.set_setting("bot_config", r#"{"enabled":true}"#).await.unwrap();
+    i.db.set_setting("points_config", r#"{"enabled":true}"#).await.unwrap();
     // Cosas que NO deben viajar.
     i.db.set_setting("server_port", "9999").await.unwrap();
     i.db.set_setting("last_username", "alguien").await.unwrap();
@@ -116,7 +117,7 @@ async fn export_then_import_restores_everything_on_a_fresh_install() {
     assert_eq!(dst.db.list_goals().await.unwrap()[0].current, 7);
     assert_eq!(dst.db.list_timers().await.unwrap().len(), 1);
     assert_eq!(dst.db.get_overlay_config("alerts").await.unwrap().as_deref(), Some(r#"{"fontSize":40}"#));
-    assert_eq!(dst.db.get_setting("bot_config").await.unwrap().as_deref(), Some(r#"{"enabled":true}"#));
+    assert_eq!(dst.db.get_setting("points_config").await.unwrap().as_deref(), Some(r#"{"enabled":true}"#));
     assert_eq!(std::fs::read(dst.path("sounds/s1.wav")).unwrap(), b"RIFFsound");
     assert_eq!(std::fs::read(dst.path("media/m1.png")).unwrap(), b"PNGimage");
     assert_eq!(dst.db.list_sounds().await.unwrap()[0].volume, 80);
@@ -225,13 +226,13 @@ async fn only_whitelisted_valid_settings_and_known_overlays_are_applied() {
     let i = Install::new().await;
     let p = i.path("s.zip");
     let cfg = config(json!({
-        "settings": { "bot_config": "{\"enabled\":true}", "server_port": "1", "euler_api_key": "secreto", "tts_config": "{roto" },
+        "settings": { "points_config": "{\"enabled\":true}", "server_port": "1", "euler_api_key": "secreto", "tts_config": "{roto" },
         "overlays": { "alerts": { "fontSize": 50, "campoFalso": 1 }, "fantasma": { "x": 1 }, "feed": { "fontSize": "mucho" } }
     }));
     zip_with(&p, &cfg, &[]);
     stage_import(&p, i.dir.path()).unwrap();
     let summary = apply_pending(&i.db, i.dir.path(), 1).await.unwrap().unwrap();
-    assert_eq!(i.db.get_setting("bot_config").await.unwrap().as_deref(), Some("{\"enabled\":true}"));
+    assert_eq!(i.db.get_setting("points_config").await.unwrap().as_deref(), Some("{\"enabled\":true}"));
     for k in ["server_port", "euler_api_key", "tts_config"] {
         assert_eq!(i.db.get_setting(k).await.unwrap(), None, "{k}");
     }

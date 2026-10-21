@@ -9,7 +9,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::Value;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, oneshot};
 
 use crate::bus::EventBus;
 use crate::events::{EventType, LiveEvent};
@@ -25,6 +25,8 @@ pub struct OverlayMessage {
 pub struct OverlayHub {
     tx: broadcast::Sender<Arc<OverlayMessage>>,
     retained: Arc<Mutex<HashMap<String, Arc<OverlayMessage>>>>,
+    /// Quien espera a que un overlay confirme que ya está mostrando algo (ver `expect_ack`).
+    acks: Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>,
 }
 
 impl OverlayHub {
@@ -33,7 +35,29 @@ impl OverlayHub {
         Self {
             tx,
             retained: Arc::default(),
+            acks: Arc::default(),
         }
+    }
+
+    /// Pide aviso de que el overlay mostró el mensaje `id` (llega por WebSocket como `{"type":"shown","id":…}`).
+    /// Sirve para que el sonido de una alerta arranque justo cuando aparece su vídeo.
+    pub fn expect_ack(&self, id: &str) -> oneshot::Receiver<()> {
+        let (tx, rx) = oneshot::channel();
+        self.acks.lock().unwrap_or_else(PoisonError::into_inner).insert(id.to_string(), tx);
+        rx
+    }
+
+    /// Un overlay confirma que mostró `id`. Si nadie lo esperaba (o ya había caducado) no pasa nada.
+    pub fn ack(&self, id: &str) {
+        let tx = self.acks.lock().unwrap_or_else(PoisonError::into_inner).remove(id);
+        if let Some(tx) = tx {
+            let _ = tx.send(());
+        }
+    }
+
+    /// Deja de esperar `id` (si el aviso no llegó a tiempo).
+    pub fn forget_ack(&self, id: &str) {
+        self.acks.lock().unwrap_or_else(PoisonError::into_inner).remove(id);
     }
 
     /// Publica un mensaje efímero. Sin overlays conectados no es un error.
@@ -146,6 +170,20 @@ mod tests {
     use super::*;
     use crate::events::testing::sample_event;
     use serde_json::json;
+
+    #[tokio::test]
+    async fn an_ack_wakes_up_only_who_waits_for_it_and_only_once() {
+        let hub = OverlayHub::new(8);
+        let rx = hub.expect_ack("a1");
+        hub.ack("otro");
+        hub.ack("a1");
+        assert!(rx.await.is_ok());
+        // Sin nadie esperando, o ya consumido, no pasa nada.
+        hub.ack("a1");
+        let late = hub.expect_ack("a2");
+        hub.forget_ack("a2");
+        assert!(late.await.is_err());
+    }
 
     #[tokio::test]
     async fn subscribers_receive_channel_and_data() {

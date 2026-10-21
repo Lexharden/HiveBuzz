@@ -12,11 +12,10 @@ use super::api::{Playing, SpotifyApi, Track};
 use super::auth::SpotifyAuth;
 use super::{default_client_id, effective_client_id, ApiError, MinRole, SpotifyConfig, CHANNEL, KEY_SPOTIFY_CONFIG};
 use crate::actions::clock::Clock;
-use crate::bot::service::BotService;
 use crate::bus::EventBus;
 use crate::db::Db;
 use crate::error::{AppError, Result};
-use crate::events::{EventType, LiveEvent, Platform, User};
+use crate::events::{EventType, LiveEvent, User};
 use crate::overlay::OverlayHub;
 use crate::rules::engine::PointsGate;
 
@@ -28,17 +27,6 @@ const POLL_PLAYING: Duration = Duration::from_secs(4);
 const POLL_IDLE: Duration = Duration::from_secs(10);
 const POLL_ERROR: Duration = Duration::from_secs(20);
 const POLL_DISCONNECTED: Duration = Duration::from_secs(5);
-
-/// Salida al chat (el bot); un trait para probar sin TikTok.
-pub trait ChatOut: Send + Sync {
-    fn say(&self, text: &str, source: &str) -> bool;
-}
-
-impl ChatOut for BotService {
-    fn say(&self, text: &str, source: &str) -> bool {
-        BotService::say(self, text, source)
-    }
-}
 
 #[derive(Debug, Clone)]
 struct Request {
@@ -75,7 +63,6 @@ pub struct SongService {
     auth: Arc<SpotifyAuth>,
     api: Arc<dyn SpotifyApi>,
     wallet: Arc<dyn PointsGate>,
-    chat: Arc<dyn ChatOut>,
     hub: OverlayHub,
     clock: Arc<dyn Clock>,
 }
@@ -106,11 +93,10 @@ impl SongService {
         auth: Arc<SpotifyAuth>,
         api: Arc<dyn SpotifyApi>,
         wallet: Arc<dyn PointsGate>,
-        chat: Arc<dyn ChatOut>,
         hub: OverlayHub,
         clock: Arc<dyn Clock>,
     ) -> Arc<Self> {
-        Arc::new(Self { cfg: RwLock::new(SpotifyConfig::default()), state: Mutex::new(State::default()), db, auth, api, wallet, chat, hub, clock })
+        Arc::new(Self { cfg: RwLock::new(SpotifyConfig::default()), state: Mutex::new(State::default()), db, auth, api, wallet, hub, clock })
     }
 
     fn lock(&self) -> MutexGuard<'_, State> {
@@ -169,39 +155,23 @@ impl SongService {
 
     // ---------------------------------------------------------------- chat
 
-    /// Atiende un mensaje de chat. Devuelve `true` si era un comando de canciones.
-    pub async fn on_event(&self, ev: &LiveEvent) -> bool {
+    /// Atiende un mensaje de chat. Si era un comando de canciones devuelve el resultado de la petición
+    /// («añadida…», «espera 30 s…», etc.), que se deja en el registro: no hay forma de escribir en el chat.
+    pub async fn on_event(&self, ev: &LiveEvent) -> Option<String> {
         if ev.kind != EventType::Chat || ev.is_simulated() {
-            return false;
+            return None;
         }
-        let Some(chat) = &ev.chat else { return false };
+        let chat = ev.chat.as_ref()?;
         let cfg = self.config();
         if !cfg.song.enabled {
-            return false;
+            return None;
         }
-        let Some((name, rest)) = split_command(&chat.text) else { return false };
-        if cfg.song.commands.contains(&name) {
-            let reply = self.request(&ev.user, rest).await;
-            // La respuesta solo puede salir por el chat de TikTok.
-            if cfg.song.reply && ev.platform == Platform::Tiktok {
-                self.chat.say(&reply, "canciones");
-            }
-            true
-        } else if cfg.song.now_playing_commands.contains(&name) {
-            if cfg.song.reply && ev.platform == Platform::Tiktok {
-                let text = match self.playing().filter(|p| p.is_playing) {
-                    Some(p) => format!("🎵 Suena: «{}» — {}", p.track.name, p.track.artist_line()),
-                    None => "🎵 Ahora mismo no suena nada.".to_string(),
-                };
-                self.chat.say(&text, "canciones");
-            }
-            true
-        } else {
-            false
-        }
+        let (name, rest) = split_command(&chat.text)?;
+        cfg.song.commands.contains(&name).then_some(())?;
+        Some(self.request(&ev.user, rest).await)
     }
 
-    /// Procesa una petición y devuelve el mensaje de respuesta para el chat.
+    /// Procesa una petición y devuelve su resultado en una frase.
     pub async fn request(&self, user: &User, query: &str) -> String {
         let cfg = self.config();
         let s = &cfg.song;
@@ -242,7 +212,7 @@ impl SongService {
 
         let track = match self.api.find_track(query).await {
             Ok(Some(t)) => t,
-            Ok(None) => return format!("{me} no encontré «{}».", crate::bot::engine::fit(query)),
+            Ok(None) => return format!("{me} no encontré «{}».", query.chars().take(60).collect::<String>()),
             Err(e) => return format!("{me} {}", Self::friendly(&e)),
         };
         let hay = format!("{} {}", track.name, track.artist_line()).to_lowercase();
@@ -393,7 +363,9 @@ impl SongService {
             loop {
                 match events.recv().await {
                     Ok(ev) => {
-                        svc.on_event(&ev).await;
+                        if let Some(outcome) = svc.on_event(&ev).await {
+                            tracing::debug!(%outcome, "petición de canción");
+                        }
                     }
                     Err(RecvError::Lagged(n)) => tracing::warn!(missed = n, "las canciones se quedaron atrás en el bus"),
                     Err(RecvError::Closed) => break,

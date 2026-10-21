@@ -2,8 +2,8 @@ import { useTranslation } from "react-i18next";
 import { DOCUMENTED, ICONS, type Page } from "../../lib/nav";
 import { Btn, Card } from "../ui";
 
-const GLOSSARY = ["event", "rule", "trigger", "action", "overlay", "session", "points", "tts", "cooldown"] as const;
-const FAQ = ["obs", "bot", "spotify", "safe", "test", "update"] as const;
+const GLOSSARY = ["event", "rule", "trigger", "action", "overlay", "session", "points", "tts", "cooldown", "group"] as const;
+const FAQ = ["obs", "chatWrite", "spotify", "safe", "test", "update", "vip", "sound", "busy"] as const;
 const ITEMS = [1, 2, 3, 4] as const;
 
 /** Ayuda: el recorrido, qué hay en cada parte del menú, un glosario y respuestas rápidas. */

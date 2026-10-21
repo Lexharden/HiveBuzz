@@ -70,7 +70,7 @@ export function SpotifySection() {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm text-emerald-400">✅ {t("spotify.connected")}</span>
-              <Btn variant="danger" disabled={busy} onClick={() => void run(async () => { await api.spotifyDisconnect(); setMsg(null); refreshStatus(); })}>
+              <Btn variant="danger" disabled={busy} onClick={() => run(async () => { await api.spotifyDisconnect(); setMsg(null); refreshStatus(); })}>
                 {t("spotify.disconnect")}
               </Btn>
             </div>
@@ -108,15 +108,11 @@ export function SpotifySection() {
                   <NumberInput value={song.userCooldownS} min={0} max={3600} onChange={(v) => setSong({ userCooldownS: v ?? 0 })} />
                 </Field>
               </div>
-              <Checkbox checked={song.reply} onChange={(reply) => setSong({ reply })} label={t("spotify.reply")} />
               <details>
                 <summary className="cursor-pointer text-xs text-zinc-400">{t("spotify.moreOptions")}</summary>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <Field label={t("spotify.commands")} hint={t("spotify.commandsHint")}>
                     <TextInput value={lines(song.commands)} onChange={(v) => setSong({ commands: parseList(v) })} />
-                  </Field>
-                  <Field label={t("spotify.nowCommands")}>
-                    <TextInput value={lines(song.nowPlayingCommands)} onChange={(v) => setSong({ nowPlayingCommands: parseList(v) })} />
                   </Field>
                   <Field label={t("spotify.maxDuration")}>
                     <NumberInput value={song.maxDurationS} min={30} max={10800} onChange={(v) => setSong({ maxDurationS: v ?? 600 })} />
@@ -129,7 +125,7 @@ export function SpotifySection() {
                   </Field>
                 </div>
               </details>
-              <Btn variant="primary" disabled={busy} onClick={() => void save(cfg).then(() => setMsg(t("integrations.saved")))}>
+              <Btn variant="primary" disabled={busy} onClick={() => save(cfg).then(() => setMsg(t("integrations.saved")))}>
                 {t("integrations.save")}
               </Btn>
             </div>
@@ -186,7 +182,7 @@ export function SpotifySection() {
                 <code className="block select-all break-all rounded-md border border-zinc-800 bg-zinc-950 p-2 text-xs text-zinc-300">{status.redirectUri}</code>
               </Field>
             )}
-            <Btn disabled={busy} onClick={() => void save(cfg).then(() => setMsg(t("integrations.saved")))}>
+            <Btn disabled={busy} onClick={() => save(cfg).then(() => setMsg(t("integrations.saved")))}>
               {t("integrations.save")}
             </Btn>
           </div>

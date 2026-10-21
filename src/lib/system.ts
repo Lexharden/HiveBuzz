@@ -90,7 +90,6 @@ export interface UpdateProgress {
 export interface SongConfig {
   enabled: boolean;
   commands: string[];
-  nowPlayingCommands: string[];
   minRole: "everyone" | "follower" | "subscriber" | "moderator";
   costPoints: number;
   perUserLimit: number;
@@ -98,7 +97,6 @@ export interface SongConfig {
   maxDurationS: number;
   blockedTerms: string[];
   blockedUsers: string[];
-  reply: boolean;
 }
 
 export interface SpotifyConfig {

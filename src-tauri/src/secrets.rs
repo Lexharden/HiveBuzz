@@ -1,11 +1,10 @@
-//! Secretos (API key de Euler, token de los overlays, y en el futuro Spotify/TikTok)
+//! Secretos (API key de Euler, token de los overlays y Spotify)
 //! en el llavero del sistema operativo. Nunca en SQLite.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::error::{AppError, Result};
-use crate::source::protocol::SessionPayload;
+use crate::error::Result;
 
 pub const KEY_EULER_API: &str = "euler_api_key";
 pub const KEY_OVERLAY_TOKEN: &str = "overlay_token";
@@ -72,36 +71,16 @@ impl SecretStore for MemoryStore {
     }
 }
 
-pub const KEY_TIKTOK_SESSION_ID: &str = "tiktok_session_id";
-pub const KEY_TIKTOK_TT_TARGET_IDC: &str = "tiktok_tt_target_idc";
+/// Claves de la sesión de TikTok que guardaban versiones anteriores (el bot de chat ya no existe).
+const LEGACY_TIKTOK_SESSION_KEYS: [&str; 2] = ["tiktok_session_id", "tiktok_tt_target_idc"];
 
-/// Sesión de TikTok guardada (las dos cookies), si la hay. Una a medias cuenta como «no hay».
-pub fn load_tiktok_session(store: &dyn SecretStore) -> Result<Option<SessionPayload>> {
-    let (id, idc) = (store.get(KEY_TIKTOK_SESSION_ID)?, store.get(KEY_TIKTOK_TT_TARGET_IDC)?);
-    Ok(match (id, idc) {
-        (Some(session_id), Some(tt_target_idc)) if !session_id.is_empty() && !tt_target_idc.is_empty() => {
-            Some(SessionPayload { session_id, tt_target_idc })
-        }
-        _ => None,
-    })
-}
-
-/// Valor de cookie razonable: sin espacios ni caracteres de control, de longitud acotada.
-fn valid_cookie_value(v: &str) -> bool {
-    !v.is_empty() && v.len() <= 512 && v.chars().all(|c| c.is_ascii_graphic())
-}
-
-pub fn save_tiktok_session(store: &dyn SecretStore, session: &SessionPayload) -> Result<()> {
-    if !valid_cookie_value(&session.session_id) || !valid_cookie_value(&session.tt_target_idc) {
-        return Err(AppError::Invalid("la sesión de TikTok no es válida".into()));
+/// Borra del llavero las cookies de TikTok que dejó el bot de chat: ya no se usan y no deben quedarse guardadas.
+/// Es idempotente (borrar lo que no existe no falla).
+pub fn clear_legacy_tiktok_session(store: &dyn SecretStore) -> Result<()> {
+    for key in LEGACY_TIKTOK_SESSION_KEYS {
+        store.delete(key)?;
     }
-    store.set(KEY_TIKTOK_SESSION_ID, &session.session_id)?;
-    store.set(KEY_TIKTOK_TT_TARGET_IDC, &session.tt_target_idc)
-}
-
-pub fn clear_tiktok_session(store: &dyn SecretStore) -> Result<()> {
-    store.delete(KEY_TIKTOK_SESSION_ID)?;
-    store.delete(KEY_TIKTOK_TT_TARGET_IDC)
+    Ok(())
 }
 
 /// Devuelve el token de overlays/API; lo genera (256 bits) la primera vez.
@@ -146,6 +125,7 @@ pub fn generate_token() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::AppError;
 
     #[test]
     fn token_is_64_hex_chars_and_random() {
@@ -197,37 +177,17 @@ mod tests {
         assert_eq!(t.len(), 64);
     }
 
-    fn session(id: &str, idc: &str) -> SessionPayload {
-        SessionPayload { session_id: id.into(), tt_target_idc: idc.into() }
-    }
-
     #[test]
-    fn tiktok_session_roundtrip_and_clear() {
+    fn leftover_tiktok_session_cookies_are_removed_and_other_secrets_are_kept() {
         let s = MemoryStore::default();
-        assert_eq!(load_tiktok_session(&s).expect("load"), None);
-        save_tiktok_session(&s, &session("abc123", "useast1a")).expect("save");
-        assert_eq!(load_tiktok_session(&s).expect("load"), Some(session("abc123", "useast1a")));
-        clear_tiktok_session(&s).expect("clear");
-        assert_eq!(load_tiktok_session(&s).expect("load"), None);
-    }
-
-    #[test]
-    fn a_half_stored_session_counts_as_no_session() {
-        let s = MemoryStore::default();
-        s.set(KEY_TIKTOK_SESSION_ID, "solo-una").expect("set");
-        assert_eq!(load_tiktok_session(&s).expect("load"), None);
-        s.set(KEY_TIKTOK_TT_TARGET_IDC, "").expect("set");
-        assert_eq!(load_tiktok_session(&s).expect("load"), None);
-    }
-
-    #[test]
-    fn cookie_values_with_spaces_control_characters_or_excess_length_are_rejected() {
-        let s = MemoryStore::default();
-        for bad in ["", "con espacio", "salto\nlinea", "tab\t", "ñandú", &"x".repeat(513)] {
-            assert!(save_tiktok_session(&s, &session(bad, "idc")).is_err(), "{bad:?}");
-            assert!(save_tiktok_session(&s, &session("ok", bad)).is_err(), "{bad:?}");
-        }
-        assert_eq!(load_tiktok_session(&s).expect("load"), None, "un intento fallido no guarda nada");
+        s.set("tiktok_session_id", "abc123").expect("set");
+        s.set("tiktok_tt_target_idc", "useast1a").expect("set");
+        s.set(KEY_EULER_API, "clave").expect("set");
+        clear_legacy_tiktok_session(&s).expect("clear");
+        assert_eq!(s.get("tiktok_session_id").expect("get"), None);
+        assert_eq!(s.get("tiktok_tt_target_idc").expect("get"), None);
+        assert_eq!(s.get(KEY_EULER_API).expect("get"), Some("clave".into()));
+        clear_legacy_tiktok_session(&s).expect("idempotente");
     }
 
     #[test]

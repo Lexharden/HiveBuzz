@@ -115,7 +115,8 @@ async fn ws_upgrade(ws: WebSocketUpgrade, State(state): State<ServerState>) -> R
     let overlays = state.hub.subscribe();
     let retained = state.hub.retained();
     let history = state.recent.snapshot();
-    ws.on_upgrade(move |socket| client_loop(socket, events, overlays, retained, history))
+    let hub = state.hub.clone();
+    ws.on_upgrade(move |socket| client_loop(socket, events, overlays, retained, history, hub))
 }
 
 async fn client_loop(
@@ -124,6 +125,7 @@ async fn client_loop(
     mut overlays: broadcast::Receiver<Arc<OverlayMessage>>,
     retained: Vec<Arc<OverlayMessage>>,
     history: Vec<Arc<LiveEvent>>,
+    hub: OverlayHub,
 ) {
     if send(&mut socket, &Outgoing::Hello { version: 1 }).await.is_err() {
         return;
@@ -169,11 +171,28 @@ async fn client_loop(
             }
             incoming = socket.recv() => match incoming {
                 Some(Ok(Message::Close(_)) | Err(_)) | None => break,
+                Some(Ok(Message::Text(text))) => {
+                    if let Some(id) = shown_id(&text) {
+                        hub.ack(&id);
+                    }
+                }
                 // Los pings se contestan solos; el resto de mensajes del cliente se ignora.
                 Some(Ok(_)) => {}
             },
         }
     }
+}
+
+/// El único mensaje que aceptamos de un overlay: `{"type":"shown","id":"…"}` (ya se está mostrando esa alerta).
+fn shown_id(text: &str) -> Option<String> {
+    if text.len() > 256 {
+        return None;
+    }
+    let v: Value = serde_json::from_str(text).ok()?;
+    if v.get("type")?.as_str()? != "shown" {
+        return None;
+    }
+    Some(v.get("id")?.as_str()?.to_string())
 }
 
 async fn send(socket: &mut WebSocket, msg: &Outgoing<'_>) -> std::result::Result<(), ()> {

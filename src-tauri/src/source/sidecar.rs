@@ -2,15 +2,14 @@
 //! comandos y, si muere, lo reinicia solo (backoff exponencial con jitter) restaurando
 //! la conexión que el usuario tenía pedida.
 
-use std::collections::HashMap;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 use tokio::time::Instant;
 
 use super::protocol::{LogLevel, SidecarCommand, SidecarMessage};
-use super::{ChatReply, ConnectTarget, LiveSource, SourceMessage, StatusUpdate};
+use super::{ConnectTarget, LiveSource, SourceMessage, StatusUpdate};
 use crate::error::{AppError, Result};
 use crate::source::protocol::ConnectionState;
 
@@ -57,19 +56,9 @@ pub fn backoff_delay(attempt: u32, base: Duration, max: Duration, jitter: f64) -
     exp.min(max).mul_f64(0.5 + 0.5 * jitter.clamp(0.0, 1.0))
 }
 
-/// Máximo de mensajes del bot esperando respuesta de TikTok.
-const MAX_PENDING_CHAT: usize = 50;
-/// Tiempo máximo esperando el resultado de un mensaje (el sidecar tiene su propio plazo, algo menor).
-const CHAT_REPLY_TIMEOUT: Duration = Duration::from_secs(25);
-
 enum Control {
     Connect(ConnectTarget),
     Disconnect,
-    SendChat {
-        request_id: String,
-        text: String,
-        reply: oneshot::Sender<ChatReply>,
-    },
     Shutdown,
 }
 
@@ -92,7 +81,6 @@ impl SidecarSource {
             cfg,
             desired: None,
             attempt: 0,
-            pending_chat: HashMap::new(),
         };
         tokio::spawn(supervisor.run(rx));
         Self { ctl }
@@ -119,17 +107,6 @@ impl LiveSource for SidecarSource {
     async fn disconnect(&self) -> Result<()> {
         self.send(Control::Disconnect)
     }
-
-    async fn send_chat(&self, text: String) -> Result<()> {
-        let (reply, rx) = oneshot::channel();
-        self.send(Control::SendChat { request_id: uuid::Uuid::new_v4().to_string(), text, reply })?;
-        match tokio::time::timeout(CHAT_REPLY_TIMEOUT, rx).await {
-            Ok(Ok(Ok(()))) => Ok(()),
-            Ok(Ok(Err(why))) => Err(AppError::Invalid(why)),
-            Ok(Err(_)) => Err(AppError::Sidecar("el sidecar no respondió al mensaje".into())),
-            Err(_) => Err(AppError::Invalid("TikTok tardó demasiado en confirmar el mensaje".into())),
-        }
-    }
 }
 
 enum SessionEnd {
@@ -144,8 +121,6 @@ struct Supervisor<S> {
     /// Conexión que el usuario tiene pedida; se restaura tras reiniciar el sidecar.
     desired: Option<ConnectTarget>,
     attempt: u32,
-    /// Mensajes del bot enviados al sidecar que esperan su `chatResult`.
-    pending_chat: HashMap<String, oneshot::Sender<ChatReply>>,
 }
 
 impl<S: Spawner> Supervisor<S> {
@@ -155,8 +130,6 @@ impl<S: Spawner> Supervisor<S> {
                 Ok(proc) => {
                     let started = Instant::now();
                     let end = self.session(proc, &mut ctl).await;
-                    // Ningún mensaje del bot sobrevive a su proceso: quien espera recibe un error.
-                    self.fail_pending_chat("el sidecar se detuvo antes de confirmar el mensaje");
                     match end {
                         SessionEnd::Shutdown => return,
                         SessionEnd::Died(code) => {
@@ -215,17 +188,8 @@ impl<S: Spawner> Supervisor<S> {
                         self.desired = None;
                         self.emit(SourceMessage::Status(StatusUpdate::new(ConnectionState::Disconnected))).await;
                     }
-                    Some(Control::SendChat { reply, .. }) => {
-                        let _ = reply.send(Err("el sidecar se está reiniciando".into()));
-                    }
                 },
             }
-        }
-    }
-
-    fn fail_pending_chat(&mut self, why: &str) {
-        for (_, tx) in self.pending_chat.drain() {
-            let _ = tx.send(Err(why.to_string()));
         }
     }
 
@@ -255,18 +219,6 @@ impl<S: Spawner> Supervisor<S> {
                             send_cmd(&proc.stdin, &SidecarCommand::Disconnect).await;
                         } else {
                             self.emit(SourceMessage::Status(StatusUpdate::new(ConnectionState::Disconnected))).await;
-                        }
-                    }
-                    Some(Control::SendChat { request_id, text, reply }) => {
-                        // Se descartan las peticiones cuyo emisor ya se rindió (timeout) antes de acumular más.
-                        self.pending_chat.retain(|_, tx| !tx.is_closed());
-                        if !ready {
-                            let _ = reply.send(Err("el sidecar aún no está listo".into()));
-                        } else if self.pending_chat.len() >= MAX_PENDING_CHAT {
-                            let _ = reply.send(Err("hay demasiados mensajes esperando respuesta de TikTok".into()));
-                        } else {
-                            self.pending_chat.insert(request_id.clone(), reply);
-                            send_cmd(&proc.stdin, &SidecarCommand::SendChat { request_id, text }).await;
                         }
                     }
                 },
@@ -305,12 +257,6 @@ impl<S: Spawner> Supervisor<S> {
                 .await;
             }
             Ok(SidecarMessage::Viewers { count }) => self.emit(SourceMessage::Viewers(count)).await,
-            Ok(SidecarMessage::ChatResult { request_id, ok, error }) => {
-                // Un resultado sin petición (ya caducó) simplemente se ignora.
-                if let Some(tx) = self.pending_chat.remove(&request_id) {
-                    let _ = tx.send(if ok { Ok(()) } else { Err(error.unwrap_or_else(|| "TikTok rechazó el mensaje".into())) });
-                }
-            }
             Ok(SidecarMessage::Log { level, message }) => {
                 match level {
                     LogLevel::Debug => tracing::debug!(target: "sidecar", "{message}"),
@@ -340,7 +286,6 @@ impl<S: Spawner> Supervisor<S> {
                 &SidecarCommand::Connect {
                     unique_id: t.unique_id.clone(),
                     euler_api_key: t.euler_api_key.clone(),
-                    session: t.session.clone(),
                 },
             )
             .await;
@@ -368,7 +313,6 @@ async fn send_cmd(stdin: &mpsc::Sender<String>, cmd: &SidecarCommand) {
 mod tests {
     use super::*;
     use crate::events::testing::sample_event;
-    use crate::source::protocol::SessionPayload;
     use std::collections::VecDeque;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
@@ -519,94 +463,6 @@ mod tests {
         let mut h = harness(vec![Ok(handle)]);
         p.say(r#"{"kind":"viewers","count":321}"#).await;
         assert_eq!(h.out.recv().await, Some(SourceMessage::Viewers(321)));
-    }
-
-    // ---- Mensajes del bot (send_chat) ----
-
-    /// Lanza `send_chat` en segundo plano y devuelve el comando que le llega al sidecar.
-    async fn start_send(h: &Harness, p: &mut FakeProc, text: &str) -> (tokio::task::JoinHandle<Result<()>>, String) {
-        let src = h.source.clone();
-        let text = text.to_string();
-        let task = tokio::spawn(async move { src.send_chat(text).await });
-        let line = p.next_cmd().await;
-        (task, line)
-    }
-
-    fn request_id(line: &str) -> String {
-        let v: serde_json::Value = serde_json::from_str(line.trim()).expect("json");
-        assert_eq!(v["cmd"], "sendChat");
-        v["requestId"].as_str().expect("requestId").to_string()
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn send_chat_waits_for_the_matching_result() {
-        let (handle, mut p) = fake();
-        let h = harness(vec![Ok(handle)]);
-        p.say(r#"{"kind":"ready"}"#).await;
-        let (task, line) = start_send(&h, &mut p, "hola \"chat\"").await;
-        let v: serde_json::Value = serde_json::from_str(line.trim()).expect("json");
-        assert_eq!(v["text"], "hola \"chat\"");
-        let id = request_id(&line);
-        // Un resultado de otra petición no desbloquea a esta.
-        p.say(r#"{"kind":"chatResult","requestId":"otra","ok":true}"#).await;
-        tokio::time::sleep(Duration::from_millis(10)).await;
-        assert!(!task.is_finished());
-        p.say(&format!(r#"{{"kind":"chatResult","requestId":"{id}","ok":true}}"#)).await;
-        task.await.expect("join").expect("ok");
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn send_chat_surfaces_the_reason_tiktok_gave() {
-        let (handle, mut p) = fake();
-        let h = harness(vec![Ok(handle)]);
-        p.say(r#"{"kind":"ready"}"#).await;
-        let (task, line) = start_send(&h, &mut p, "hola").await;
-        let id = request_id(&line);
-        p.say(&format!(r#"{{"kind":"chatResult","requestId":"{id}","ok":false,"error":"falta iniciar sesión"}}"#)).await;
-        let err = task.await.expect("join").expect_err("debe fallar");
-        assert!(err.to_string().contains("falta iniciar sesión"), "{err}");
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn send_chat_fails_fast_when_the_sidecar_is_not_ready() {
-        let (handle, _p) = fake();
-        let h = harness(vec![Ok(handle)]);
-        let err = h.source.send_chat("hola".into()).await.expect_err("sin Ready");
-        assert!(err.to_string().contains("no está listo"), "{err}");
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn pending_messages_fail_when_the_sidecar_dies() {
-        let (handle, mut p) = fake();
-        let h = harness(vec![Ok(handle)]);
-        p.say(r#"{"kind":"ready"}"#).await;
-        let (task, _line) = start_send(&h, &mut p, "hola").await;
-        p.die(1).await;
-        let err = task.await.expect("join").expect_err("debe fallar");
-        assert!(err.to_string().contains("se detuvo"), "{err}");
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn send_chat_gives_up_if_tiktok_never_answers() {
-        let (handle, mut p) = fake();
-        let h = harness(vec![Ok(handle)]);
-        p.say(r#"{"kind":"ready"}"#).await;
-        let (task, _line) = start_send(&h, &mut p, "hola").await;
-        // Nunca llega el chatResult: tras el plazo se rinde (con el tiempo pausado avanza solo).
-        let err = task.await.expect("join").expect_err("debe fallar");
-        assert!(err.to_string().contains("tardó demasiado"), "{err}");
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn the_session_travels_with_the_connect_command() {
-        let (handle, mut p) = fake();
-        let h = harness(vec![Ok(handle)]);
-        let mut t = target("ana");
-        t.session = Some(SessionPayload { session_id: "SID".into(), tt_target_idc: "IDC".into() });
-        h.source.connect(t).await.expect("connect");
-        p.say(r#"{"kind":"ready"}"#).await;
-        let line = p.next_cmd().await;
-        assert!(line.contains("\"session\":{\"sessionId\":\"SID\",\"ttTargetIdc\":\"IDC\"}"), "{line}");
     }
 
     #[tokio::test(start_paused = true)]

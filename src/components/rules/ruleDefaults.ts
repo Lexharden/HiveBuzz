@@ -53,8 +53,6 @@ export function defaultAction(type: string): ActionSpec {
       return { type, goalId: "", op: "add", amount: 1 };
     case "timerControl":
       return { type, timerId: "", op: "add", seconds: 60 };
-    case "botMessage":
-      return { type, text: "¡Gracias {nickname}!" };
     case "pointsAdjust":
       return { type, amount: 10, target: "{user}" };
     case "startPoll":

@@ -145,6 +145,13 @@ window.HB = (function () {
    * Conecta con HiveBuzz y entrega: configuración (`onConfig`), eventos (`onEvent(ev, replay)`) y
    * mensajes de otros canales (`onOverlay(channel, data)`). Reconecta solo con espera creciente.
    */
+  var socket = null;
+  /** Avisa a HiveBuzz de que el overlay ya está mostrando la alerta `id` (para sincronizar su sonido). */
+  function shown(id) {
+    if (!id || !socket || socket.readyState !== 1) return;
+    try { socket.send(JSON.stringify({ type: "shown", id: id })); } catch (e) { /* sin conexión: el sonido sale por tiempo */ }
+  }
+
   function start(opts) {
     var root = document.getElementById("hb-root");
     if (preview) document.body.classList.add("hb-preview");
@@ -169,6 +176,7 @@ window.HB = (function () {
     function connect() {
       var proto = location.protocol === "https:" ? "wss:" : "ws:";
       var ws = new WebSocket(proto + "//" + location.host + "/ws?token=" + encodeURIComponent(token));
+      socket = ws;
       ws.onopen = function () { delay = 1000; if (dot) dot.classList.remove("show"); };
       ws.onmessage = function (m) {
         var msg;
@@ -204,6 +212,6 @@ window.HB = (function () {
     params: params, token: token, preview: preview,
     t: t, el: el, img: img, coinsLabel: coinsLabel, platformBadge: platformBadge, isHttps: isHttps, isLocalMedia: isLocalMedia,
     fmt: fmt, clamp: clamp, userColor: userColor, trim: trim, expireAfter: expireAfter,
-    applyStyle: applyStyle, start: start
+    applyStyle: applyStyle, start: start, shown: shown
   };
 })();

@@ -1,13 +1,9 @@
 use std::sync::atomic::{AtomicI64, Ordering};
 
-use async_trait::async_trait;
 
 use super::*;
-use crate::bot::outbox::{ChatSender, Outbox, OutboxLimits};
-use crate::db::Db;
 use crate::events::testing::sample_event;
 use crate::events::Chat;
-use crate::points::service::PointsService;
 
 #[test]
 fn votes_are_numbers_with_optional_prefixes() {
@@ -36,15 +32,6 @@ fn votes_are_numbers_with_optional_prefixes() {
     }
 }
 
-struct Mute;
-
-#[async_trait]
-impl ChatSender for Mute {
-    async fn send_chat(&self, _text: String) -> Result<()> {
-        Ok(())
-    }
-}
-
 struct TestClock(AtomicI64);
 
 impl Clock for TestClock {
@@ -61,12 +48,8 @@ struct Rig {
 
 async fn rig() -> Rig {
     let clock = Arc::new(TestClock(AtomicI64::new(1_000_000)));
-    let db = Db::open_memory().await.expect("db");
     let hub = OverlayHub::new(16);
-    let points = PointsService::new(db.clone(), clock.clone());
-    let outbox = Outbox::start(Arc::new(Mute), clock.clone(), Duration::from_millis(1_000), OutboxLimits::default());
-    let bot = BotService::new(db, clock.clone(), points, outbox);
-    Rig { poll: PollService::new(hub.clone(), bot, clock.clone()), hub, clock }
+    Rig { poll: PollService::new(hub.clone(), clock.clone()), hub, clock }
 }
 
 fn opts(list: &[&str]) -> Vec<String> {
@@ -184,13 +167,11 @@ async fn ties_and_empty_polls_are_reported_honestly() {
     r.poll.on_event(&vote("beto", "3"));
     let v = r.poll.stop().expect("activa");
     assert_eq!(v.winners, [0, 2]);
-    assert!(PollService::result_text(&v).contains("Empate"));
     assert!(r.poll.stop().is_none(), "ya estaba cerrada");
 
     r.poll.start("q2", &opts(&["a", "b"]), 30).expect("start");
     let v = r.poll.stop().expect("activa");
     assert!(v.winners.is_empty());
-    assert!(PollService::result_text(&v).contains("Nadie votó"));
 }
 
 #[tokio::test]

@@ -1,8 +1,9 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { onUpdateProgress, systemApi as api, type ReleaseInfo, type UpdateProgress } from "../../lib/system";
-import { Btn, Card, ErrorText, useAction } from "../ui";
+import { systemApi as api, type ReleaseInfo } from "../../lib/system";
+import { Btn, Card, ErrorText, Spinner, useAction } from "../ui";
+import { InstallStatus, useInstall } from "./useInstall";
 
 const RELEASES_PAGE = "https://github.com/Lexharden/HiveBuzz/releases";
 
@@ -19,25 +20,24 @@ export function UpdatesCard() {
   const [releases, setReleases] = useState<ReleaseInfo[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
-  const [progress, setProgress] = useState<UpdateProgress | null>(null);
+  const { stage, progress, start, active } = useInstall();
   const { run, error, busy } = useAction();
 
   const load = useCallback(() => void run(async () => setReleases(await api.listReleases())), [run]);
 
   useEffect(() => {
     load();
-    const un = onUpdateProgress(setProgress);
-    return () => void un.then((f) => f());
   }, [load]);
 
   const install = (r: ReleaseInfo) => {
     if (r.relation === "older" && !window.confirm(t("system.update.confirmOlder", { version: r.version }))) return;
     void run(async () => {
       setInstalling(r.tag);
-      setProgress(null);
       try {
-        await api.prepareRelease(r.tag);
-        await api.installUpdate();
+        await start(async () => {
+          await api.prepareRelease(r.tag);
+          await api.installUpdate();
+        });
       } finally {
         setInstalling(null);
       }
@@ -54,13 +54,16 @@ export function UpdatesCard() {
       actions={
         <div className="flex gap-2">
           <Btn onClick={() => void openUrl(RELEASES_PAGE)}>{t("system.update.openGithub")}</Btn>
-          <Btn disabled={busy} onClick={load}>
+          <Btn busy={busy && !active} disabled={active} onClick={load}>
             ↻ {t("system.update.check")}
           </Btn>
         </div>
       }
     >
       <div className="space-y-3">
+        {busy && !releases && (
+          <p className="text-xs text-zinc-400"><Spinner className="mr-1.5 h-3 w-3" />{t("system.update.checking")}</p>
+        )}
         {releases && (
           <p className={`text-xs ${newest ? "text-amber-300" : "text-emerald-400"}`}>
             {newest ? t("system.update.newer", { version: newest.version }) : releases.length > 0 ? t("system.update.upToDate") : null}
@@ -89,7 +92,7 @@ export function UpdatesCard() {
                   {r.notes.trim() && <Btn onClick={() => setOpen(open === r.tag ? null : r.tag)}>{t(open === r.tag ? "system.update.hideNotes" : "system.update.notes")}</Btn>}
                   {r.relation !== "current" &&
                     (r.installable ? (
-                      <Btn variant={r.relation === "newer" ? "primary" : "ghost"} disabled={busy} onClick={() => install(r)}>
+                      <Btn variant={r.relation === "newer" ? "primary" : "ghost"} busy={installing === r.tag} disabled={busy || active} onClick={() => install(r)}>
                         {installing === r.tag ? t("system.update.installing") : t("system.update.installThis")}
                       </Btn>
                     ) : (
@@ -97,11 +100,7 @@ export function UpdatesCard() {
                     ))}
                 </div>
                 {open === r.tag && <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-zinc-950 p-2 text-xs text-zinc-400">{r.notes}</pre>}
-                {installing === r.tag && progress && (
-                  <p className="mt-1 text-xs text-zinc-400">
-                    {t("system.update.progress", { done: Math.round(progress.downloaded / 1024), total: progress.total ? Math.round(progress.total / 1024) : "?" })}
-                  </p>
-                )}
+                {installing === r.tag && <InstallStatus stage={stage} progress={progress} />}
               </li>
             ))}
           </ul>

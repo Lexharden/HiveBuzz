@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, errorMessage } from "../../lib/api";
 import type { AppInfo, OverlayConfig, OverlayDef } from "../../lib/types";
-import { Btn, Card, ErrorText } from "../ui";
+import { Btn, Card, ErrorText, toast } from "../ui";
 import { Preview } from "./Preview";
 import { SchemaForm } from "./SchemaForm";
 
@@ -101,7 +101,7 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
                   <Btn onClick={() => void copyUrl(url?.replace("//127.0.0.1:", "//localhost:"))} disabled={!url} title={t("overlays.copyLocalhostHint")}>
                     {t("overlays.copyLocalhost")}
                   </Btn>
-                  {TESTABLE.has(def.id) && <Btn onClick={() => void api.testOverlay(def.id).catch((e: unknown) => setError(errorMessage(e)))}>▶ {t("overlays.test")}</Btn>}
+                  {TESTABLE.has(def.id) && <Btn onClick={() => api.testOverlay(def.id).then(() => toast(t("overlays.testSent"))).catch((e: unknown) => setError(errorMessage(e)))}>▶ {t("overlays.test")}</Btn>}
                   <Btn
                     onClick={() => {
                       if (window.confirm(t("overlays.confirmReset"))) void api.resetOverlayConfig(def.id).then(setConfig).catch((e: unknown) => setError(errorMessage(e)));

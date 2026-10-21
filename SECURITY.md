@@ -1,7 +1,7 @@
 # Seguridad
 
 HiveBuzz corre en tu propio equipo: el servidor local solo escucha en `127.0.0.1`, los overlays y la API piden un token, y los secretos
-(sesión de TikTok, tokens de Twitch y Spotify, contraseña de OBS) se guardan en el llavero del sistema.
+(API key de Euler Stream, tokens de Twitch y Spotify, contraseña de OBS) se guardan en el llavero del sistema.
 
 ## Cómo avisar de una vulnerabilidad
 **No abras un issue público.** Usa *Security → Report a vulnerability* en la página del repositorio (aviso privado de GitHub).

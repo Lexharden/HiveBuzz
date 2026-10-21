@@ -105,7 +105,7 @@ export function TimerEditor({ initial, isNew, onSave, onCancel }: Props) {
         <div className="flex items-center justify-end gap-2">
           <ErrorText error={error} />
           <Btn onClick={onCancel}>{t("editor.cancel")}</Btn>
-          <Btn variant="primary" disabled={busy} onClick={() => void run(() => onSave(cfg))}>
+          <Btn variant="primary" disabled={busy} onClick={() => run(() => onSave(cfg))}>
             {t("editor.save")}
           </Btn>
         </div>

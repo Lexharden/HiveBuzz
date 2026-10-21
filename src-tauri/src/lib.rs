@@ -5,11 +5,10 @@ pub mod actions;
 pub mod app;
 pub mod audio;
 pub mod backup;
-pub mod bot;
 pub mod bus;
 pub mod commands;
 pub mod commands_app;
-pub mod commands_bot;
+pub mod commands_community;
 pub mod commands_integrations;
 pub mod commands_spotify;
 pub mod commands_twitch;
@@ -27,6 +26,7 @@ pub mod leaderboard;
 pub mod logs;
 pub mod media;
 pub mod mic;
+pub mod myinstants;
 pub mod overlay;
 pub mod overlay_config;
 pub mod points;
@@ -48,6 +48,7 @@ pub mod twitch;
 pub mod tray;
 pub mod tts;
 pub mod updater;
+pub mod viewer_groups;
 
 use tauri::{Manager, RunEvent};
 use tracing_subscriber::layer::SubscriberExt;
@@ -149,6 +150,13 @@ pub fn run() {
             commands::update_sound,
             commands::delete_sound,
             commands::preview_sound,
+            commands::list_viewer_groups,
+            commands::save_viewer_group,
+            commands::delete_viewer_group,
+            commands::viewer_group_usage,
+            commands::myinstants_search,
+            commands::myinstants_preview,
+            commands::myinstants_download,
             commands::stop_audio,
             commands::list_media,
             commands::import_media,
@@ -191,33 +199,23 @@ pub fn run() {
             commands::clear_donor_history,
             commands::get_counters,
             commands::new_session,
-            commands_bot::get_points_config,
-            commands_bot::set_points_config,
-            commands_bot::list_viewers,
-            commands_bot::viewer_history,
-            commands_bot::adjust_viewer_points,
-            commands_bot::set_viewer_points,
-            commands_bot::delete_viewer,
-            commands_bot::clear_viewers,
-            commands_bot::export_viewers_csv,
-            commands_bot::import_viewers_csv,
-            commands_bot::get_bot_config,
-            commands_bot::set_bot_config,
-            commands_bot::get_bot_log,
-            commands_bot::clear_bot_log,
-            commands_bot::bot_say,
-            commands_bot::get_wheel_config,
-            commands_bot::set_wheel_config,
-            commands_bot::spin_wheel_test,
-            commands_bot::get_poll,
-            commands_bot::start_poll,
-            commands_bot::stop_poll,
-            commands_bot::clear_poll,
-            commands_bot::has_tiktok_session,
-            commands_bot::tiktok_login_start,
-            commands_bot::tiktok_login_finish,
-            commands_bot::tiktok_login_manual,
-            commands_bot::tiktok_logout,
+            commands_community::get_points_config,
+            commands_community::set_points_config,
+            commands_community::list_viewers,
+            commands_community::viewer_history,
+            commands_community::adjust_viewer_points,
+            commands_community::set_viewer_points,
+            commands_community::delete_viewer,
+            commands_community::clear_viewers,
+            commands_community::export_viewers_csv,
+            commands_community::import_viewers_csv,
+            commands_community::get_wheel_config,
+            commands_community::set_wheel_config,
+            commands_community::spin_wheel_test,
+            commands_community::get_poll,
+            commands_community::start_poll,
+            commands_community::stop_poll,
+            commands_community::clear_poll,
             commands_integrations::get_obs_config,
             commands_integrations::set_obs_config,
             commands_integrations::has_obs_password,

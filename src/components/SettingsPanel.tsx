@@ -76,7 +76,7 @@ export function SettingsPanel({ info, onChanged }: { info: AppInfo; onChanged: (
           />
           <button
             disabled={eulerKey.trim() === ""}
-            onClick={() => void run(async () => { await api.setEulerApiKey(eulerKey); setEulerKey(""); })}
+            onClick={() => run(async () => { await api.setEulerApiKey(eulerKey); setEulerKey(""); })}
             className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 disabled:opacity-50"
           >
             {t("settings.save")}
@@ -103,7 +103,7 @@ export function SettingsPanel({ info, onChanged }: { info: AppInfo; onChanged: (
           />
           <button
             disabled={Number(port) === info.serverPort}
-            onClick={() => void run(() => api.setServerPort(Number(port)))}
+            onClick={() => run(() => api.setServerPort(Number(port)))}
             className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 disabled:opacity-50"
           >
             {t("settings.save")}

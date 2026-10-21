@@ -3,7 +3,7 @@
 # HiveBuzz
 
 App de escritorio **gratuita e independiente** para streamers de TikTok LIVE: alertas, TTS,
-overlays para OBS, chatbot, puntos y acciones automáticas.
+overlays para OBS, puntos y acciones automáticas.
 
 Todo corre en la PC del streamer: sin servidor propio y sin costo de infraestructura. La conexión
 a TikTok sale desde tu IP.
@@ -107,7 +107,7 @@ HiveBuzz lee **TikTok y Twitch a la vez**. En *Inicio* hay una tarjeta por plata
 - **Con cuenta (opcional):** *Entrar con Twitch* muestra un código para escribir en `twitch.tv/activate` (sin contraseñas en HiveBuzz,
   sin redirecciones). Añade **seguidores nuevos**, saber si estás **en directo** y cuántos te ven. Solo funciona si el canal conectado es el de la cuenta.
   Se pide un único permiso (`moderator:read:followers`); el token se guarda en el llavero del sistema.
-- **Solo lectura:** el bot, `!sr` y los agradecimientos **no escriben en Twitch** (siguen respondiendo solo en TikTok). Los puntos, las reglas, el TTS,
+- **Solo lectura:** HiveBuzz **no escribe en el chat** de Twitch ni en el de TikTok. Los puntos, las reglas, el TTS,
   las alertas, los overlays y los votos de las encuestas sí funcionan con los espectadores de Twitch.
 - **Identidad:** los ids de Twitch llevan el prefijo `tw:` (no chocan con los de TikTok); no hay migración de base de datos.
   `is_follower` y los niveles de equipo/donador no existen en Twitch (siempre falsos/ausentes). Raids, puntos de canal y hype train no se leen todavía.
@@ -286,11 +286,12 @@ apaga en *Overlays → Alertas*. Las reglas con «Mostrar alerta» añaden alert
 Pruebas con red (no corren por defecto): `cargo test edge_live -- --ignored` y
 `cargo test piper_live -- --ignored`.
 
-## Chatbot, puntos, ruleta y encuestas (Fase 4)
+## Puntos, ruleta y encuestas (Fase 4)
 
-- **Bot**: pestaña *Bot y puntos*. Para que escriba en el chat hay que iniciar sesión en TikTok
-  (sección *Sesión de TikTok*, o pegando las cookies a mano si la ventana no abre), tener una **API key de Euler Stream**
-  (escribir puede exigir un plan de pago de Euler: si el aviso lo dice, revisa tu plan) y volver a conectar al LIVE. El bot nace apagado.
+> **Sin bot de chat.** Escribir en el chat de TikTok solo es posible con el servicio de pago de Euler Stream
+> (la propia librería lo avisa: *"Sending chats requires an API key & a paid plan"*), así que se retiró el bot.
+> HiveBuzz lee el chat y responde con alertas, voz y sonidos.
+
 - **Puntos y recompensas**: configura cuánto se gana; una recompensa es una regla de *comando de chat*
   con coste en puntos. CSV de espectadores: exportar/importar desde la misma pestaña.
 - **Ruleta**: acción `spinWheel` (p. ej. al recibir un regalo o con un comando); overlay `/overlay/wheel`.
@@ -359,7 +360,7 @@ Requisitos de Spotify: la cuenta dueña de una app en modo desarrollo necesita *
 - **Estadísticas** (pestaña propia): una fila por LIVE con monedas, pico de espectadores, comentarios, likes,
   follows, shares, suscripciones, top de donadores y regalos por tipo. No cuenta eventos simulados.
 - **Perfiles** (*Ajustes*): instantáneas con nombre de **reglas + configuración de overlays**; aplicar uno
-  sustituye ambos de golpe. No incluyen metas, timers, puntos, bot ni ruleta.
+  sustituye ambos de golpe. No incluyen metas, timers, puntos ni ruleta.
 - **Exportar / importar**: un `.zip` con reglas, metas, timers, overlays, perfiles, ajustes y tus sonidos e
   imágenes. Nunca incluye secretos del llavero ni datos de la comunidad (espectadores, puntos, donaciones).
   Importar **valida y deja pendiente** el archivo; se aplica al reiniciar, antes de cargar ningún servicio
@@ -387,13 +388,12 @@ Requisitos de Spotify: la cuenta dueña de una app en modo desarrollo necesita *
 - Interfaz completa y textos de los overlays en inglés (`src/i18n/en.json`, diccionario `HB.t` de
   `overlays/common.js`). El idioma se elige en *Ajustes*; las URLs de overlays pasan a llevar `&lang=en`.
   Un test comprueba que ambos idiomas tengan las mismas claves y los mismos marcadores.
-- Siguen en español los mensajes de error del backend y las respuestas por defecto del bot/encuestas/canciones
+- Siguen en español los mensajes de error del backend y las respuestas por defecto de las canciones
   (son texto que el streamer puede editar o que viene de Rust).
 
 ## Secretos y datos
 
-- La API key de Euler Stream (opcional; sin ella se usa el tier gratuito), el token de overlays, la sesión de
-  TikTok, la contraseña de OBS y el refresh token de Spotify se
+- La API key de Euler Stream (opcional; sin ella se usa el tier gratuito), el token de overlays, la contraseña de OBS y el refresh token de Spotify se
   guardan en el **llavero del sistema** (Credential Manager / Keychain / Secret Service), nunca en SQLite.
 - Base de datos: `hivebuzz.db` en el directorio de datos de la app (`%APPDATA%\com.yafel.hivebuzz`
   en Windows). Contiene ajustes y el log de eventos, que se rota a 7 días.

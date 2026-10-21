@@ -3,22 +3,20 @@ import { useTranslation } from "react-i18next";
 import { pickFile } from "../../lib/api";
 import {
   interactApi as api,
-  type BotConfig,
-  type BotLogEntry,
   type PointsConfig,
   type PollView,
   type Viewer,
   type WheelConfig,
 } from "../../lib/interact";
-import { ConditionFields } from "../rules/RuleEditor";
+import { ViewerGroupsSection } from "../groups/ViewerGroupsSection";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, TextInput, useAction } from "../ui";
 
-const SECTIONS = ["bot", "points", "wheel", "poll", "login"] as const;
+const SECTIONS = ["points", "groups", "wheel", "poll"] as const;
 type Section = (typeof SECTIONS)[number];
 
 export function InteractPage() {
   const { t } = useTranslation();
-  const [section, setSection] = useState<Section>("bot");
+  const [section, setSection] = useState<Section>("points");
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <nav className="flex gap-1 text-sm">
@@ -33,209 +31,16 @@ export function InteractPage() {
         ))}
       </nav>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
-        {section === "bot" && <BotSection />}
         {section === "points" && <PointsSection />}
+        {section === "groups" && <ViewerGroupsSection />}
         {section === "wheel" && <WheelSection />}
         {section === "poll" && <PollSection />}
-        {section === "login" && <LoginSection />}
       </div>
     </div>
   );
 }
 
 const uid = () => Math.random().toString(36).slice(2, 10);
-
-function BotSection() {
-  const { t } = useTranslation();
-  const [cfg, setCfg] = useState<BotConfig | null>(null);
-  const [log, setLog] = useState<BotLogEntry[]>([]);
-  const [saved, setSaved] = useState(false);
-  const { run, error, busy } = useAction();
-
-  const refreshLog = useCallback(() => void api.getBotLog().then(setLog).catch(() => undefined), []);
-  useEffect(() => {
-    void api.getBotConfig().then(setCfg);
-    refreshLog();
-    const timer = setInterval(refreshLog, 3000);
-    return () => clearInterval(timer);
-  }, [refreshLog]);
-
-  if (!cfg) return null;
-  const update = (patch: Partial<BotConfig>) => {
-    setSaved(false);
-    setCfg({ ...cfg, ...patch });
-  };
-  const thanksKeys = ["gift", "follow", "share", "subscribe"] as const;
-
-  return (
-    <>
-      <Card
-        title={t("interact.bot.title")}
-        hint={t("interact.bot.hint")}
-        actions={
-          <Btn
-            variant="primary"
-            disabled={busy}
-            onClick={() => void run(async () => { setCfg(await api.setBotConfig(cfg)); setSaved(true); })}
-          >
-            {saved ? t("interact.saved") : t("interact.save")}
-          </Btn>
-        }
-      >
-        <div className="space-y-3">
-          <Checkbox checked={cfg.enabled} onChange={(v) => update({ enabled: v })} label={t("interact.bot.enabled")} />
-          <Field label={t("interact.bot.minInterval")}>
-            <NumberInput value={cfg.minIntervalMs} min={1000} max={600000} step={500} onChange={(v) => update({ minIntervalMs: v ?? 2000 })} />
-          </Field>
-          <ErrorText error={error} />
-        </div>
-      </Card>
-
-      <Card
-        title={t("interact.bot.commands")}
-        actions={
-          <Btn
-            onClick={() =>
-              update({
-                commands: [
-                  ...cfg.commands,
-                  {
-                    id: uid(),
-                    enabled: true,
-                    names: [""],
-                    responses: [""],
-                    conditions: { globalCooldownMs: 5000, userCooldownMs: 15000, rolesAny: [], probability: 100 },
-                  },
-                ],
-              })
-            }
-          >
-            {t("interact.add")}
-          </Btn>
-        }
-      >
-        <div className="space-y-3">
-          {cfg.commands.length === 0 && <p className="text-xs text-zinc-500">{t("interact.bot.noCommands")}</p>}
-          {cfg.commands.map((c, i) => {
-            const set = (patch: Partial<typeof c>) => update({ commands: cfg.commands.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-            return (
-              <div key={c.id} className="space-y-1">
-              <div className="grid grid-cols-[1fr_2fr_auto] items-end gap-2">
-                <Field label={t("interact.bot.names")}>
-                  <TextInput value={c.names.join(", ")} placeholder="discord, ds" onChange={(v) => set({ names: v.split(",").map((s) => s.trim()) })} />
-                </Field>
-                <Field label={t("interact.bot.response")}>
-                  <TextInput value={c.responses[0] ?? ""} placeholder="{user}: discord.gg/…" onChange={(v) => set({ responses: [v] })} />
-                </Field>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={c.enabled} onChange={(v) => set({ enabled: v })} label="" />
-                  <Btn variant="danger" onClick={() => update({ commands: cfg.commands.filter((_, j) => j !== i) })}>
-                    ✕
-                  </Btn>
-                </div>
-              </div>
-              <details className="text-xs">
-                <summary className="cursor-pointer text-zinc-400">{t("interact.bot.permissions")}</summary>
-                <div className="mt-2 rounded-md border border-zinc-800 p-2">
-                  <ConditionFields c={c.conditions} onChange={(patch) => set({ conditions: { ...c.conditions, ...patch } })} />
-                </div>
-              </details>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      <Card
-        title={t("interact.bot.timed")}
-        actions={
-          <Btn
-            onClick={() => update({ timedMessages: [...cfg.timedMessages, { id: uid(), enabled: true, text: "", everyMinutes: 10, minChatMessages: 3 }] })}
-          >
-            {t("interact.add")}
-          </Btn>
-        }
-      >
-        <div className="space-y-3">
-          {cfg.timedMessages.map((m, i) => {
-            const set = (patch: Partial<typeof m>) => update({ timedMessages: cfg.timedMessages.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
-            return (
-              <div key={m.id} className="grid grid-cols-[3fr_1fr_1fr_auto] items-end gap-2">
-                <Field label={t("interact.bot.text")}>
-                  <TextInput value={m.text} onChange={(v) => set({ text: v })} />
-                </Field>
-                <Field label={t("interact.bot.everyMinutes")}>
-                  <NumberInput value={m.everyMinutes} min={1} max={720} onChange={(v) => set({ everyMinutes: v ?? 10 })} />
-                </Field>
-                <Field label={t("interact.bot.minChat")}>
-                  <NumberInput value={m.minChatMessages} min={0} onChange={(v) => set({ minChatMessages: v ?? 0 })} />
-                </Field>
-                <div className="flex items-center gap-2">
-                  <Checkbox checked={m.enabled} onChange={(v) => set({ enabled: v })} label="" />
-                  <Btn variant="danger" onClick={() => update({ timedMessages: cfg.timedMessages.filter((_, j) => j !== i) })}>
-                    ✕
-                  </Btn>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-
-      <Card title={t("interact.bot.thanks")} hint={t("interact.bot.thanksHint")}>
-        <div className="space-y-3">
-          {thanksKeys.map((k) => (
-            <div key={k} className="grid grid-cols-[auto_1fr] items-end gap-3">
-              <Checkbox
-                checked={cfg.thanks[k].enabled}
-                onChange={(v) => update({ thanks: { ...cfg.thanks, [k]: { ...cfg.thanks[k], enabled: v } } })}
-                label={t(`interact.bot.thanksKinds.${k}`)}
-              />
-              <TextInput value={cfg.thanks[k].template} onChange={(v) => update({ thanks: { ...cfg.thanks, [k]: { ...cfg.thanks[k], template: v } } })} />
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <Card
-        title={t("interact.bot.log")}
-        actions={<Btn onClick={() => void api.clearBotLog().then(refreshLog)}>{t("interact.bot.clearLog")}</Btn>}
-      >
-        <BotSay />
-        <ul className="mt-3 max-h-56 space-y-1 overflow-y-auto text-xs">
-          {log.length === 0 && <li className="text-zinc-500">{t("interact.bot.emptyLog")}</li>}
-          {log.map((e, i) => (
-            <li key={`${e.ts}-${i}`} className="flex gap-2">
-              <span className={e.status.state === "sent" ? "text-emerald-400" : e.status.state === "failed" ? "text-rose-400" : "text-amber-400"}>
-                {t(`interact.bot.state.${e.status.state}`)}
-              </span>
-              <span className="text-zinc-500">{e.source}</span>
-              <span className="min-w-0 flex-1 truncate">{e.text}</span>
-              {e.status.reason && <span className="text-zinc-500">{e.status.reason}</span>}
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </>
-  );
-}
-
-function BotSay() {
-  const { t } = useTranslation();
-  const [text, setText] = useState("");
-  const { run, error } = useAction();
-  return (
-    <div className="flex items-end gap-2">
-      <Field label={t("interact.bot.testMessage")} className="flex-1">
-        <TextInput value={text} onChange={setText} />
-      </Field>
-      <Btn disabled={!text.trim()} onClick={() => void run(async () => { await api.botSay(text); setText(""); })}>
-        {t("interact.bot.send")}
-      </Btn>
-      <ErrorText error={error} />
-    </div>
-  );
-}
 
 function PointsSection() {
   const { t } = useTranslation();
@@ -268,7 +73,7 @@ function PointsSection() {
         title={t("interact.points.title")}
         hint={t("interact.points.hint")}
         actions={
-          <Btn variant="primary" disabled={busy} onClick={() => void run(async () => { setCfg(await api.setPointsConfig(cfg)); setSaved(true); })}>
+          <Btn variant="primary" disabled={busy} onClick={() => run(async () => { setCfg(await api.setPointsConfig(cfg)); setSaved(true); })}>
             {saved ? t("interact.saved") : t("interact.save")}
           </Btn>
         }
@@ -289,13 +94,6 @@ function PointsSection() {
             {num("subscribePoints", t("interact.points.subscribe"))}
             {num("pointsPerCoin", t("interact.points.perCoin"))}
             {num("subscriberMultiplier", t("interact.points.subMultiplier"))}
-            {num("topSize", t("interact.points.topSize"))}
-            <Field label={t("interact.points.pointsCommand")}>
-              <TextInput value={cfg.pointsCommand} onChange={(v) => upd({ pointsCommand: v })} />
-            </Field>
-            <Field label={t("interact.points.topCommand")}>
-              <TextInput value={cfg.topCommand} onChange={(v) => upd({ topCommand: v })} />
-            </Field>
           </div>
           <p className="text-xs text-zinc-500">{t("interact.points.rewardsHint")}</p>
           <ErrorText error={error} />
@@ -306,7 +104,7 @@ function PointsSection() {
         title={`${t("interact.points.viewers")} (${total})`}
         actions={
           <div className="flex gap-2">
-            <Btn onClick={() => void run(async () => { await api.exportViewersCsv(); })}>{t("interact.points.export")}</Btn>
+            <Btn onClick={() => run(async () => { await api.exportViewersCsv(); })}>{t("interact.points.export")}</Btn>
             <Btn
               onClick={() =>
                 void run(async () => {
@@ -346,9 +144,9 @@ function PointsSection() {
                 <td>{v.coinsGifted}</td>
                 <td className="text-zinc-400">{v.teamLevel > 0 || v.gifterLevel > 0 ? `${v.teamLevel} / ${v.gifterLevel}` : "—"}</td>
                 <td className="flex justify-end gap-1 py-1">
-                  <Btn onClick={() => void run(async () => { await api.adjustViewerPoints(v.userId, 100); load(); })}>+100</Btn>
-                  <Btn onClick={() => void run(async () => { await api.adjustViewerPoints(v.userId, -100); load(); })}>−100</Btn>
-                  <Btn variant="danger" onClick={() => void run(async () => { await api.deleteViewer(v.userId); load(); })}>✕</Btn>
+                  <Btn onClick={() => run(async () => { await api.adjustViewerPoints(v.userId, 100); load(); })}>+100</Btn>
+                  <Btn onClick={() => run(async () => { await api.adjustViewerPoints(v.userId, -100); load(); })}>−100</Btn>
+                  <Btn variant="danger" onClick={() => run(async () => { await api.deleteViewer(v.userId); load(); })}>✕</Btn>
                 </td>
               </tr>
             ))}
@@ -374,17 +172,14 @@ function WheelSection() {
       hint={t("interact.wheel.hint")}
       actions={
         <div className="flex gap-2">
-          <Btn disabled={busy} onClick={() => void run(() => api.spinWheelTest())}>{t("interact.wheel.test")}</Btn>
-          <Btn variant="primary" disabled={busy} onClick={() => void run(async () => { setCfg(await api.setWheelConfig(cfg)); setSaved(true); })}>
+          <Btn disabled={busy} onClick={() => run(() => api.spinWheelTest())}>{t("interact.wheel.test")}</Btn>
+          <Btn variant="primary" disabled={busy} onClick={() => run(async () => { setCfg(await api.setWheelConfig(cfg)); setSaved(true); })}>
             {saved ? t("interact.saved") : t("interact.save")}
           </Btn>
         </div>
       }
     >
       <div className="space-y-3">
-        <Field label={t("interact.wheel.announce")}>
-          <TextInput value={cfg.announce} onChange={(v) => upd({ announce: v })} />
-        </Field>
         {cfg.segments.map((s, i) => {
           const set = (patch: Partial<typeof s>) => upd({ segments: cfg.segments.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
           return (
@@ -445,12 +240,12 @@ function PollSection() {
           <Btn
             variant="primary"
             disabled={busy}
-            onClick={() => void run(async () => setPoll(await api.startPoll(question, options.split("\n"), seconds ?? 60)))}
+            onClick={() => run(async () => setPoll(await api.startPoll(question, options.split("\n"), seconds ?? 60)))}
           >
             {t("interact.poll.start")}
           </Btn>
-          <Btn disabled={!poll || poll.ended} onClick={() => void run(async () => { await api.stopPoll(); })}>{t("interact.poll.stop")}</Btn>
-          <Btn onClick={() => void run(async () => { await api.clearPoll(); setPoll(null); })}>{t("interact.poll.clear")}</Btn>
+          <Btn disabled={!poll || poll.ended} onClick={() => run(async () => { await api.stopPoll(); })}>{t("interact.poll.stop")}</Btn>
+          <Btn onClick={() => run(async () => { await api.clearPoll(); setPoll(null); })}>{t("interact.poll.clear")}</Btn>
         </div>
         <ErrorText error={error} />
         {poll && (
@@ -463,78 +258,6 @@ function PollSection() {
             ))}
           </ul>
         )}
-      </div>
-    </Card>
-  );
-}
-
-function LoginSection() {
-  const { t } = useTranslation();
-  const [has, setHas] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [manual, setManual] = useState(false);
-  const [sessionId, setSessionId] = useState("");
-  const [idc, setIdc] = useState("");
-  const { run, error, busy } = useAction();
-  const refresh = () => void api.hasTiktokSession().then(setHas);
-  useEffect(refresh, []);
-  return (
-    <Card title={t("interact.login.title")} hint={t("interact.login.hint")}>
-      <div className="space-y-3">
-        <p className="text-sm">{has ? t("interact.login.active") : t("interact.login.none")}</p>
-        <div className="flex flex-wrap gap-2">
-          <Btn variant="primary" disabled={busy} onClick={() => void run(async () => { await api.tiktokLoginStart(); setMsg(t("interact.login.opened")); })}>
-            {t("interact.login.start")}
-          </Btn>
-          <Btn
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const ok = await api.tiktokLoginFinish();
-                setMsg(ok ? t("interact.login.saved") : t("interact.login.notYet"));
-                refresh();
-              })
-            }
-          >
-            {t("interact.login.finish")}
-          </Btn>
-          {has && (
-            <Btn variant="danger" disabled={busy} onClick={() => void run(async () => { await api.tiktokLogout(); setMsg(null); refresh(); })}>
-              {t("interact.login.logout")}
-            </Btn>
-          )}
-        </div>
-        <button type="button" className="text-xs text-amber-400 underline" onClick={() => setManual((v) => !v)}>
-          {t("interact.login.manualToggle")}
-        </button>
-        {manual && (
-          <div className="space-y-2 rounded-lg border border-zinc-700 p-3">
-            <p className="text-xs text-zinc-400">{t("interact.login.manualHint")}</p>
-            <Field label="sessionid">
-              <TextInput type="password" value={sessionId} onChange={setSessionId} autoComplete="off" />
-            </Field>
-            <Field label="tt-target-idc">
-              <TextInput value={idc} onChange={setIdc} autoComplete="off" placeholder="useast2a" />
-            </Field>
-            <Btn
-              disabled={busy || !sessionId.trim() || !idc.trim()}
-              onClick={() =>
-                void run(async () => {
-                  await api.tiktokLoginManual(sessionId, idc);
-                  setSessionId("");
-                  setIdc("");
-                  setMsg(t("interact.login.saved"));
-                  refresh();
-                })
-              }
-            >
-              {t("interact.login.manualSave")}
-            </Btn>
-          </div>
-        )}
-        {msg && <p className="text-xs text-zinc-400">{msg}</p>}
-        <p className="text-xs text-zinc-500">{t("interact.login.reconnect")}</p>
-        <ErrorText error={error} />
       </div>
     </Card>
   );

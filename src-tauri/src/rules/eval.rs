@@ -2,12 +2,15 @@
 //! probabilidad). El reloj y el azar entran por parámetro para poder probarlo.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use chrono::{Datelike, NaiveDateTime, Timelike};
 
 use super::matcher::{match_trigger, TriggerInput};
 use super::model::{Conditions, Role, Rule, Schedule};
 use super::template::{event_vars, Vars};
+use crate::events::{Platform, User};
+use crate::viewer_groups::GroupIndex;
 
 /// Estado mutable de una regla (cooldowns y acumulador de likes).
 #[derive(Debug, Default)]
@@ -38,12 +41,16 @@ pub struct EvalEnv {
     /// Saldo de puntos del espectador que dispara el evento. `None` = desconocido (sin sistema de
     /// puntos o sin usuario): una regla con coste no puede dispararse sin saber el saldo.
     pub balance: Option<u64>,
+    /// Grupos de espectadores vigentes (para `groups_any` / `groups_none`).
+    pub groups: Arc<GroupIndex>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Blocked {
     Disabled,
     Role,
+    /// El espectador no está (o está) en los grupos que pide la regla.
+    Group,
     Schedule,
     GlobalCooldown,
     UserCooldown,
@@ -76,6 +83,11 @@ pub fn evaluate(rule: &Rule, input: &TriggerInput, state: &mut RuleState, env: &
     if let Some(u) = user {
         if !roles_allow(c, u) {
             return Decision::Blocked(Blocked::Role);
+        }
+        if let TriggerInput::Live(ev) = input {
+            if !groups_allow(c, u, ev.platform, &env.groups) {
+                return Decision::Blocked(Blocked::Group);
+            }
         }
     }
     if let Some(s) = &c.schedule {
@@ -141,6 +153,11 @@ fn roles_allow(c: &Conditions, u: &crate::events::User) -> bool {
         && c.min_gifter_level.is_none_or(|m| u.gifter_level.unwrap_or(0) >= m)
 }
 
+fn groups_allow(c: &Conditions, u: &User, platform: Platform, groups: &GroupIndex) -> bool {
+    (c.groups_any.is_empty() || c.groups_any.iter().any(|g| groups.contains(g, u, platform)))
+        && !c.groups_none.iter().any(|g| groups.contains(g, u, platform))
+}
+
 /// "HH:MM" → minutos desde medianoche.
 pub fn parse_hhmm(s: &str) -> Option<u32> {
     let (h, m) = s.trim().split_once(':')?;
@@ -192,6 +209,7 @@ mod tests {
             priority: None,
             ttl_ms: 1000,
             cost_points: None,
+            replaces_general: false,
         }
     }
 
@@ -210,6 +228,7 @@ mod tests {
             local: NaiveDate::from_ymd_opt(2026, 10, 8).expect("fecha").and_hms_opt(12, 0, 0).expect("hora"),
             roll: 0.0,
             balance: None,
+            groups: Arc::default(),
         }
     }
 
@@ -365,6 +384,50 @@ mod tests {
             Decision::Fire { vars, .. } => assert_eq!(vars["goal"], "g"),
             other => panic!("{other:?}"),
         }
+    }
+
+    // ---- Grupos de espectadores ----
+
+    fn env_with_group(members: &[&str]) -> EvalEnv {
+        use crate::viewer_groups::{Member, ViewerGroup};
+        let members = members.iter().map(|h| Member { handle: (*h).into(), platform: None }).collect();
+        let g = ViewerGroup { id: "vip".into(), name: "VIPs".into(), members };
+        EvalEnv { groups: Arc::new(GroupIndex::new(&[g])), ..env(0) }
+    }
+
+    #[test]
+    fn groups_any_only_lets_its_members_through() {
+        let r = rule(Trigger::Follow, Conditions { groups_any: vec!["vip".into()], ..Default::default() });
+        let ev = follow().0; // el usuario de ejemplo es «ana»
+        assert!(matches!(fire(&r, &ev, &mut RuleState::default(), &env_with_group(&["ana"])), Decision::Fire { .. }));
+        assert_eq!(fire(&r, &ev, &mut RuleState::default(), &env_with_group(&["bob"])), Decision::Blocked(Blocked::Group));
+        // Un grupo borrado (o sin cargar) no deja pasar a nadie.
+        assert_eq!(fire(&r, &ev, &mut RuleState::default(), &env(0)), Decision::Blocked(Blocked::Group));
+    }
+
+    #[test]
+    fn groups_none_excludes_its_members() {
+        let r = rule(Trigger::Follow, Conditions { groups_none: vec!["vip".into()], ..Default::default() });
+        let ev = follow().0;
+        assert_eq!(fire(&r, &ev, &mut RuleState::default(), &env_with_group(&["ana"])), Decision::Blocked(Blocked::Group));
+        assert!(matches!(fire(&r, &ev, &mut RuleState::default(), &env_with_group(&["bob"])), Decision::Fire { .. }));
+        assert!(matches!(fire(&r, &ev, &mut RuleState::default(), &env(0)), Decision::Fire { .. }));
+    }
+
+    #[test]
+    fn a_blocked_group_member_does_not_burn_the_cooldown() {
+        let r = rule(Trigger::Follow, Conditions { groups_any: vec!["vip".into()], global_cooldown_ms: 60_000, ..Default::default() });
+        let ev = follow().0;
+        let mut st = RuleState::default();
+        assert_eq!(fire(&r, &ev, &mut st, &env_with_group(&["bob"])), Decision::Blocked(Blocked::Group));
+        assert!(matches!(fire(&r, &ev, &mut st, &env_with_group(&["ana"])), Decision::Fire { .. }));
+    }
+
+    #[test]
+    fn system_triggers_ignore_groups() {
+        let c = Conditions { groups_any: vec!["vip".into()], ..Default::default() };
+        let r = rule(Trigger::GoalReached { goal_id: "g".into() }, c);
+        assert!(matches!(evaluate(&r, &TriggerInput::GoalReached("g"), &mut RuleState::default(), &env(0)), Decision::Fire { .. }));
     }
 
     // ---- Coste en puntos (recompensas) ----

@@ -4,6 +4,23 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.4.0] - 2026-10-21
+
+### Novedades
+- **Buscador de MyInstants en la Biblioteca**: busca (o mira lo que está en tendencia) en myinstants.com, escucha cualquier sonido con ▶ sin descargarlo y pulsa *Descargar* para guardarlo en tu biblioteca y usarlo en reglas y alertas.
+- **Exclusividad por espectador (grupos)**: nueva sección *Puntos y grupos → Grupos* para crear listas de usuarios (VIPs, amigos…). Las reglas pueden exigir uno o varios grupos («Solo para») o excluirlos, así un comando o una animación (p. ej. su propio overlay al regalar una ballena) es solo para ellos. Las reglas tienen además el interruptor **Reemplaza a las reglas generales**: si se dispara, no se dispara la regla normal para ese mismo evento.
+
+### Mejorado
+- **Alertas con el sonido sincronizado**: la acción «Alerta en overlay» tiene ahora un campo *Sonido* (y su volumen). El sonido empieza justo cuando el overlay muestra la alerta —con vídeo, cuando éste arranca—, también si hay otras alertas en cola. Antes, un «Reproducir sonido» aparte sonaba al instante y el vídeo aparecía después.
+- **Se nota cuándo la app está trabajando**: los botones muestran una rueda y se bloquean mientras ejecutan algo (pruebas, escuchar sonidos, guardar, conectar…); las pruebas de overlay avisan con un mensaje flotante; y al actualizar se ven las etapas *Preparando → Descargando (barra con MB y %) → Instalando*, tanto en Sistema como en el aviso de arriba, con la nota de que la app se reinicia sola.
+- **Plantillas y ayuda al día**: dos plantillas nuevas en «Novedades» (animación exclusiva de un VIP al regalar una ballena y `!vip` solo para un grupo) y la Ayuda explica grupos, el sonido sincronizado de las alertas, el buscador de MyInstants, los avisos de progreso y por qué no hay bot de chat.
+
+### Eliminado
+- **El bot de chat de TikTok** y todo lo que dependía de él. Escribir en el chat de TikTok solo es posible a través del servicio de pago de Euler Stream (la propia librería lo dice: «Sending chats requires an API key & a paid plan») y no existe una forma gratuita, así que en vez de dejar un módulo que no funciona se retira. Desaparecen: la acción *Mensaje del bot*, los comandos y respuestas automáticas del bot, `!puntos` y `!top`, el anuncio de la ruleta y de las encuestas por chat, las respuestas de las peticiones de Spotify por chat (las canciones se siguen encolando; también los comandos «qué suena»), el inicio de sesión de TikTok (ventana y cookies) y la plantilla/categoría «Bot de chat».
+- La pestaña «Bot y puntos» pasa a llamarse **Puntos y grupos** (puntos, grupos de espectadores, ruleta y encuestas).
+- **Limpieza al actualizar**: las reglas que tenían la acción *Mensaje del bot* la pierden; las que solo hacían eso se eliminan. Se borran también del equipo la configuración del bot y las cookies de TikTok guardadas en el llavero. La API key de Euler Stream **se conserva**: sigue sirviendo para conectar al LIVE con más margen de firmas.
+- Las plantillas que respondían en el chat (`!fan`, `!vip`, regalo grande) ahora muestran una **alerta en pantalla**, y los agradecimientos de suscripción y del jarrón se quedan en voz. Se quitan las de saludo y comandos (`!discord`, `!redes`, `!comandos`).
+
 ## [0.3.4] - 2026-10-17
 
 ### Corregido

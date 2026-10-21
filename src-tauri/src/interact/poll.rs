@@ -10,7 +10,6 @@ use serde_json::json;
 use tokio::sync::broadcast::error::RecvError;
 
 use crate::actions::clock::Clock;
-use crate::bot::service::BotService;
 use crate::bus::EventBus;
 use crate::error::{AppError, Result};
 use crate::events::{EventType, LiveEvent};
@@ -98,7 +97,6 @@ pub struct PollService {
     active: Mutex<Option<Active>>,
     next_id: Mutex<u64>,
     hub: OverlayHub,
-    bot: Arc<BotService>,
     clock: Arc<dyn Clock>,
 }
 
@@ -107,8 +105,8 @@ fn clean(s: &str, max: usize) -> String {
 }
 
 impl PollService {
-    pub fn new(hub: OverlayHub, bot: Arc<BotService>, clock: Arc<dyn Clock>) -> Arc<Self> {
-        Arc::new(Self { active: Mutex::new(None), next_id: Mutex::new(0), hub, bot, clock })
+    pub fn new(hub: OverlayHub, clock: Arc<dyn Clock>) -> Arc<Self> {
+        Arc::new(Self { active: Mutex::new(None), next_id: Mutex::new(0), hub, clock })
     }
 
     /// Lanza una encuesta (sustituye a la que hubiera). Devuelve su estado inicial.
@@ -130,16 +128,9 @@ impl PollService {
         let ends_at_ms = self.clock.now_ms() + i64::try_from(duration_s * 1_000).unwrap_or(i64::MAX);
         let poll = Active { id, question, options, ends_at_ms, votes: HashMap::new(), dirty: false, ended: false };
         let view = poll.view();
-        let say = Self::intro(&view);
         *self.active.lock().unwrap_or_else(PoisonError::into_inner) = Some(poll);
         self.publish(&view);
-        self.bot.say(&say, "encuesta");
         Ok(view)
-    }
-
-    fn intro(v: &PollView) -> String {
-        let opts = v.options.iter().enumerate().map(|(i, o)| format!("{}) {}", i + 1, o.label)).collect::<Vec<_>>().join("  ");
-        format!("📊 {} — vota escribiendo el número: {opts}", v.question)
     }
 
     fn publish(&self, v: &PollView) {
@@ -154,7 +145,6 @@ impl PollService {
         let view = poll.view();
         drop(guard);
         self.publish(&view);
-        self.bot.say(&Self::result_text(&view), "encuesta");
         Some(view)
     }
 
@@ -166,20 +156,6 @@ impl PollService {
 
     pub fn current(&self) -> Option<PollView> {
         self.active.lock().unwrap_or_else(PoisonError::into_inner).as_ref().map(Active::view)
-    }
-
-    fn result_text(v: &PollView) -> String {
-        match v.winners.as_slice() {
-            [] => format!("📊 Encuesta cerrada: «{}». Nadie votó.", v.question),
-            [w] => {
-                let o = &v.options[*w];
-                format!("📊 Resultado de «{}»: {} con {} de {} votos 🏆", v.question, o.label, o.votes, v.total)
-            }
-            many => {
-                let names = many.iter().map(|i| v.options[*i].label.as_str()).collect::<Vec<_>>().join(" y ");
-                format!("📊 Empate en «{}»: {names} ({} votos cada una)", v.question, v.options[many[0]].votes)
-            }
-        }
     }
 
     /// Registra el voto de un mensaje de chat. Devuelve `true` si cambió algo.
@@ -212,7 +188,6 @@ impl PollService {
             let view = poll.view();
             drop(guard);
             self.publish(&view);
-            self.bot.say(&Self::result_text(&view), "encuesta");
         } else if poll.dirty {
             poll.dirty = false;
             let view = poll.view();

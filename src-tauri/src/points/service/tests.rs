@@ -117,8 +117,8 @@ async fn a_new_session_clears_presence() {
 #[tokio::test]
 async fn config_is_saved_sanitized_and_reloaded() {
     let r = rig().await;
-    let saved = r.svc.set_config(PointsConfig { watch_interval_minutes: 0, points_command: "!MIS_PUNTOS".into(), ..Default::default() }).await.expect("cfg");
-    assert_eq!((saved.watch_interval_minutes, saved.points_command.as_str()), (1, "mis_puntos"));
+    let saved = r.svc.set_config(PointsConfig { watch_interval_minutes: 0, ..Default::default() }).await.expect("cfg");
+    assert_eq!(saved.watch_interval_minutes, 1);
     let fresh = PointsService::new(r.db.clone(), r.clock.clone());
     fresh.load_config().await.expect("load");
     assert_eq!(fresh.config(), saved);

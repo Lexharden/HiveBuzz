@@ -9,7 +9,7 @@ use tokio::net::TcpListener;
 
 use super::api::{parse_track, track_id_from_ref, HttpSpotify, Playing, SpotifyApi, Track};
 use super::auth::SpotifyAuth;
-use super::service::{ChatOut, SongService};
+use super::service::SongService;
 use super::*;
 use crate::actions::clock::{AppClock, Clock};
 use crate::db::Db;
@@ -496,21 +496,11 @@ impl PointsGate for FakeWallet {
     }
 }
 
-#[derive(Default)]
-struct FakeChat(StdMutex<Vec<String>>);
-
-impl ChatOut for FakeChat {
-    fn say(&self, text: &str, _source: &str) -> bool {
-        self.0.lock().unwrap().push(text.to_string());
-        true
-    }
-}
-
 struct Rig {
     svc: Arc<SongService>,
     api: Arc<FakeApi>,
     wallet: Arc<FakeWallet>,
-    chat: Arc<FakeChat>,
+    said: StdMutex<Vec<String>>,
     clock: Arc<AppClockAdjustable>,
     hub: OverlayHub,
 }
@@ -521,14 +511,14 @@ async fn rig(tweak: impl FnOnce(&mut SongConfig)) -> Rig {
     store.set(KEY_SPOTIFY_REFRESH, "RT").unwrap();
     let clock = Arc::new(AppClockAdjustable::default());
     let auth = SpotifyAuth::with_endpoints(store, clock.clone(), "https://a/authorize", "http://127.0.0.1:1/t").unwrap();
-    let (api, wallet, chat, hub) = (FakeApi::new(), Arc::new(FakeWallet::default()), Arc::new(FakeChat::default()), OverlayHub::new(16));
-    let svc = SongService::new(db, auth, api.clone(), wallet.clone(), chat.clone(), hub.clone(), clock.clone());
+    let (api, wallet, hub) = (FakeApi::new(), Arc::new(FakeWallet::default()), OverlayHub::new(16));
+    let svc = SongService::new(db, auth, api.clone(), wallet.clone(), hub.clone(), clock.clone());
     let mut cfg = SpotifyConfig { client_id: "cid".into(), ..SpotifyConfig::default() };
     cfg.song.enabled = true;
     cfg.song.user_cooldown_s = 0;
     tweak(&mut cfg.song);
     svc.set_config(cfg).await.unwrap();
-    Rig { svc, api, wallet, chat, clock, hub }
+    Rig { svc, api, wallet, said: StdMutex::default(), clock, hub }
 }
 
 fn chat_ev(id: &str, user: &str, text: &str) -> LiveEvent {
@@ -545,15 +535,24 @@ fn chat_ev(id: &str, user: &str, text: &str) -> LiveEvent {
 }
 
 impl Rig {
+    /// Lo que respondió el servicio a cada comando (lo que antes salía por el chat).
     fn said(&self) -> Vec<String> {
-        self.chat.0.lock().unwrap().clone()
+        self.said.lock().unwrap().clone()
+    }
+
+    /// Entrega un mensaje de chat al servicio; `true` si era un comando de canciones.
+    async fn on_event(&self, ev: &LiveEvent) -> bool {
+        let outcome = self.svc.on_event(ev).await;
+        let handled = outcome.is_some();
+        self.said.lock().unwrap().extend(outcome);
+        handled
     }
 }
 
 #[tokio::test]
 async fn a_request_is_queued_and_announced() {
     let r = rig(|_| {}).await;
-    assert!(r.svc.on_event(&chat_ev("1", "ana", "!sr la bamba")).await);
+    assert!(r.on_event(&chat_ev("1", "ana", "!sr la bamba")).await);
     assert_eq!(r.api.queued.lock().unwrap().len(), 1);
     let said = r.said();
     assert_eq!(said.len(), 1);
@@ -563,18 +562,18 @@ async fn a_request_is_queued_and_announced() {
 #[tokio::test]
 async fn disabled_service_and_simulated_events_do_nothing() {
     let r = rig(|c| c.enabled = false).await;
-    assert!(!r.svc.on_event(&chat_ev("1", "ana", "!sr x")).await);
+    assert!(!r.on_event(&chat_ev("1", "ana", "!sr x")).await);
     let r = rig(|_| {}).await;
-    assert!(!r.svc.on_event(&chat_ev("sim-1", "ana", "!sr x")).await);
+    assert!(!r.on_event(&chat_ev("sim-1", "ana", "!sr x")).await);
     assert!(r.api.queued.lock().unwrap().is_empty());
-    assert!(!r.svc.on_event(&chat_ev("2", "ana", "hola !sr")).await, "el comando va al principio");
-    assert!(!r.svc.on_event(&chat_ev("3", "ana", "!otra cosa")).await);
+    assert!(!r.on_event(&chat_ev("2", "ana", "hola !sr")).await, "el comando va al principio");
+    assert!(!r.on_event(&chat_ev("3", "ana", "!otra cosa")).await);
 }
 
 #[tokio::test]
 async fn empty_queries_get_usage_help() {
     let r = rig(|_| {}).await;
-    r.svc.on_event(&chat_ev("1", "ana", "!sr")).await;
+    r.on_event(&chat_ev("1", "ana", "!sr")).await;
     assert!(r.said()[0].contains("uso: !sr"));
     assert!(r.api.queued.lock().unwrap().is_empty());
 }
@@ -586,19 +585,19 @@ async fn roles_blocked_users_and_terms_are_enforced() {
         c.blocked_users = vec!["troll".into()];
     })
     .await;
-    r.svc.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
     assert!(r.said()[0].contains("permiso"));
     let mut sub = chat_ev("2", "troll", "!sr x");
     sub.user.is_subscriber = true;
-    r.svc.on_event(&sub).await;
+    r.on_event(&sub).await;
     assert!(r.said()[1].contains("no puedes"));
     let mut ok = chat_ev("3", "bea", "!sr x");
     ok.user.is_moderator = true;
-    r.svc.on_event(&ok).await;
+    r.on_event(&ok).await;
     assert_eq!(r.api.queued.lock().unwrap().len(), 1, "un moderador cumple «suscriptor»");
 
     let r = rig(|c| c.blocked_terms = vec!["ritchie".into()]).await;
-    r.svc.on_event(&chat_ev("4", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("4", "ana", "!sr x")).await;
     assert!(r.said()[0].contains("bloqueada"));
     assert!(r.api.queued.lock().unwrap().is_empty());
 }
@@ -606,10 +605,10 @@ async fn roles_blocked_users_and_terms_are_enforced() {
 #[tokio::test]
 async fn long_tracks_and_unknown_tracks_are_rejected() {
     let r = rig(|c| c.max_duration_s = 60).await;
-    r.svc.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
     assert!(r.said()[0].contains("dura demasiado"));
     *r.api.find.lock().unwrap() = None;
-    r.svc.on_event(&chat_ev("2", "ana", "!sr nada")).await;
+    r.on_event(&chat_ev("2", "ana", "!sr nada")).await;
     assert!(r.said()[1].contains("no encontré"));
     assert!(r.api.queued.lock().unwrap().is_empty());
 }
@@ -618,20 +617,20 @@ async fn long_tracks_and_unknown_tracks_are_rejected() {
 async fn per_user_limit_and_cooldown_apply() {
     let r = rig(|c| c.per_user_limit = 2).await;
     for i in 0..3 {
-        r.svc.on_event(&chat_ev(&format!("a{i}"), "ana", "!sr x")).await;
+        r.on_event(&chat_ev(&format!("a{i}"), "ana", "!sr x")).await;
     }
     assert_eq!(r.api.queued.lock().unwrap().len(), 2);
     assert!(r.said()[2].contains("ya tienes 2"));
     // Otro espectador no se ve afectado.
-    r.svc.on_event(&chat_ev("b", "bea", "!sr x")).await;
+    r.on_event(&chat_ev("b", "bea", "!sr x")).await;
     assert_eq!(r.api.queued.lock().unwrap().len(), 3);
 
     let r = rig(|c| c.user_cooldown_s = 30).await;
-    r.svc.on_event(&chat_ev("1", "ana", "!sr x")).await;
-    r.svc.on_event(&chat_ev("2", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("2", "ana", "!sr x")).await;
     assert!(r.said()[1].contains("espera"));
     r.clock.advance(31_000);
-    r.svc.on_event(&chat_ev("3", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("3", "ana", "!sr x")).await;
     assert_eq!(r.api.queued.lock().unwrap().len(), 2);
 }
 
@@ -639,15 +638,15 @@ async fn per_user_limit_and_cooldown_apply() {
 async fn points_are_charged_and_refunded_when_queueing_fails() {
     let r = rig(|c| c.cost_points = 50).await;
     *r.wallet.balance.lock().unwrap() = 80;
-    r.svc.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
     assert_eq!(*r.wallet.balance.lock().unwrap(), 30);
-    r.svc.on_event(&chat_ev("2", "bea", "!sr x")).await;
+    r.on_event(&chat_ev("2", "bea", "!sr x")).await;
     assert!(r.said()[1].contains("necesitas 50 puntos"));
     assert_eq!(r.api.queued.lock().unwrap().len(), 1);
 
     *r.wallet.balance.lock().unwrap() = 100;
     *r.api.queue_result.lock().unwrap() = Err(ApiError::NoDevice);
-    r.svc.on_event(&chat_ev("3", "cris", "!sr x")).await;
+    r.on_event(&chat_ev("3", "cris", "!sr x")).await;
     assert_eq!(*r.wallet.balance.lock().unwrap(), 100, "se devolvieron los puntos");
     assert_eq!(*r.wallet.refunds.lock().unwrap(), 50);
     assert!(r.said()[2].contains("no hay Spotify activo"));
@@ -657,25 +656,17 @@ async fn points_are_charged_and_refunded_when_queueing_fails() {
 async fn a_failed_attempt_does_not_burn_the_cooldown() {
     let r = rig(|c| c.user_cooldown_s = 60).await;
     *r.api.queue_result.lock().unwrap() = Err(ApiError::PremiumRequired);
-    r.svc.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
     *r.api.queue_result.lock().unwrap() = Ok(());
-    r.svc.on_event(&chat_ev("2", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("2", "ana", "!sr x")).await;
     assert_eq!(r.api.queued.lock().unwrap().len(), 1);
-}
-
-#[tokio::test]
-async fn reply_can_be_turned_off() {
-    let r = rig(|c| c.reply = false).await;
-    r.svc.on_event(&chat_ev("1", "ana", "!sr x")).await;
-    assert_eq!(r.api.queued.lock().unwrap().len(), 1);
-    assert!(r.said().is_empty());
 }
 
 #[tokio::test]
 async fn now_playing_updates_pending_requests_and_the_overlay() {
     let r = rig(|c| c.per_user_limit = 1).await;
-    r.svc.on_event(&chat_ev("1", "ana", "!sr x")).await;
-    r.svc.on_event(&chat_ev("2", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("2", "ana", "!sr x")).await;
     assert!(r.said()[1].contains("ya tienes 1"));
 
     let track = parse_track(&track_json(ID1, "La Bamba", "Ritchie Valens", 120_000)).unwrap();
@@ -690,24 +681,13 @@ async fn now_playing_updates_pending_requests_and_the_overlay() {
     let other = parse_track(&track_json(ID2, "Otra", "Alguien", 1000)).unwrap();
     *r.api.playing.lock().unwrap() = Some(Playing { track: other, progress_ms: 0, is_playing: true });
     r.svc.poll_once().await;
-    r.svc.on_event(&chat_ev("3", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("3", "ana", "!sr x")).await;
     assert_eq!(r.api.queued.lock().unwrap().len(), 2);
 
     *r.api.playing.lock().unwrap() = None;
     r.svc.poll_once().await;
     let msg = r.hub.retained().into_iter().find(|m| m.channel == CHANNEL).unwrap();
     assert_eq!(msg.data["kind"], "none");
-}
-
-#[tokio::test]
-async fn the_now_playing_command_answers_from_the_last_poll() {
-    let r = rig(|_| {}).await;
-    r.svc.on_event(&chat_ev("1", "ana", "!song")).await;
-    assert!(r.said()[0].contains("no suena nada"));
-    let track = parse_track(&track_json(ID1, "La Bamba", "Ritchie Valens", 120_000)).unwrap();
-    r.svc.apply_playing(Some(Playing { track, progress_ms: 0, is_playing: true }));
-    r.svc.on_event(&chat_ev("2", "ana", "!cancion")).await;
-    assert!(r.said()[1].contains("La Bamba"));
 }
 
 #[tokio::test]
@@ -742,17 +722,10 @@ fn the_builtin_client_id_is_used_unless_the_user_sets_their_own() {
 }
 
 #[tokio::test]
-async fn song_requests_from_twitch_are_queued_but_never_answered_in_the_tiktok_chat() {
+async fn song_requests_from_twitch_are_queued_too() {
     let r = rig(|_| {}).await;
     let mut ev = chat_ev("t1", "ana", "!sr la bamba");
     ev.platform = Platform::Twitch;
-    assert!(r.svc.on_event(&ev).await);
-    assert_eq!(r.api.queued.lock().unwrap().len(), 1, "la canción sí entra a la cola");
-    assert!(r.said().is_empty(), "pero la respuesta no puede salir por TikTok");
-    let mut now_playing = chat_ev("t2", "ana", "!song");
-    now_playing.platform = Platform::Twitch;
-    assert!(r.svc.on_event(&now_playing).await);
-    assert!(r.said().is_empty());
-    r.svc.on_event(&chat_ev("k1", "bea", "!song")).await;
-    assert_eq!(r.said().len(), 1, "en TikTok sí responde");
+    assert!(r.on_event(&ev).await);
+    assert_eq!(r.api.queued.lock().unwrap().len(), 1, "la canción entra a la cola");
 }

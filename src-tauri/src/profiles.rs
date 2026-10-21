@@ -1,7 +1,7 @@
 //! Perfiles: instantáneas con nombre de las reglas y de la configuración de los overlays
 //! («Minecraft», «Charla», «Sleep stream»…). Aplicar un perfil sustituye ambas cosas de un golpe.
 //!
-//! Un perfil NO incluye metas, timers, puntos, bot ni ruleta: son estado de la comunidad o del
+//! Un perfil NO incluye metas, timers, puntos ni ruleta: son estado de la comunidad o del
 //! canal, no de «cómo reacciono en este tipo de stream».
 
 use std::sync::{Arc, PoisonError, RwLock};

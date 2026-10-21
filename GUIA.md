@@ -2,7 +2,7 @@
 
 HiveBuzz es una app de escritorio **gratis** para streamers de TikTok LIVE. Todo corre en tu PC: no hay servidor
 de por medio. Se conecta a tu LIVE, convierte lo que pasa (regalos, chat, follows…) en **eventos** y tú decides
-qué hacer con ellos: sonidos, alertas en pantalla, voz, bot, puntos, OBS, etc.
+qué hacer con ellos: sonidos, alertas en pantalla, voz, puntos, OBS, etc.
 
 > Estado honesto: está todo programado y probado con simulaciones, pero **no se ha probado con un LIVE real, Spotify
 > real ni OBS real**. Si algo falla en vivo, mira la pestaña *Ajustes → Registro*.
@@ -17,7 +17,7 @@ TikTok LIVE → HiveBuzz lee los eventos → REGLAS ("si pasa X, haz Y") → ACC
 ```
 
 - **Regla** = *cuándo* (regalo, follow, comando de chat…) + *condiciones* (cooldown, rol, probabilidad…) + *acciones*.
-- **Acción** = algo que se ejecuta: sonido, alerta, voz, mensaje del bot, tecla, OBS, webhook…
+- **Acción** = algo que se ejecuta: sonido, alerta, voz, tecla, OBS, webhook…
 - **Overlay** = una página web que pegas en OBS como *Browser Source*; muestra alertas, chat, metas, etc.
 - **Simulador** (pestaña Panel) genera eventos falsos: úsalo para probar todo sin estar en vivo.
 
@@ -36,7 +36,7 @@ Variables que puedes usar en los textos: `{user}` `{nickname}` `{gift}` `{count}
 
 ## 2b. Cómo está organizada la app
 
-Menú a la izquierda, agrupado por lo que quieres hacer: **Inicio** · **Automatización** (Reglas, Metas y timers) · **Comunidad** (Bot y puntos, Estadísticas) ·
+Menú a la izquierda, agrupado por lo que quieres hacer: **Inicio** · **Automatización** (Reglas, Metas y timers) · **Comunidad** (Puntos y grupos, Estadísticas) ·
 **Pantalla y sonido** (Overlays, Biblioteca, Voz) · **Conectar con otros** (OBS, Spotify, API) · **La aplicación** (Ajustes). Abajo del menú siempre ves si TikTok y Twitch están conectados.
 Cada pantalla trae una frase que explica para qué sirve.
 
@@ -51,7 +51,7 @@ Cada pantalla trae una frase que explica para qué sirve.
    Para ver también **seguidores nuevos**, saber si estás en directo y cuántos te ven, pulsa **Entrar con Twitch**: se abre twitch.tv/activate, escribes el código que ves en
    pantalla, aceptas y HiveBuzz lo detecta solo. (HiveBuzz no escribe en el chat de Twitch.)
 5. **Primeros pasos:** en Inicio hay una lista que se va marcando sola (conectar, poner un overlay en OBS, probar una alerta, crear una regla).
-6. (Opcional) **Ajustes → API key de Euler Stream**: mejora la firma. Sin ella funciona el nivel gratuito.
+6. (Opcional) **Ajustes → API key de Euler Stream**: da más margen de firmas al conectar. Sin ella funciona el nivel gratuito.
 
 ---
 
@@ -84,6 +84,13 @@ Pestaña **Reglas → Nueva regla**:
 
 Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; sobrevive a un cierre de la app.
 
+### Reglas exclusivas para ciertos espectadores (grupos)
+En **Puntos y grupos → Grupos** creas listas de usuarios (VIPs, amigos…). Luego, en cualquier regla, en *Condiciones* eliges **Solo para estos grupos** (o **Excluir estos grupos**). Ejemplos:
+- **Comando solo para VIPs**: regla con disparador *Comando* (`!vip`) + «Solo para: VIPs».
+- **Animación propia cuando un VIP regala una ballena**: regla con disparador *Regalo* (Whale) + «Solo para: VIPs» + acción *Alerta en overlay* con su vídeo y sonido. Activa **Reemplaza a las reglas generales** para que, cuando el VIP regale, no se dispare además la animación normal de la ballena.
+- **Regla general «todos menos VIPs»**: la misma ballena de siempre con «Excluir: VIPs».
+Los usuarios se reconocen por su @ (sin importar mayúsculas ni el `@`), y puedes limitarlos a TikTok o a Twitch. Si alguien cambia de @, actualízalo en el grupo. Si borras un grupo, las reglas que lo exigían dejan de dispararse para todos.
+
 ### Tipos de acción
 | Acción | Para qué |
 |---|---|
@@ -91,7 +98,6 @@ Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; 
 | Alerta en overlay | Imagen/GIF/video + texto con variables |
 | Texto a voz | Lee un texto con la voz elegida |
 | Modificar meta / Controlar timer | Sumar progreso, extender el subathon… |
-| Mensaje del bot | El bot escribe en tu chat |
 | Sumar/restar puntos | Premiar o cobrar puntos |
 | Girar la ruleta / Lanzar encuesta | Interacción con el chat |
 | Webhook HTTP | Avisar a IFTTT, Home Assistant, Streamer.bot… |
@@ -125,19 +131,18 @@ Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; 
 
 ---
 
-## 8. Chatbot, puntos, ruleta y encuestas (pestaña "Bot y puntos")
+## 8. Puntos, grupos, ruleta y encuestas (pestaña "Puntos y grupos")
 
-1. **Iniciar sesión en TikTok** (sección *Sesión de TikTok*): se abre una ventana de TikTok; inicias sesión tú mismo
-   (la app solo guarda las cookies en el llavero del sistema). Luego vuelve a conectar al LIVE. Sin sesión todo
-   funciona en solo lectura; solo el bot necesita escribir.
-2. **Bot** (nace apagado): comandos con alias (`!discord`), respuestas por palabra clave, mensajes temporizados,
-   agradecimientos automáticos, `!puntos` y `!top`.
-3. **Puntos**: se ganan por ver, comentar, likes, shares, follows, suscripciones y monedas. Tabla de espectadores
+> **HiveBuzz no escribe en el chat de TikTok.** TikTok solo permite enviar mensajes a través de un servicio de pago
+> de terceros (Euler Stream) y no hay forma gratuita, así que no hay bot de chat. Tu chat se *lee* (comandos,
+> palabras clave, votos) y se responde con alertas en pantalla, voz y sonidos.
+
+1. **Puntos**: se ganan por ver, comentar, likes, shares, follows, suscripciones y monedas. Tabla de espectadores
    con edición e importación/exportación CSV.
-4. **Recompensas**: crea una regla con disparador *comando de chat* y ponle **coste en puntos**; el espectador la
+2. **Recompensas**: crea una regla con disparador *comando de chat* y ponle **coste en puntos**; el espectador la
    "canjea" escribiendo el comando (si falla, se le devuelven los puntos).
-5. **Ruleta**: define premios con pesos; se lanza con la acción *Girar la ruleta* o el botón de prueba.
-6. **Encuesta**: pregunta + 2 a 8 opciones; el chat vota escribiendo el número. Overlay de resultados.
+3. **Ruleta**: define premios con pesos; se lanza con la acción *Girar la ruleta* o el botón de prueba.
+4. **Encuesta**: pregunta + 2 a 8 opciones; el chat vota escribiendo el número. Overlay de resultados.
 
 ---
 
@@ -208,7 +213,6 @@ TikTok, contraseña de OBS, Spotify) van al **llavero del sistema**, nunca a la 
 |---|---|
 | No conecta | Estado en el Panel; *Ajustes → Registro*; prueba la API key de Euler |
 | Overlay vacío en OBS | URL completa con token; servidor local sin error en Ajustes; puerto libre |
-| El bot no escribe | ¿Está activado? ¿Hay sesión de TikTok? Escribir en el chat exige además una API key de Euler Stream (puede requerir un plan de pago: el aviso del bot muestra la respuesta de Euler). Reconecta al LIVE después de iniciar sesión |
 | Spotify no encola | Premium, dispositivo activo, Redirect URI exacta, "Conectado" en verde |
 | Spotify: 403 Forbidden | Añade tu cuenta en *Settings → User Management* de tu app de Spotify y reconecta |
 | Las teclas no se envían | La ventana activa debe estar en la lista blanca; si el juego es "administrador", abre HiveBuzz igual |

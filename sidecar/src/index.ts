@@ -44,14 +44,10 @@ rl.on("line", (line) => {
       void connector.connect({
         uniqueId: cmd.uniqueId,
         ...(cmd.eulerApiKey ? { eulerApiKey: cmd.eulerApiKey } : {}),
-        ...(cmd.session ? { session: cmd.session } : {}),
       });
       break;
     case "disconnect":
       void connector.disconnect();
-      break;
-    case "sendChat":
-      void connector.sendChat(cmd.requestId, cmd.text);
       break;
     case "shutdown":
       void shutdown(0);

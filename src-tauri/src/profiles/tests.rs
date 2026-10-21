@@ -32,6 +32,7 @@ fn rule(id: &str) -> Rule {
         priority: None,
         ttl_ms: 60_000,
         cost_points: None,
+        replaces_general: false,
     }
 }
 

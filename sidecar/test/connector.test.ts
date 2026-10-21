@@ -72,8 +72,6 @@ interface World {
   live: (boolean | Error)[];
   /** Comportamiento de `connect()` por intento; si se agota, conecta bien. */
   connects: (Error | "ok")[];
-  /** Si se define, los clientes tienen `sendChat` (es decir, hay sesión de TikTok). */
-  chat?: (text: string) => Promise<void>;
   connector: Connector;
 }
 
@@ -98,7 +96,6 @@ function world(random = 0): World {
         disconnect: async () => {
           c.connected = false;
         },
-        ...(w.chat ? { sendChat: (text: string) => (w.chat as (t: string) => Promise<void>)(text) } : {}),
       };
       w.clients.push(c);
       return c;
@@ -107,7 +104,6 @@ function world(random = 0): World {
     now: clock.now,
     sleep: clock.sleep,
     random: () => random,
-    config: { sendTimeoutMs: 40 },
   });
   return w;
 }
@@ -244,16 +240,6 @@ describe("recuperación", () => {
     await w.connector.disconnect();
   });
 
-  it("si TikTok rechaza la conexión con la sesión iniciada, reintenta de inmediato sin ella", async () => {
-    w.connects = [new SignatureRateLimitError("TikTok no aceptó la sesión")];
-    await w.connector.connect({ uniqueId: "ana", session: { sessionId: "SID", ttTargetIdc: "IDC" } });
-    await w.clock.advance(0);
-    expect(w.connector.state).toBe("connected");
-    expect(states(w)).not.toContain("signature_error");
-    expect(w.clients).toHaveLength(2);
-    await w.connector.disconnect();
-  });
-
   it("un @usuario inválido es fatal: no reintenta", async () => {
     w.live = [new InvalidUniqueIdError("usuario inválido")];
     await w.connector.connect({ uniqueId: "???" });
@@ -303,79 +289,6 @@ describe("recuperación", () => {
     expect(w.connector.state).toBe("connected");
     expect(events(w)).toEqual([]);
     await w.connector.disconnect();
-  });
-});
-
-describe("escribir en el chat (bot)", () => {
-  const results = (w: World) => w.out.flatMap((m) => (m.kind === "chatResult" ? [m] : []));
-
-  it("sin conexión responde con un error claro (nunca se queda callado)", async () => {
-    await w.connector.sendChat("r1", "hola");
-    expect(results(w)).toEqual([{ kind: "chatResult", requestId: "r1", ok: false, error: "no hay conexión con el LIVE" }]);
-  });
-
-  it("conectado pero sin sesión de TikTok: explica qué falta", async () => {
-    await w.connector.connect({ uniqueId: "ana" });
-    await w.clock.advance(0);
-    await w.connector.sendChat("r1", "hola");
-    expect(results(w)[0]).toMatchObject({ ok: false });
-    expect(results(w)[0]?.error).toContain("sesión de TikTok");
-    await w.connector.disconnect();
-  });
-
-  it("envía el texto limpio (una línea, recortado a 150 caracteres sin partir emojis)", async () => {
-    const sent: string[] = [];
-    w.chat = async (t) => void sent.push(t);
-    await w.connector.connect({ uniqueId: "ana", session: { sessionId: "s", ttTargetIdc: "t" } });
-    await w.clock.advance(0);
-    await w.connector.sendChat("r1", "  hola\r\nmundo  ");
-    await w.connector.sendChat("r2", "🔥".repeat(200));
-    expect(sent[0]).toBe("hola mundo");
-    expect([...(sent[1] ?? "")]).toHaveLength(150);
-    expect(sent[1]).toBe("🔥".repeat(150));
-    expect(results(w).map((r) => [r.requestId, r.ok])).toEqual([["r1", true], ["r2", true]]);
-    await w.connector.disconnect();
-  });
-
-  it("rechaza mensajes vacíos sin tocar TikTok", async () => {
-    let calls = 0;
-    w.chat = async () => void calls++;
-    await w.connector.connect({ uniqueId: "ana", session: { sessionId: "s", ttTargetIdc: "t" } });
-    await w.clock.advance(0);
-    await w.connector.sendChat("r1", " \r\n ");
-    expect(calls).toBe(0);
-    expect(results(w)[0]).toMatchObject({ ok: false, error: "mensaje vacío" });
-    await w.connector.disconnect();
-  });
-
-  it("un fallo de TikTok se informa con su motivo", async () => {
-    w.chat = async () => {
-      throw new Error("rate limited");
-    };
-    await w.connector.connect({ uniqueId: "ana", session: { sessionId: "s", ttTargetIdc: "t" } });
-    await w.clock.advance(0);
-    await w.connector.sendChat("r1", "hola");
-    expect(results(w)[0]).toMatchObject({ ok: false, error: "rate limited" });
-    await w.connector.disconnect();
-  });
-
-  it("si TikTok no responde a tiempo, se informa en vez de colgarse", async () => {
-    w.chat = () => new Promise(() => undefined);
-    await w.connector.connect({ uniqueId: "ana", session: { sessionId: "s", ttTargetIdc: "t" } });
-    await w.clock.advance(0);
-    await w.connector.sendChat("r1", "hola");
-    expect(results(w)[0]).toMatchObject({ ok: false });
-    expect(results(w)[0]?.error).toContain("tardó demasiado");
-    await w.connector.disconnect();
-  });
-
-  it("tras desconectar vuelve a no haber conexión", async () => {
-    w.chat = async () => undefined;
-    await w.connector.connect({ uniqueId: "ana", session: { sessionId: "s", ttTargetIdc: "t" } });
-    await w.clock.advance(0);
-    await w.connector.disconnect();
-    await w.connector.sendChat("r1", "hola");
-    expect(results(w)[0]).toMatchObject({ ok: false, error: "no hay conexión con el LIVE" });
   });
 });
 

@@ -9,11 +9,48 @@ pub mod template;
 
 use crate::error::{AppError, Result};
 use eval::parse_hhmm;
-use model::{Rule, Trigger};
+use model::{ActionPlan, Rule, Trigger};
 
 const MAX_STEPS: usize = 50;
 const MAX_COST: u64 = 1_000_000_000;
 const MAX_DELAY_MS: u64 = 60 * 60 * 1000;
+
+/// Acciones que existían en versiones anteriores y ya no (el bot de chat de TikTok, que no se puede enviar gratis).
+const REMOVED_ACTIONS: [&str; 1] = ["botMessage"];
+
+/// Quita de un plan los pasos de acciones retiradas. Devuelve cuántos quitó.
+pub fn strip_removed_steps(plan: &mut ActionPlan) -> usize {
+    let before = plan.steps.len();
+    plan.steps.retain(|s| !REMOVED_ACTIONS.contains(&s.action.kind.as_str()));
+    before - plan.steps.len()
+}
+
+/// Resultado de limpiar reglas guardadas con acciones retiradas.
+#[derive(Debug, Default, PartialEq)]
+pub struct Stripped {
+    /// Reglas que siguen existiendo (las modificadas, ya sin esos pasos).
+    pub rules: Vec<Rule>,
+    /// Ids de las reglas a las que se les quitó algún paso (hay que guardarlas de nuevo).
+    pub edited: Vec<String>,
+    /// Ids de las reglas que se quedaron sin ninguna acción y se eliminan: solo servían para escribir en el chat.
+    pub dropped: Vec<String>,
+}
+
+/// Quita las acciones retiradas de las reglas; las que se quedan sin acciones desaparecen.
+pub fn strip_removed_actions(rules: Vec<Rule>) -> Stripped {
+    let mut out = Stripped::default();
+    for mut rule in rules {
+        if strip_removed_steps(&mut rule.plan) == 0 {
+            out.rules.push(rule);
+        } else if rule.plan.steps.is_empty() {
+            out.dropped.push(rule.id);
+        } else {
+            out.edited.push(rule.id.clone());
+            out.rules.push(rule);
+        }
+    }
+    out
+}
 
 /// Nombre de una llamada a la API local: corto y sin caracteres que compliquen una URL o un JSON.
 pub fn valid_api_name(name: &str) -> bool {
@@ -98,7 +135,34 @@ mod tests {
             priority: None,
             ttl_ms: 1000,
             cost_points: None,
+            replaces_general: false,
         }
+    }
+
+    fn with_actions(id: &str, kinds: &[&str]) -> Rule {
+        let steps = kinds.iter().map(|k| Step { delay_ms: 0, action: ActionSpec::new(k, json!({ "text": "x" })) }).collect();
+        Rule { id: id.into(), plan: ActionPlan { mode: Default::default(), steps }, ..valid() }
+    }
+
+    #[test]
+    fn removed_actions_are_stripped_and_rules_left_empty_are_dropped() {
+        let out = strip_removed_actions(vec![
+            with_actions("solo-voz", &["tts"]),
+            with_actions("mixta", &["tts", "botMessage", "overlayAlert"]),
+            with_actions("solo-bot", &["botMessage", "botMessage"]),
+        ]);
+        assert_eq!(out.rules.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(), ["solo-voz", "mixta"]);
+        assert_eq!(out.edited, ["mixta"]);
+        assert_eq!(out.dropped, ["solo-bot"]);
+        let kinds: Vec<&str> = out.rules[1].plan.steps.iter().map(|s| s.action.kind.as_str()).collect();
+        assert_eq!(kinds, ["tts", "overlayAlert"]);
+    }
+
+    #[test]
+    fn stripping_leaves_untouched_rules_alone() {
+        let r = with_actions("a", &["tts", "playSound"]);
+        let out = strip_removed_actions(vec![r.clone()]);
+        assert_eq!((out.rules, out.edited, out.dropped), (vec![r], vec![], vec![]));
     }
 
     #[test]

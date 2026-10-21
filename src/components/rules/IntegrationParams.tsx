@@ -41,15 +41,6 @@ function JsonField({ label, hint, value, onValid }: { label: string; hint?: stri
   );
 }
 
-export function BotMessageParams({ action, onChange }: P) {
-  const { t } = useTranslation();
-  return (
-    <Field label={t("action.botText")} hint={t("action.botTextHint")}>
-      <TextInput value={str(action, "text")} onChange={(v) => onChange(set(action, "text", v))} placeholder="¡Gracias {nickname}!" />
-    </Field>
-  );
-}
-
 export function PointsAdjustParams({ action, onChange }: P) {
   const { t } = useTranslation();
   return (
@@ -127,7 +118,7 @@ export function WebhookParams({ action, onChange }: P) {
           <NumberInput value={num(action, "retries") ?? 0} min={0} max={3} onChange={(v) => onChange(set(action, "retries", v))} />
         </Field>
         <div className="flex items-end pb-1.5">
-          <Btn disabled={testing || str(action, "url").trim() === ""} onClick={() => void runTest()}>
+          <Btn busy={testing} disabled={str(action, "url").trim() === ""} onClick={() => runTest()}>
             {testing ? t("action.webhookTesting") : t("action.webhookTest")}
           </Btn>
         </div>

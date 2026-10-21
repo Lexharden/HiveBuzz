@@ -126,7 +126,7 @@ describe("ayuda", () => {
       both(`help.glossary.${g}.term`);
       both(`help.glossary.${g}.def`);
     }
-    for (const f of ["obs", "bot", "spotify", "safe", "test", "update"]) {
+    for (const f of ["obs", "chatWrite", "spotify", "safe", "test", "update", "vip", "sound", "busy"]) {
       both(`help.faq.${f}.q`);
       both(`help.faq.${f}.a`);
     }

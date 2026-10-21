@@ -1,47 +1,13 @@
-//! Acciones del chatbot y de puntos: `botMessage` y `pointsAdjust`.
+//! Acción de puntos: `pointsAdjust`.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{Map, Value};
 
-use super::require_str;
 use crate::actions::{ActionContext, ActionExecutor};
-use crate::bot::service::BotService;
 use crate::error::{AppError, Result};
 use crate::points::service::PointsService;
-
-/// `botMessage`: `text` (con variables). Lo dice el bot en el chat aunque el interruptor general
-/// esté apagado: una regla que lo pide es una orden explícita del streamer.
-pub struct BotMessageExecutor {
-    bot: Arc<BotService>,
-}
-
-impl BotMessageExecutor {
-    pub fn new(bot: Arc<BotService>) -> Self {
-        Self { bot }
-    }
-}
-
-#[async_trait]
-impl ActionExecutor for BotMessageExecutor {
-    fn kind(&self) -> &'static str {
-        "botMessage"
-    }
-
-    fn validate(&self, params: &Map<String, Value>) -> Result<()> {
-        require_str(params, "text").map(|_| ())
-    }
-
-    async fn execute(&self, ctx: &ActionContext, params: &Map<String, Value>) -> Result<()> {
-        let text = ctx.render(require_str(params, "text")?);
-        if self.bot.say(&text, "acción de regla") {
-            Ok(())
-        } else {
-            Err(AppError::Invalid("el mensaje del bot está vacío o la cola está llena".into()))
-        }
-    }
-}
 
 /// `pointsAdjust`: `amount` (entero con signo o variable) y `target` (`@usuario`; por defecto `{user}`).
 pub struct PointsAdjustExecutor {

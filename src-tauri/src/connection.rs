@@ -8,7 +8,7 @@ use tokio::sync::{mpsc, watch};
 use crate::bus::EventBus;
 use crate::error::{AppError, Result};
 use crate::events::Platform;
-use crate::source::protocol::{ConnectionState, SessionPayload};
+use crate::source::protocol::ConnectionState;
 use crate::source::{ConnectTarget, LiveSource, SourceMessage, StatusUpdate};
 
 pub struct ConnectionService {
@@ -47,27 +47,18 @@ impl ConnectionService {
         self.viewers.subscribe()
     }
 
-    pub async fn connect(&self, raw_username: &str, euler_api_key: Option<String>, session: Option<SessionPayload>) -> Result<()> {
+    pub async fn connect(&self, raw_username: &str, euler_api_key: Option<String>) -> Result<()> {
         let unique_id = match self.platform {
             Platform::Tiktok => normalize_username(raw_username)?,
             Platform::Twitch => crate::twitch::normalize_channel(raw_username)?,
         };
         self.source
-            .connect(ConnectTarget {
-                unique_id,
-                euler_api_key,
-                session,
-            })
+            .connect(ConnectTarget { unique_id, euler_api_key })
             .await
     }
 
     pub async fn disconnect(&self) -> Result<()> {
         self.source.disconnect().await
-    }
-
-    /// Escribe en el chat del LIVE (necesita sesión de TikTok).
-    pub async fn send_chat(&self, text: String) -> Result<()> {
-        self.source.send_chat(text).await
     }
 
     /// Consume los mensajes de la fuente: eventos → bus, estados → `watch`.
@@ -172,8 +163,8 @@ mod tests {
     async fn connect_validates_then_delegates() {
         let src = Arc::new(FakeSource::default());
         let svc = ConnectionService::new(src.clone());
-        assert!(svc.connect("no valido!", None, None).await.is_err());
-        svc.connect("@ana", Some("k".into()), None).await.expect("connect");
+        assert!(svc.connect("no valido!", None).await.is_err());
+        svc.connect("@ana", Some("k".into())).await.expect("connect");
         svc.disconnect().await.expect("disconnect");
         assert_eq!(
             *src.calls.lock().expect("lock"),

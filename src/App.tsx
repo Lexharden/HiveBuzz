@@ -14,10 +14,13 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { Sidebar } from "./components/Sidebar";
 import { StatsPage } from "./components/stats/StatsPage";
 import { SystemPanel } from "./components/system/SystemPanel";
+import { InstallStatus, useInstall } from "./components/system/useInstall";
 import { Tour } from "./components/tour/Tour";
 import { TourOffer } from "./components/tour/TourOffer";
 import { TtsPage } from "./components/tts/TtsPage";
+import { Btn, ToastHost, toast } from "./components/ui";
 import i18n from "./i18n";
+import { errorMessage } from "./lib/api";
 import type { Page } from "./lib/nav";
 import { systemApi, type UpdateInfo } from "./lib/system";
 import { useLive } from "./lib/useLive";
@@ -29,6 +32,7 @@ function App() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [version, setVersion] = useState<string | null>(null);
   const [touring, setTouring] = useState(false);
+  const installer = useInstall();
 
   useEffect(() => {
     void getVersion().then(setVersion).catch(() => undefined);
@@ -68,10 +72,15 @@ function App() {
         {update && (
           <p className="flex items-center justify-between rounded-lg border border-amber-400/40 bg-amber-400/10 p-3 text-sm text-amber-200">
             <span>{t("system.update.banner", { version: update.version })}</span>
-            <button onClick={() => void systemApi.installUpdate()} className="rounded-md bg-amber-400 px-3 py-1 text-xs font-semibold text-brand-900">
-              {t("system.update.install", { version: update.version })}
-            </button>
+            <Btn variant="primary" busy={installer.active} onClick={() => installer.start(() => systemApi.installUpdate()).catch((e: unknown) => toast(errorMessage(e), "error"))}>
+              {installer.active ? t("system.update.installing") : t("system.update.install", { version: update.version })}
+            </Btn>
           </p>
+        )}
+        {installer.active && (
+          <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 p-3">
+            <InstallStatus stage={installer.stage} progress={installer.progress} />
+          </div>
         )}
 
         {page === "dashboard" && !touring && <TourOffer onStart={() => setTouring(true)} />}
@@ -97,6 +106,7 @@ function App() {
         )}
       </main>
 
+      <ToastHost />
       {touring && <Tour page={page} setPage={setPage} onClose={() => setTouring(false)} />}
     </div>
   );

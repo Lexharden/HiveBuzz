@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
-import type { Conditions, Step } from "./types";
+import type { Step } from "./types";
 
 export interface PointsConfig {
   enabled: boolean;
@@ -16,8 +16,6 @@ export interface PointsConfig {
   subscribePoints: number;
   pointsPerCoin: number;
   subscriberMultiplier: number;
-  pointsCommand: string;
-  topCommand: string;
   topSize: number;
   countSimulated: boolean;
 }
@@ -47,46 +45,6 @@ export interface ImportReport {
   [k: string]: unknown;
 }
 
-export interface BotCommand {
-  id: string;
-  enabled: boolean;
-  names: string[];
-  responses: string[];
-  conditions: Conditions;
-}
-
-export interface TimedMessage {
-  id: string;
-  enabled: boolean;
-  text: string;
-  everyMinutes: number;
-  minChatMessages: number;
-}
-
-export interface Thanks {
-  enabled: boolean;
-  template: string;
-  minCoins: number;
-  userCooldownMs: number;
-}
-
-export interface BotConfig {
-  enabled: boolean;
-  minIntervalMs: number;
-  commands: BotCommand[];
-  keywordReplies: unknown[];
-  timedMessages: TimedMessage[];
-  thanks: { gift: Thanks; follow: Thanks; share: Thanks; subscribe: Thanks };
-  builtin: { points: string; top: string; redeemed: string; denied: string };
-}
-
-export interface BotLogEntry {
-  ts: number;
-  text: string;
-  source: string;
-  status: { state: "sent" | "failed" | "dropped"; reason?: string };
-}
-
 export interface WheelSegment {
   id: string;
   label: string;
@@ -98,7 +56,6 @@ export interface WheelSegment {
 export interface WheelConfig {
   segments: WheelSegment[];
   spinMs: number;
-  announce: string;
 }
 
 export interface PollView {
@@ -126,12 +83,6 @@ export const interactApi = {
   },
   importViewersCsv: (path: string, mode: "replace" | "add") => invoke<ImportReport>("import_viewers_csv", { path, mode }),
 
-  getBotConfig: () => invoke<BotConfig>("get_bot_config"),
-  setBotConfig: (config: BotConfig) => invoke<BotConfig>("set_bot_config", { config }),
-  getBotLog: () => invoke<BotLogEntry[]>("get_bot_log"),
-  clearBotLog: () => invoke<void>("clear_bot_log"),
-  botSay: (text: string) => invoke<void>("bot_say", { text }),
-
   getWheelConfig: () => invoke<WheelConfig>("get_wheel_config"),
   setWheelConfig: (config: WheelConfig) => invoke<WheelConfig>("set_wheel_config", { config }),
   spinWheelTest: () => invoke<void>("spin_wheel_test"),
@@ -141,9 +92,4 @@ export const interactApi = {
   stopPoll: () => invoke<PollView | null>("stop_poll"),
   clearPoll: () => invoke<void>("clear_poll"),
 
-  hasTiktokSession: () => invoke<boolean>("has_tiktok_session"),
-  tiktokLoginStart: () => invoke<void>("tiktok_login_start"),
-  tiktokLoginFinish: () => invoke<boolean>("tiktok_login_finish"),
-  tiktokLoginManual: (sessionId: string, ttTargetIdc: string) => invoke<void>("tiktok_login_manual", { sessionId, ttTargetIdc }),
-  tiktokLogout: () => invoke<void>("tiktok_logout"),
 };

@@ -5,6 +5,11 @@
 //! `showAvatar`, `durationMs` (500–60000, por defecto 5000) y `wait` (esperar a que termine la
 //! alerta antes de seguir con el plan; por defecto `true`).
 //!
+//! Sonido opcional (`soundId`/`soundIds`, `soundVolume` 0–100): suena justo cuando el overlay empieza a
+//! mostrar la alerta (el overlay avisa por WebSocket cuando su vídeo está reproduciéndose), así imagen y
+//! audio salen a la vez aunque haya otras alertas en cola. Si el overlay no está abierto, suena tras unos
+//! segundos de todos modos.
+//!
 //! Las alertas se muestran de una en una (grupo serial): el overlay no las superpone.
 
 use std::sync::Arc;
@@ -13,23 +18,30 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde_json::{json, Map, Value};
 
+use super::sound::{resolve, sound_ids};
 use super::{opt_bool, opt_number};
 use crate::actions::{ActionContext, ActionExecutor, Concurrency};
+use crate::audio::{AudioBackend, TAG_SOUND};
 use crate::error::{AppError, Result};
 use crate::media::MediaLibrary;
 use crate::overlay::OverlayHub;
+use crate::sounds::SoundLibrary;
 
 pub const CHANNEL: &str = "alerts";
 const DEFAULT_DURATION_MS: f64 = 5000.0;
+/// Cuánto se espera el aviso del overlay antes de reproducir el sonido igualmente.
+const ACK_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub struct OverlayAlertExecutor {
     media: Arc<MediaLibrary>,
     hub: OverlayHub,
+    sounds: Arc<SoundLibrary>,
+    audio: Arc<dyn AudioBackend>,
 }
 
 impl OverlayAlertExecutor {
-    pub fn new(media: Arc<MediaLibrary>, hub: OverlayHub) -> Self {
-        Self { media, hub }
+    pub fn new(media: Arc<MediaLibrary>, hub: OverlayHub, sounds: Arc<SoundLibrary>, audio: Arc<dyn AudioBackend>) -> Self {
+        Self { media, hub, sounds, audio }
     }
 }
 
@@ -48,11 +60,12 @@ impl ActionExecutor for OverlayAlertExecutor {
     }
 
     fn validate(&self, params: &Map<String, Value>) -> Result<()> {
-        let has_content = ["title", "text", "mediaId", "imageUrl"].iter().any(|k| text_param(params, k).is_some());
+        let has_content = ["title", "text", "mediaId", "imageUrl"].iter().any(|k| text_param(params, k).is_some()) || !sound_ids(params).is_empty();
         if !has_content {
             return Err(AppError::Invalid("la alerta necesita título, texto o un medio".into()));
         }
         opt_number(params, "durationMs", 500.0, 60_000.0)?;
+        opt_number(params, "soundVolume", 0.0, 100.0)?;
         opt_bool(params, "wait", true)?;
         opt_bool(params, "showAvatar", false)?;
         Ok(())
@@ -80,8 +93,26 @@ impl ActionExecutor for OverlayAlertExecutor {
             None
         };
 
+        // Un sonido que ya no existe no debe impedir la alerta: se avisa y sale sin sonido.
+        let sound = if sound_ids(params).is_empty() {
+            None
+        } else {
+            match resolve(&self.sounds, params, "soundVolume").await {
+                Ok(s) => Some(s),
+                Err(e) => {
+                    tracing::warn!(error = %e, "la alerta sale sin sonido");
+                    None
+                }
+            }
+        };
+
+        let id = uuid::Uuid::new_v4().to_string();
+        // Se pide el aviso antes de publicar: así no puede llegar antes de que alguien lo espere.
+        let shown = sound.as_ref().map(|_| self.hub.expect_ack(&id));
+
         let payload = json!({
-            "id": uuid::Uuid::new_v4().to_string(),
+            "id": id,
+            "sync": sound.is_some(),
             "title": text_param(params, "title").map(|t| ctx.render(t)),
             "text": text_param(params, "text").map(|t| ctx.render(t)),
             "imageUrl": text_param(params, "imageUrl").map(|t| ctx.render(t)).filter(|u| !u.is_empty()),
@@ -90,6 +121,18 @@ impl ActionExecutor for OverlayAlertExecutor {
             "durationMs": duration_ms,
         });
         self.hub.publish(CHANNEL, payload);
+
+        if let (Some((path, volume)), Some(shown)) = (sound, shown) {
+            let (audio, hub) = (Arc::clone(&self.audio), self.hub.clone());
+            tokio::spawn(async move {
+                if tokio::time::timeout(ACK_TIMEOUT, shown).await.is_err() {
+                    hub.forget_ack(&id);
+                }
+                if let Err(e) = audio.play(path, volume, TAG_SOUND).await {
+                    tracing::warn!(error = %e, "falló el sonido de la alerta");
+                }
+            });
+        }
 
         if opt_bool(params, "wait", true)? {
             tokio::time::sleep(Duration::from_millis(duration_ms)).await;
@@ -104,21 +147,34 @@ mod tests {
 
     use super::*;
     use crate::actions::clock::AppClock;
+    use crate::audio::testing::FakeAudio;
     use crate::db::Db;
+    use crate::sounds::testing::silent_wav;
 
     struct Rig {
         exec: OverlayAlertExecutor,
         hub: OverlayHub,
         media: Arc<MediaLibrary>,
+        sounds: Arc<SoundLibrary>,
+        audio: Arc<FakeAudio>,
         tmp: tempfile::TempDir,
     }
 
     async fn rig() -> Rig {
         let tmp = tempfile::tempdir().expect("tmp");
         let db = Db::open_memory().await.expect("db");
-        let media = Arc::new(MediaLibrary::new(db, tmp.path().join("m"), Arc::new(AppClock::new())).expect("lib"));
+        let clock = Arc::new(AppClock::new());
+        let media = Arc::new(MediaLibrary::new(db.clone(), tmp.path().join("m"), clock.clone()).expect("lib"));
+        let sounds = Arc::new(SoundLibrary::new(db, tmp.path().join("s"), clock).expect("sounds"));
+        let audio = Arc::new(FakeAudio { duration: Duration::from_millis(10), ..Default::default() });
         let hub = OverlayHub::new(16);
-        Rig { exec: OverlayAlertExecutor::new(media.clone(), hub.clone()), hub, media, tmp }
+        Rig { exec: OverlayAlertExecutor::new(media.clone(), hub.clone(), sounds.clone(), audio.clone()), hub, media, sounds, audio, tmp }
+    }
+
+    async fn import_sound(r: &Rig) -> String {
+        let p = r.tmp.path().join("ding.wav");
+        std::fs::write(&p, silent_wav(100)).expect("write");
+        r.sounds.import(&p, None).await.expect("import").id
     }
 
     fn ctx() -> ActionContext {
@@ -208,6 +264,56 @@ mod tests {
         assert!(v(json!({"text": "x", "durationMs": 100})).is_err());
         assert!(v(json!({"text": "x", "durationMs": 70000})).is_err());
         assert!(v(json!({"text": "x", "wait": 1})).is_err());
+    }
+
+    async fn plays(r: &Rig) -> usize {
+        r.audio.played.lock().expect("lock").len()
+    }
+
+    #[tokio::test]
+    async fn the_sound_waits_for_the_overlay_to_confirm_it_is_showing_the_alert() {
+        let r = rig().await;
+        let sound = import_sound(&r).await;
+        let mut rx = r.hub.subscribe();
+        r.exec.execute(&ctx(), &params(json!({"text": "hola", "soundId": sound, "wait": false}))).await.expect("exec");
+        let m = rx.recv().await.expect("msg");
+        assert_eq!(m.data["sync"], true);
+        // Hasta que el overlay no avisa, no suena nada.
+        tokio::time::sleep(Duration::from_millis(80)).await;
+        assert_eq!(plays(&r).await, 0);
+        r.hub.ack(m.data["id"].as_str().expect("id"));
+        for _ in 0..50 {
+            if plays(&r).await == 1 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        assert_eq!(plays(&r).await, 1);
+    }
+
+    #[tokio::test]
+    async fn an_alert_without_sound_does_not_wait_for_anything() {
+        let r = rig().await;
+        let mut rx = r.hub.subscribe();
+        r.exec.execute(&ctx(), &params(json!({"text": "hola", "wait": false}))).await.expect("exec");
+        assert_eq!(rx.recv().await.expect("msg").data["sync"], false);
+        assert_eq!(plays(&r).await, 0);
+    }
+
+    #[tokio::test]
+    async fn a_missing_sound_still_shows_the_alert() {
+        let r = rig().await;
+        let mut rx = r.hub.subscribe();
+        r.exec.execute(&ctx(), &params(json!({"text": "hola", "soundId": "fantasma", "wait": false}))).await.expect("exec");
+        let m = rx.recv().await.expect("msg");
+        assert_eq!((m.data["text"].clone(), m.data["sync"].clone()), (json!("hola"), json!(false)));
+    }
+
+    #[tokio::test]
+    async fn a_sound_alone_is_valid_content() {
+        let r = rig().await;
+        assert!(r.exec.validate(&params(json!({"soundId": "s"}))).is_ok());
+        assert!(r.exec.validate(&params(json!({"text": "x", "soundVolume": 120}))).is_err());
     }
 
     #[tokio::test]

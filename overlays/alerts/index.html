@@ -48,6 +48,7 @@
       if (m.kind === "video") {
         node = HB.el("video", "media");
         node.src = src; node.autoplay = true; node.loop = true; node.muted = true; node.playsInline = true;
+        a.videoNode = node;
       } else {
         node = HB.el("img", "media");
         node.src = src;
@@ -69,12 +70,28 @@
     return el;
   }
 
+  // Si la alerta lleva sonido, HiveBuzz lo hace sonar cuando se le avisa de que ya se ve: con vídeo, cuando
+  // empieza a reproducirse (no antes, que tarda en cargar); sin vídeo, al instante. Tope de 3 s por si no arranca.
+  function announce(a) {
+    if (!a.sync || !a.id) return;
+    var done = false;
+    function go() { if (!done) { done = true; HB.shown(a.id); } }
+    var v = a.videoNode;
+    if (v) {
+      v.addEventListener("playing", go, { once: true });
+      setTimeout(go, 3000);
+    } else {
+      requestAnimationFrame(go);
+    }
+  }
+
   function next() {
     if (showing || queue.length === 0) return;
     showing = true;
     var a = queue.shift();
     var el = build(a);
     root.appendChild(el);
+    announce(a);
     var ms = HB.clamp(Number(a.durationMs) || 5000, 500, 60000);
     setTimeout(function () {
       el.classList.remove("pop", "slide", "fade");

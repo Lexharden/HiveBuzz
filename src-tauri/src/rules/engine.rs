@@ -6,7 +6,8 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError, RwLock};
 use serde::Serialize;
 use tokio::sync::broadcast::{self, error::RecvError};
 
-use super::eval::{evaluate, Blocked, Decision, EvalEnv, RuleState};
+use crate::viewer_groups::ViewerGroups;
+use super::eval::{evaluate, Decision, EvalEnv, RuleState};
 use super::matcher::{match_trigger, TriggerInput};
 use super::model::{Rule, Trigger};
 use super::sample::sample_event_for;
@@ -55,7 +56,7 @@ pub trait PointsGate: Send + Sync {
     async fn refund(&self, user_id: &str, amount: u64, reward: &str) -> Result<()>;
 }
 
-/// Aviso de que una regla se disparó (para mostrarlo en la UI y para que el chatbot confirme canjes).
+/// Aviso de que una regla se disparó (para mostrarlo en la UI).
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FiredReport {
@@ -70,20 +71,7 @@ pub struct FiredReport {
     /// Puntos cobrados y saldo restante (si era una recompensa con coste).
     pub cost: Option<u64>,
     pub points_left: Option<u64>,
-    /// Plataforma de quien la disparó (el bot solo confirma canjes en TikTok).
-    pub platform: Platform,
-}
-
-/// Un espectador intentó una recompensa sin tener puntos suficientes.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeniedReport {
-    pub rule_id: String,
-    pub rule_name: String,
-    pub user: String,
-    pub nickname: String,
-    pub cost: u64,
-    pub have: u64,
+    /// Plataforma de quien la disparó.
     pub platform: Platform,
 }
 
@@ -113,15 +101,14 @@ pub struct RuleEngine {
     clock: Arc<dyn Clock>,
     db: Db,
     fired: broadcast::Sender<FiredReport>,
-    denied: broadcast::Sender<DeniedReport>,
     points: OnceLock<Arc<dyn PointsGate>>,
+    groups: OnceLock<Arc<ViewerGroups>>,
     handled: Mutex<u64>,
 }
 
 impl RuleEngine {
     pub fn new(db: Db, queue: Arc<ActionQueue>, registry: ExecutorRegistry, clock: Arc<dyn Clock>) -> Arc<Self> {
         let (fired, _) = broadcast::channel(64);
-        let (denied, _) = broadcast::channel(64);
         Arc::new(Self {
             rules: RwLock::new(Arc::new(Vec::new())),
             states: Mutex::new(HashMap::new()),
@@ -130,18 +117,14 @@ impl RuleEngine {
             clock,
             db,
             fired,
-            denied,
             points: OnceLock::new(),
+            groups: OnceLock::new(),
             handled: Mutex::new(0),
         })
     }
 
     pub fn subscribe_fired(&self) -> broadcast::Receiver<FiredReport> {
         self.fired.subscribe()
-    }
-
-    pub fn subscribe_denied(&self) -> broadcast::Receiver<DeniedReport> {
-        self.denied.subscribe()
     }
 
     /// Conecta el sistema de puntos (necesario para las recompensas con coste).
@@ -151,11 +134,32 @@ impl RuleEngine {
         }
     }
 
+    /// Conecta los grupos de espectadores (condiciones `groups_any` / `groups_none`).
+    pub fn attach_groups(&self, groups: Arc<ViewerGroups>) {
+        if self.groups.set(groups).is_err() {
+            tracing::warn!("los grupos de espectadores ya estaban conectados al motor de reglas");
+        }
+    }
+
     /// Carga las reglas guardadas.
     pub async fn load(&self) -> Result<usize> {
-        let rules = self.db.list_rules().await?;
-        let n = rules.len();
-        self.set_rules(rules);
+        let stripped = super::strip_removed_actions(self.db.list_rules().await?);
+        let now = self.clock.now_ms();
+        for rule in stripped.rules.iter().filter(|r| stripped.edited.contains(&r.id)) {
+            self.db.save_rule(rule, now).await?;
+        }
+        for id in &stripped.dropped {
+            self.db.delete_rule(id).await?;
+        }
+        if !stripped.edited.is_empty() || !stripped.dropped.is_empty() {
+            tracing::info!(
+                editadas = stripped.edited.len(),
+                eliminadas = stripped.dropped.len(),
+                "reglas con la acción «mensaje del bot» (ya no existe) actualizadas"
+            );
+        }
+        let n = stripped.rules.len();
+        self.set_rules(stripped.rules);
         Ok(n)
     }
 
@@ -183,6 +187,8 @@ impl RuleEngine {
 
     /// Sustituye todas las reglas (aplicar un perfil). Si alguna es inválida no se cambia nada.
     pub async fn replace_all(&self, rules: Vec<Rule>) -> Result<()> {
+        // Un perfil o una copia antigua pueden traer la acción «mensaje del bot», que ya no existe.
+        let rules = super::strip_removed_actions(rules).rules;
         let mut seen = std::collections::HashSet::new();
         for rule in &rules {
             validate_rule(rule)?;
@@ -308,35 +314,27 @@ impl RuleEngine {
             _ => None,
         };
 
+        let groups = self.groups.get().map(|g| g.index()).unwrap_or_default();
         let mut firings = Vec::new();
-        let mut broke = Vec::new();
         {
             let mut states = self.states.lock().unwrap_or_else(PoisonError::into_inner);
-            for rule in rules.iter() {
-                let state = states.entry(rule.id.clone()).or_default();
-                let env = EvalEnv { now_ms, local, roll: rand::random::<f64>(), balance };
-                match evaluate(rule, &input, state, &env) {
-                    Decision::Fire { times, vars } => firings.push((Arc::clone(rule), times, vars)),
-                    Decision::Blocked(Blocked::Points) => broke.push(Arc::clone(rule)),
-                    _ => {}
+            // Primero las reglas exclusivas; si alguna se dispara, las demás ni se evalúan (así no gastan
+            // cooldown ni turno por un evento que no van a ejecutar).
+            let mut replaced = false;
+            for exclusive_pass in [true, false] {
+                if !exclusive_pass && replaced {
+                    break;
+                }
+                for rule in rules.iter().filter(|r| r.replaces_general == exclusive_pass) {
+                    let state = states.entry(rule.id.clone()).or_default();
+                    let env = EvalEnv { now_ms, local, roll: rand::random::<f64>(), balance, groups: Arc::clone(&groups) };
+                    if let Decision::Fire { times, vars } = evaluate(rule, &input, state, &env) {
+                        replaced |= exclusive_pass;
+                        firings.push((Arc::clone(rule), times, vars));
+                    }
                 }
             }
             self.maybe_prune(&mut states, &rules, now_ms);
-        }
-
-        // Sin sistema de puntos conectado no se avisa de «no tienes puntos»: no sabemos su saldo.
-        if let (Some(u), Some(_)) = (user, gate) {
-            for rule in broke {
-                let _ = self.denied.send(DeniedReport {
-                    rule_id: rule.id.clone(),
-                    rule_name: rule.name.clone(),
-                    user: u.unique_id.clone(),
-                    nickname: display_name(&u.nickname, &u.unique_id),
-                    cost: rule.cost_points.unwrap_or(0),
-                    have: balance.unwrap_or(0),
-                    platform,
-                });
-            }
         }
 
         let priority_hint = auto_priority(&input);
@@ -348,18 +346,8 @@ impl RuleEngine {
                 if let (Some(cost), Some(u), Some(g)) = (rule.cost_points, user, gate) {
                     match g.spend(&u.id, cost, &rule.name).await {
                         Ok(Some(left)) => paid = Some((cost, left)),
-                        Ok(None) => {
-                            let _ = self.denied.send(DeniedReport {
-                                rule_id: rule.id.clone(),
-                                rule_name: rule.name.clone(),
-                                user: u.unique_id.clone(),
-                                nickname: display_name(&u.nickname, &u.unique_id),
-                                cost,
-                                have: g.balance(&u.id).await.unwrap_or(0),
-                                platform,
-                            });
-                            continue;
-                        }
+                        // Sin saldo suficiente no se ejecuta ni se cobra nada.
+                        Ok(None) => continue,
                         Err(e) => {
                             tracing::error!(rule = %rule.name, error = %e, "no se pudo cobrar la recompensa");
                             continue;

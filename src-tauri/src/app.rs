@@ -8,8 +8,6 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
 
 use crate::actions::clock::{AppClock, Clock};
-use crate::bot::outbox::{ChatSender, Outbox, OutboxLimits};
-use crate::bot::service::BotService;
 use crate::actions::queue::{ActionQueue, QueueConfig};
 use crate::actions::ExecutorRegistry;
 use crate::audio::{AudioBackend, NullAudio, RodioBackend};
@@ -19,7 +17,7 @@ use crate::counters::CounterService;
 use crate::db::{self, Db};
 use crate::error::Result;
 use crate::executors::alert::OverlayAlertExecutor;
-use crate::executors::bot::{BotMessageExecutor, PointsAdjustExecutor};
+use crate::executors::points::PointsAdjustExecutor;
 use crate::executors::interact::{SpinWheelExecutor, StartPollExecutor};
 use crate::executors::keys::{system_backend, PressKeysExecutor};
 use crate::executors::netcmd::{TcpSendExecutor, WsSendExecutor};
@@ -32,6 +30,7 @@ use crate::executors::sound::PlaySoundExecutor;
 use crate::executors::tts::TtsExecutor;
 use crate::goals::service::{GoalService, GoalTiming};
 use crate::jar::JarService;
+use crate::viewer_groups::ViewerGroups;
 use crate::leaderboard::{LeaderboardService, LeaderboardTiming};
 use crate::media::MediaLibrary;
 use crate::overlay::{OverlayHub, RecentEvents};
@@ -83,7 +82,7 @@ const OVERLAY_HISTORY: usize = 80;
 const SHUTDOWN_FLUSH_TIMEOUT: Duration = Duration::from_secs(3);
 
 pub struct AppState {
-    /// Conexión de TikTok (la que escribe el bot). Todas están en `connections`.
+    /// Conexión de TikTok. Todas están en `connections`.
     pub conn: Arc<ConnectionService>,
     pub connections: ConnectionManager,
     pub twitch: Arc<TwitchService>,
@@ -108,11 +107,11 @@ pub struct AppState {
     pub overlay_cfg: OverlayConfigService,
     pub goals: Arc<GoalService>,
     pub jar: Arc<JarService>,
+    pub viewer_groups: Arc<ViewerGroups>,
     pub timers: Arc<TimerService>,
     pub leaderboard: Arc<LeaderboardService>,
     pub counters: Arc<CounterService>,
     pub points: Arc<PointsService>,
-    pub bot: Arc<BotService>,
     pub wheel: Arc<WheelService>,
     pub polls: Arc<PollService>,
     pub obs: Arc<ObsService>,
@@ -151,6 +150,13 @@ impl AppState {
             }
         };
         let secrets: Arc<dyn SecretStore> = Arc::new(KeyringStore);
+        // El bot de chat de TikTok ya no existe: se borra lo que dejó (las cookies de la sesión de TikTok y su configuración).
+        if let Err(e) = secrets::clear_legacy_tiktok_session(secrets.as_ref()) {
+            tracing::warn!(error = %e, "no se pudo borrar la sesión de TikTok guardada por versiones anteriores");
+        }
+        if let Err(e) = db.delete_setting("bot_config").await {
+            tracing::warn!(error = %e, "no se pudo borrar la configuración del bot de versiones anteriores");
+        }
         let overlay_token = secrets::overlay_token_with_fallback(secrets.as_ref(), &data_dir.join("overlay-token"))?;
 
         let clock: Arc<dyn Clock> = Arc::new(AppClock::new());
@@ -236,33 +242,27 @@ impl AppState {
             tracing::error!(error = %e, "no se pudieron cargar los timers");
         }
 
-        // Puntos y chatbot (el bot escribe por la conexión; sin sesión de TikTok sus envíos fallan y se registran).
+        // Puntos y grupos de espectadores.
         let points = PointsService::new(db.clone(), Arc::clone(&clock));
         if let Err(e) = points.load_config().await {
             tracing::error!(error = %e, "no se pudo cargar la configuración de puntos");
         }
-        let outbox = Outbox::start(
-            Arc::clone(&conn) as Arc<dyn ChatSender>,
-            Arc::clone(&clock),
-            Duration::from_secs(2),
-            OutboxLimits::default(),
-        );
-        let bot = BotService::new(db.clone(), Arc::clone(&clock), Arc::clone(&points), outbox);
-        if let Err(e) = bot.load_config().await {
-            tracing::error!(error = %e, "no se pudo cargar la configuración del bot");
+        let viewer_groups = Arc::new(ViewerGroups::new(db.clone()));
+        if let Err(e) = viewer_groups.load().await {
+            tracing::error!(error = %e, "no se pudieron cargar los grupos de espectadores");
         }
 
-        let wheel = WheelService::new(db.clone(), hub.clone(), Arc::clone(&bot));
+        let wheel = WheelService::new(db.clone(), hub.clone());
         if let Err(e) = wheel.load().await {
             tracing::error!(error = %e, "no se pudo cargar la ruleta");
         }
-        let polls = PollService::new(hub.clone(), Arc::clone(&bot), Arc::clone(&clock));
+        let polls = PollService::new(hub.clone(), Arc::clone(&clock));
         let prefs = Arc::new(PrefsService::new(db.clone()));
         if let Err(e) = prefs.load().await {
             tracing::error!(error = %e, "no se pudieron cargar las preferencias");
         }
         audio.set_output(prefs.get().audio_output);
-        // Spotify: PKCE sin servidor propio; peticiones por chat y «Sonando ahora».
+        // Spotify: PKCE sin servidor propio; peticiones desde el chat y «Sonando ahora».
         let spotify_auth = SpotifyAuth::new(Arc::clone(&secrets), Arc::clone(&clock))?;
         let spotify_api = HttpSpotify::new(Arc::clone(&spotify_auth))?;
         let spotify = SongService::new(
@@ -270,7 +270,6 @@ impl AppState {
             Arc::clone(&spotify_auth),
             Arc::new(spotify_api),
             Arc::clone(&points) as Arc<dyn crate::rules::engine::PointsGate>,
-            Arc::clone(&bot) as Arc<dyn crate::spotify::service::ChatOut>,
             hub.clone(),
             Arc::clone(&clock),
         );
@@ -285,11 +284,10 @@ impl AppState {
         // Ejecutores: aquí se enchufan; agregar uno nuevo no toca el núcleo.
         let mut registry = ExecutorRegistry::new();
         registry.register(Arc::new(PlaySoundExecutor::new(Arc::clone(&sounds), Arc::clone(&audio))));
-        registry.register(Arc::new(OverlayAlertExecutor::new(Arc::clone(&media), hub.clone())));
+        registry.register(Arc::new(OverlayAlertExecutor::new(Arc::clone(&media), hub.clone(), Arc::clone(&sounds), Arc::clone(&audio))));
         registry.register(Arc::new(TtsExecutor::new(Arc::clone(&tts))));
         registry.register(Arc::new(GoalAdjustExecutor::new(Arc::clone(&goals))));
         registry.register(Arc::new(TimerControlExecutor::new(Arc::clone(&timers))));
-        registry.register(Arc::new(BotMessageExecutor::new(Arc::clone(&bot))));
         registry.register(Arc::new(PointsAdjustExecutor::new(Arc::clone(&points))));
         registry.register(Arc::new(SpinWheelExecutor::new(Arc::clone(&wheel))));
         registry.register(Arc::new(StartPollExecutor::new(Arc::clone(&polls))));
@@ -332,6 +330,7 @@ impl AppState {
             Err(e) => tracing::error!(error = %e, "no se pudieron cargar las reglas"),
         }
 
+        rules.attach_groups(Arc::clone(&viewer_groups));
         rules.attach_points(Arc::clone(&points) as Arc<dyn crate::rules::engine::PointsGate>);
 
         // Metas y timers avisan al motor de reglas («meta alcanzada», «timer terminado»).
@@ -360,7 +359,6 @@ impl AppState {
         recent.spawn(&bus);
         stats.spawn(&bus, total_viewers, session.subscribe(), Duration::from_secs(20));
         points.spawn(&bus, session.subscribe(), PointsTiming::default());
-        bot.spawn(&bus, &rules);
         polls.spawn(&bus);
         spotify.spawn(&bus);
 
@@ -413,11 +411,11 @@ impl AppState {
             overlay_cfg,
             goals,
             jar,
+            viewer_groups,
             timers,
             leaderboard,
             counters,
             points,
-            bot,
             wheel,
             polls,
             obs,

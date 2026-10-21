@@ -110,7 +110,7 @@ function AudioOutputCard() {
         {outputs.length === 0 && !loading && <p className="text-xs text-amber-400">{t("system.audio.none")}</p>}
         {missing && <p className="text-xs text-amber-400">{t("system.audio.missing")}</p>}
         <div className="flex gap-2">
-          <Btn onClick={() => void run(() => api.testAudioOutput())}>{t("system.audio.test")}</Btn>
+          <Btn onClick={() => run(() => api.testAudioOutput())}>{t("system.audio.test")}</Btn>
           <Btn variant="ghost" onClick={refresh}>{t("system.audio.refresh")}</Btn>
         </div>
         <ErrorText error={error} />
@@ -301,7 +301,7 @@ function BackupCard() {
             <p className="text-sm text-amber-300">{t("system.backup.pending")}</p>
             {staged && <SummaryText s={staged} />}
             <div className="mt-2 flex gap-2">
-              <Btn variant="primary" disabled={busy} onClick={() => void run(async () => api.restartApp())}>
+              <Btn variant="primary" disabled={busy} onClick={() => run(async () => api.restartApp())}>
                 {t("system.backup.restart")}
               </Btn>
               <Btn
@@ -355,8 +355,8 @@ function LogsCard() {
         <div className="flex items-center gap-2">
           <Select value={level} onChange={setLevel} options={LEVELS.map((l) => ({ value: l, label: l }))} />
           <Checkbox checked={auto} onChange={setAuto} label={t("system.logs.auto")} />
-          <Btn onClick={() => void run(async () => { await api.exportLogs(); })}>{t("system.logs.export")}</Btn>
-          <Btn onClick={() => void run(async () => { await api.clearLogs(); refresh(); })}>{t("system.logs.clear")}</Btn>
+          <Btn onClick={() => run(async () => { await api.exportLogs(); })}>{t("system.logs.export")}</Btn>
+          <Btn onClick={() => run(async () => { await api.clearLogs(); refresh(); })}>{t("system.logs.clear")}</Btn>
         </div>
       }
     >

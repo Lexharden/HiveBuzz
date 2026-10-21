@@ -456,3 +456,13 @@ async fn without_an_oauth_handler_the_callback_is_404() {
     let host = r.handle.addr.to_string();
     assert_eq!(http_get(r.handle.addr, "/spotify/callback?code=a&state=b", &host).await.0, 404);
 }
+
+#[test]
+fn only_a_short_well_formed_shown_message_counts_as_an_ack() {
+    use super::shown_id;
+    assert_eq!(shown_id(r#"{"type":"shown","id":"abc"}"#).as_deref(), Some("abc"));
+    assert_eq!(shown_id(r#"{"type":"otro","id":"abc"}"#), None);
+    assert_eq!(shown_id(r#"{"type":"shown"}"#), None);
+    assert_eq!(shown_id("no es json"), None);
+    assert_eq!(shown_id(&format!(r#"{{"type":"shown","id":"{}"}}"#, "x".repeat(300))), None);
+}

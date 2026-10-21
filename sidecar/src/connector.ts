@@ -4,7 +4,7 @@
 // lo que permite probar toda la lógica de resiliencia con un cliente falso y un reloj virtual.
 
 import { Normalizer } from "./normalizer";
-import type { ConnectionState, LogLevel, SidecarMessage, TikTokSession } from "./protocol";
+import type { ConnectionState, LogLevel, SidecarMessage } from "./protocol";
 import type {
   RawChatMessage,
   RawEmoteMessage,
@@ -41,18 +41,12 @@ export interface LiveClient {
   isLive(): Promise<boolean>;
   connect(): Promise<void>;
   disconnect(): Promise<void>;
-  /** Solo existe si hay sesión de TikTok (sin ella el bot no puede escribir). */
-  sendChat?(text: string): Promise<void>;
 }
 
 export interface ConnectTarget {
   uniqueId: string;
   eulerApiKey?: string;
-  session?: TikTokSession;
 }
-
-/** Máximo de caracteres de un mensaje de chat de TikTok. */
-export const MAX_CHAT_CHARS = 150;
 
 export type ClientFactory = (target: ConnectTarget, cb: ClientCallbacks) => LiveClient;
 
@@ -65,8 +59,6 @@ export interface ConnectorConfig {
   liveCheckMs: number;
   /** Periodo del bucle de mantenimiento (vaciado de likes/rachas y chequeo de heartbeat). */
   tickMs: number;
-  /** Tiempo máximo esperando a que TikTok acepte un mensaje del bot. */
-  sendTimeoutMs: number;
 }
 
 const VIEWERS_MIN_INTERVAL_MS = 1_000;
@@ -77,7 +69,6 @@ export const DEFAULT_CONFIG: ConnectorConfig = {
   heartbeatMs: 45_000,
   liveCheckMs: 30_000,
   tickMs: 250,
-  sendTimeoutMs: 15_000,
 };
 
 export interface ConnectorDeps {
@@ -150,8 +141,6 @@ export class Connector {
   state: ConnectionState = "disconnected";
   private lastDetail: string | undefined;
   private lastViewers = { count: -1, at: 0 };
-  /** El cliente mientras está conectado (con él se puede escribir en el chat). */
-  private connectedClient: LiveClient | null = null;
   /** `connect`/`disconnect` se ejecutan de uno en uno: dos `connect` seguidos no crean dos supervisores. */
   private op: Promise<void> = Promise.resolve();
 
@@ -195,35 +184,6 @@ export class Connector {
     });
   }
 
-  /**
-   * Escribe en el chat del LIVE. Siempre responde con un `chatResult` (éxito o motivo del fallo),
-   * así quien lo pidió nunca se queda esperando.
-   */
-  async sendChat(requestId: string, text: string): Promise<void> {
-    const reply = (ok: boolean, error?: string) =>
-      this.deps.emit({ kind: "chatResult", requestId, ok, ...(error !== undefined ? { error } : {}) });
-    const client = this.connectedClient;
-    if (!client) return reply(false, "no hay conexión con el LIVE");
-    if (!client.sendChat) return reply(false, "esta conexión no tiene sesión de TikTok: inicia sesión (y pon la API key de Euler Stream) y se reconecta sola; si ya lo hiciste, la sesión caducó o TikTok la rechazó, así que vuelve a iniciarla");
-    // Una sola línea y dentro del límite de TikTok (sin partir un emoji por la mitad).
-    const clean = [...text.replace(/[\r\n]+/g, " ").trim()].slice(0, MAX_CHAT_CHARS).join("");
-    if (clean === "") return reply(false, "mensaje vacío");
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        client.sendChat(clean),
-        new Promise<never>((_, rej) => {
-          timer = setTimeout(() => rej(new Error("TikTok tardó demasiado en responder")), this.cfg.sendTimeoutMs);
-        }),
-      ]);
-      return reply(true);
-    } catch (err) {
-      return reply(false, errMsg(err));
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
   private async stop(): Promise<void> {
     this.abort?.abort();
     const running = this.running;
@@ -254,10 +214,8 @@ export class Connector {
           attempt = 0;
           session.lastActivity = this.now();
           this.setState("connected");
-          this.connectedClient = client;
 
           const reason = await this.monitor(session, signal);
-          this.connectedClient = null;
           await safeDisconnect(client);
           this.emitEvents(this.normalizer.flushAll(this.now()));
           if (reason === "aborted") break;
@@ -269,7 +227,6 @@ export class Connector {
           }
           this.setState("reconnecting", { detail: reason === "heartbeat" ? "sin actividad" : "conexión cerrada" });
         } catch (err) {
-          this.connectedClient = null;
           await safeDisconnect(client);
           this.emitEvents(this.normalizer.flushAll(this.now()));
           if (signal.aborted) break;
@@ -284,14 +241,6 @@ export class Connector {
             await this.sleep(this.cfg.liveCheckMs, signal);
             continue;
           }
-          // La sesión de TikTok (cookies) solo sirve para que el bot escriba; si caduca o TikTok no la acepta,
-          // rechaza también la conexión de lectura. Se reintenta ya mismo sin ella para no perder los eventos.
-          if (kind === "signature" && target.session) {
-            this.log("warn", "TikTok no aceptó la conexión con la sesión iniciada; se conecta sin ella (el bot no podrá escribir en el chat)");
-            const { session: _dropped, ...withoutSession } = target;
-            target = withoutSession;
-            continue;
-          }
           retryAfterMs = Number((err as { retryAfter?: unknown }).retryAfter) || 0;
           this.setState(kind === "signature" ? "signature_error" : "reconnecting", { detail: errMsg(err) });
         }
@@ -304,7 +253,6 @@ export class Connector {
       }
     } finally {
       this.current = null;
-      this.connectedClient = null;
       this.emitEvents(this.normalizer.flushAll(this.now()));
       if (this.state !== "disconnected") this.setState("disconnected");
     }

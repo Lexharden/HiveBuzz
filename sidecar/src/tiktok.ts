@@ -2,31 +2,18 @@
 // Es la única pieza que conoce la librería: cambiarla o cambiar el proveedor de firma
 // (hoy Euler Stream) solo toca este archivo.
 
-import { ControlAction, ControlEvent, PremiumFeatureError, TikTokLiveConnection, WebcastEvent } from "tiktok-live-connector";
+import { ControlAction, ControlEvent, TikTokLiveConnection, WebcastEvent } from "tiktok-live-connector";
 import type { ClientCallbacks, ClientFactory, ConnectTarget, LiveClient } from "./connector";
 
-/** Euler Stream puede exigir un plan de pago para enviar chat; se muestra su respuesta real, sin darla por segura. */
-export const chatRefusedMessage = (detail: string): string =>
-  `Euler Stream rechazó enviar el mensaje (escribir en el chat puede requerir un plan de pago; revisa tu plan): ${detail}`.slice(0, 400);
-
 export const createTikTokClient: ClientFactory = (target: ConnectTarget, cb: ClientCallbacks): LiveClient => {
-  const common = {
-    // Firma: tier gratuito de Euler Stream; la API key propia es opcional.
+  // Solo lectura: no hace falta sesión de TikTok. Firma: tier gratuito de Euler Stream; la API key propia es opcional.
+  const connection = new TikTokLiveConnection(target.uniqueId, {
     ...(target.eulerApiKey ? { signApiKey: target.eulerApiKey } : {}),
     processInitialData: true,
     // Ya comprobamos `isLive()` nosotros; si el LIVE cae justo al conectar, la librería lanza
     // UserOfflineError y el supervisor vuelve a esperar.
     fetchRoomInfoOnConnect: true,
-  };
-  // Sesión de TikTok (opcional): solo hace falta para que el bot escriba en el chat. Son dos
-  // construcciones explícitas porque las opciones de la librería son una unión discriminada.
-  const connection = target.session
-    ? new TikTokLiveConnection(target.uniqueId, {
-        ...common,
-        session: { cookie: { type: "cookie", value: { sessionId: target.session.sessionId, ttTargetIdc: target.session.ttTargetIdc } } },
-        authenticateWs: true,
-      })
-    : new TikTokLiveConnection(target.uniqueId, common);
+  });
 
   // Eventos que normalizamos.
   connection.on(WebcastEvent.GIFT, (msg) => cb.onMessage({ t: "gift", msg }));
@@ -82,19 +69,5 @@ export const createTikTokClient: ClientFactory = (target: ConnectTarget, cb: Cli
       await connection.connect();
     },
     disconnect: () => connection.disconnect(),
-    // Sin sesión no hay `sendChat`: el conector responde con un error claro en vez de intentarlo.
-    ...(target.session
-      ? {
-          sendChat: async (text: string) => {
-            try {
-              await connection.sendMessage(text);
-            } catch (err) {
-              // Euler Stream envía los mensajes desde su nube y lo cobra: sin plan de pago responde 401/403.
-              if (err instanceof PremiumFeatureError) throw new Error(chatRefusedMessage(err.message));
-              throw err;
-            }
-          },
-        }
-      : {}),
   };
 };

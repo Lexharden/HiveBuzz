@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, errorMessage, pickFile } from "../../lib/api";
 import type { AppInfo, Media, Sound } from "../../lib/types";
 import { Btn, Card, ErrorText } from "../ui";
+import { MyInstantsCard } from "./MyInstantsCard";
 
 const AUDIO_EXT = ["mp3", "wav", "ogg", "flac"];
 const MEDIA_EXT = ["png", "jpg", "jpeg", "gif", "webp", "mp4", "webm"];
@@ -73,6 +74,8 @@ export function LibraryPage({ info }: { info: AppInfo | null }) {
         </ul>
       </Card>
 
+      <MyInstantsCard savedNames={sounds.map((x) => x.name)} onDownloaded={reload} />
+
       <Card
         title={t("library.media")}
         hint={t("library.mediaHint")}
@@ -113,7 +116,7 @@ function SoundRow({ sound, onChanged, onError }: { sound: Sound; onChanged: () =
 
   return (
     <li className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
-      <Btn onClick={() => guard(() => api.previewSound(sound.id))} title={t("library.preview")}>▶</Btn>
+      <Btn onClick={() => api.previewSound(sound.id).catch((e: unknown) => onError(errorMessage(e)))} title={t("library.preview")}>▶</Btn>
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}

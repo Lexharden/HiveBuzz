@@ -193,10 +193,10 @@ export function TtsPage() {
           </Field>
         </div>
         <div className="mt-3 flex gap-2">
-          <Btn variant="primary" disabled={busy || !testText.trim()} onClick={() => void run(() => api.ttsPreview(testText, testVoice || undefined))}>
+          <Btn variant="primary" disabled={!testText.trim()} onClick={() => run(() => api.ttsPreview(testText, testVoice || undefined))}>
             ▶ {t("tts.speak")}
           </Btn>
-          <Btn onClick={() => void api.ttsSkip()}>⏭ {t("tts.skip")}</Btn>
+          <Btn onClick={() => api.ttsSkip()}>⏭ {t("tts.skip")}</Btn>
         </div>
       </Card>
 

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, errorMessage, onRuleFired } from "../../lib/api";
 import type { Goal, Media, QueueInfo, Rule, Sound, TimerView, VoiceInfo } from "../../lib/types";
 import { Btn, Card, ErrorText } from "../ui";
+import { useViewerGroups } from "../groups/useViewerGroups";
 import { PresetsPanel } from "./PresetsPanel";
 import { newRule, triggerSummary } from "./ruleDefaults";
 import { RuleEditor } from "./RuleEditor";
@@ -10,6 +11,8 @@ import { RuleEditor } from "./RuleEditor";
 export function RulesPage() {
   const { t } = useTranslation();
   const [rules, setRules] = useState<Rule[]>([]);
+  const { groups } = useViewerGroups();
+  const groupNames = (ids: string[] | undefined) => (ids ?? []).map((id) => groups.find((g) => g.id === id)?.name ?? t("groups.deleted")).join(", ");
   const [actionTypes, setActionTypes] = useState<string[]>([]);
   const [sounds, setSounds] = useState<Sound[]>([]);
   const [media, setMedia] = useState<Media[]>([]);
@@ -115,7 +118,7 @@ export function RulesPage() {
         hint={t("rules.queueStats", { pending: queue.pending, running: queue.running })}
         actions={
           <div className="flex gap-2">
-            <Btn onClick={() => void act(async () => { await api.clearQueue(); setQueue(await api.queueStats()); })}>{t("rules.clearQueue")}</Btn>
+            <Btn onClick={() => act(async () => { await api.clearQueue(); setQueue(await api.queueStats()); })}>{t("rules.clearQueue")}</Btn>
             <Btn onClick={() => setShowPresets((v) => !v)}>📋 {t("presets.open")}</Btn>
             <Btn variant="primary" onClick={() => setEditing({ rule: newRule(), isNew: true })}>+ {t("rules.new")}</Btn>
           </div>
@@ -139,6 +142,13 @@ export function RulesPage() {
               />
               <div className="min-w-0 flex-1">
                 <div className={`truncate text-sm font-semibold ${r.enabled ? "" : "text-zinc-500"}`}>{r.name}</div>
+                {(r.conditions.groupsAny?.length || r.conditions.groupsNone?.length || r.replacesGeneral) && (
+                  <div className="flex flex-wrap gap-1 pb-0.5 text-[10px]">
+                    {r.conditions.groupsAny?.length ? <span className="rounded bg-amber-400/15 px-1.5 text-amber-300">🔒 {groupNames(r.conditions.groupsAny)}</span> : null}
+                    {r.conditions.groupsNone?.length ? <span className="rounded bg-zinc-700/50 px-1.5 text-zinc-300">⛔ {groupNames(r.conditions.groupsNone)}</span> : null}
+                    {r.replacesGeneral && <span className="rounded bg-sky-500/15 px-1.5 text-sky-300">{t("editor.replacesBadge")}</span>}
+                  </div>
+                )}
                 <div className="truncate text-xs text-zinc-500">
                   {t(`trigger.${r.trigger.type}`)}
                   {triggerSummary(r.trigger) && ` · ${triggerSummary(r.trigger)}`} → {r.plan.steps.map((s) => t(`actionType.${s.action.type}`, { defaultValue: s.action.type })).join(" + ")}
@@ -146,7 +156,7 @@ export function RulesPage() {
               </div>
               <Btn
                 onClick={() =>
-                  void act(async () => {
+                  act(async () => {
                     const outcome = await api.testRule(r.id);
                     setNote(t(`rules.tested.${outcome}`, { name: r.name }));
                     setTimeout(() => setNote(null), 3000);
