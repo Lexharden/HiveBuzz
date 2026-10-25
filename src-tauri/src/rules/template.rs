@@ -57,6 +57,7 @@ pub fn event_vars(ev: &LiveEvent) -> Vars {
     v.insert("avatar".into(), ev.user.avatar.clone());
     v.insert("userid".into(), ev.user.id.clone());
     v.insert("event".into(), type_name(ev.kind).into());
+    v.insert("platform".into(), ev.platform.as_str().into());
     v.insert("ismoderator".into(), ev.user.is_moderator.to_string());
     v.insert("issubscriber".into(), ev.user.is_subscriber.to_string());
     v.insert("isfollower".into(), ev.user.is_follower.to_string());

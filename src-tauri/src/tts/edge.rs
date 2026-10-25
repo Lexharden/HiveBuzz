@@ -231,7 +231,7 @@ impl TtsEngine for EdgeEngine {
             return Err(AppError::Invalid(format!("voz de Edge desconocida: {}", req.voice)));
         }
         let attempt = async {
-            let mut last = other("Edge-TTS no tiene ningún servidor configurado");
+            let mut notes = Vec::new();
             let mut skew_known = 0;
             for &(host, key_param) in ENDPOINTS {
                 let mut result = within_host_limit(host, fetch_audio(req, host, key_param, skew_known)).await;
@@ -245,15 +245,14 @@ impl TtsEngine for EdgeEngine {
                 match result {
                     Ok(audio) => return Ok(audio),
                     // Un 403 o un fallo de conexión en este host: se prueba el siguiente.
-                    Err(e) => last = e,
+                    Err(e) => notes.push(format!("{}: {}", host.split('/').nth(2).unwrap_or(host), e.describe())),
                 }
             }
-            Err(last)
+            Err(AppError::Invalid(format!("Edge-TTS no respondió ({}); usa Piper o SAPI", notes.join("; "))))
         };
         let audio = tokio::time::timeout(TIMEOUT, attempt)
             .await
-            .map_err(|_| AppError::Invalid("Edge-TTS tardó demasiado en responder".into()))?
-            .map_err(AppError::from)?;
+            .map_err(|_| AppError::Invalid("Edge-TTS tardó demasiado en responder".into()))??;
         let out = req.out_dir.join(format!("{}.mp3", uuid::Uuid::new_v4()));
         tokio::fs::write(&out, audio).await?;
         Ok(out)
@@ -277,13 +276,11 @@ enum Fetch {
     Other(String),
 }
 
-impl From<Fetch> for AppError {
-    fn from(f: Fetch) -> Self {
-        match f {
-            Fetch::Forbidden { .. } => AppError::Invalid(
-                "Edge-TTS rechazó la conexión (403) en todos sus servidores: su protocolo pudo haber cambiado; usa Piper o SAPI".into(),
-            ),
-            Fetch::Other(m) => AppError::Invalid(m),
+impl Fetch {
+    fn describe(&self) -> &str {
+        match self {
+            Fetch::Forbidden { .. } => "rechazó la conexión (403)",
+            Fetch::Other(m) => m,
         }
     }
 }
@@ -301,17 +298,10 @@ pub fn connection_url(host: &str, key_param: &str, connection_id: &str, unix_sec
     )
 }
 
-async fn fetch_audio(
-    req: &SynthRequest,
-    host: &str,
-    key_param: &str,
-    skew_secs: i64,
-) -> std::result::Result<Vec<u8>, Fetch> {
-    let unix = u64::try_from(unix_now() + skew_secs).unwrap_or(0);
-    let connection_id = uuid::Uuid::new_v4().simple().to_string();
-    let url = connection_url(host, key_param, &connection_id, unix);
+/// Petición de apertura del WebSocket, con las cabeceras que Microsoft exige a un cliente de Edge.
+fn build_request(url: &str) -> std::result::Result<tokio_tungstenite::tungstenite::handshake::client::Request, Fetch> {
     let major = CHROMIUM_VERSION.split('.').next().unwrap_or("143");
-    let mut request = url.into_client_request().map_err(|e| other(format!("Edge-TTS: URL inválida: {e}")))?;
+    let mut request = url.into_client_request().map_err(|e| other(format!("URL inválida: {e}")))?;
     let muid = uuid::Uuid::new_v4().simple().to_string().to_uppercase();
     let h = request.headers_mut();
     let set = |h: &mut tokio_tungstenite::tungstenite::http::HeaderMap, k: &'static str, v: String| {
@@ -319,6 +309,11 @@ async fn fetch_audio(
             h.insert(k, v);
         }
     };
+    // Sin `Accept` y `Accept-Encoding` el servidor nuevo responde `200 OK` vacío en vez de aceptar el
+    // WebSocket (los clientes HTTP habituales las añaden solos; este no). Con el `User-Agent` y el
+    // `Accept-Language` ausentes responde 403 o 200 igualmente.
+    set(h, "Accept", "*/*".into());
+    set(h, "Accept-Encoding", "gzip, deflate, br, zstd".into());
     set(h, "Pragma", "no-cache".into());
     set(h, "Cache-Control", "no-cache".into());
     set(h, "Origin", "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold".into());
@@ -329,6 +324,19 @@ async fn fetch_audio(
         "User-Agent",
         format!("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36 Edg/{major}.0.0.0"),
     );
+    Ok(request)
+}
+
+async fn fetch_audio(
+    req: &SynthRequest,
+    host: &str,
+    key_param: &str,
+    skew_secs: i64,
+) -> std::result::Result<Vec<u8>, Fetch> {
+    let unix = u64::try_from(unix_now() + skew_secs).unwrap_or(0);
+    let connection_id = uuid::Uuid::new_v4().simple().to_string();
+    let url = connection_url(host, key_param, &connection_id, unix);
+    let request = build_request(&url)?;
 
     let (mut ws, _) = match tokio_tungstenite::connect_async(request).await {
         Ok(ok) => ok,
@@ -340,7 +348,10 @@ async fn fetch_audio(
                 .and_then(|d| clock_skew_from_date_header(d, unix_now()));
             return Err(Fetch::Forbidden { skew_secs: skew });
         }
-        Err(e) => return Err(other(format!("Edge-TTS: no se pudo conectar: {e}"))),
+        Err(tokio_tungstenite::tungstenite::Error::Http(resp)) => {
+            return Err(other(format!("respondió HTTP {} en vez de abrir la conexión", resp.status().as_u16())));
+        }
+        Err(e) => return Err(other(format!("no se pudo conectar: {e}"))),
     };
 
     let ts = timestamp();
@@ -355,12 +366,12 @@ async fn fetch_audio(
         build_ssml(&req.voice, &req.text, req.rate)
     );
     for msg in [config, ssml] {
-        ws.send(Message::text(msg)).await.map_err(|e| other(format!("Edge-TTS: no se pudo enviar: {e}")))?;
+        ws.send(Message::text(msg)).await.map_err(|e| other(format!("no se pudo enviar: {e}")))?;
     }
 
     let mut audio = Vec::new();
     while let Some(frame) = ws.next().await {
-        match frame.map_err(|e| other(format!("Edge-TTS: conexión interrumpida: {e}")))? {
+        match frame.map_err(|e| other(format!("conexión interrumpida: {e}")))? {
             Message::Binary(data) => {
                 if let Some(chunk) = audio_payload(&data) {
                     audio.extend_from_slice(chunk);
@@ -373,7 +384,7 @@ async fn fetch_audio(
     }
     let _ = ws.close(None).await;
     if audio.is_empty() {
-        return Err(other("Edge-TTS no devolvió audio"));
+        return Err(other("no devolvió audio"));
     }
     Ok(audio)
 }
@@ -412,6 +423,16 @@ mod tests {
         let old = connection_url(ENDPOINTS[1].0, ENDPOINTS[1].1, "abc", 1_700_000_000);
         assert!(old.contains("?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4&ConnectionId=abc&Sec-MS-GEC="));
         assert!(new.ends_with("&Sec-MS-GEC-Version=1-143.0.3650.75"));
+    }
+
+    #[test]
+    fn the_handshake_carries_the_headers_microsoft_requires() {
+        let req = build_request(&connection_url(ENDPOINTS[0].0, ENDPOINTS[0].1, "abc", 1_700_000_000)).unwrap_or_else(|_| panic!("petición"));
+        let h = req.headers();
+        for name in ["accept", "accept-encoding", "accept-language", "user-agent", "origin", "cookie", "sec-websocket-key"] {
+            assert!(h.contains_key(name), "falta la cabecera {name}");
+        }
+        assert!(h["user-agent"].to_str().unwrap_or_default().contains("Edg/143."));
     }
 
     #[test]

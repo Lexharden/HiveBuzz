@@ -11,7 +11,12 @@ use crate::audio::testing::FakeAudio;
 use crate::events::testing::sample_event;
 use crate::events::{Chat, EventType};
 use crate::executors::tts::TtsExecutor;
-use crate::tts::policy::VoiceMode;
+use crate::tts::policy::{ChatTts, VoiceMode};
+
+/// Configuración con solo la sección de TikTok personalizada (los eventos de prueba son de TikTok).
+fn on_tiktok(chat: ChatTts) -> TtsConfig {
+    TtsConfig { tiktok: chat, ..Default::default() }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 struct Call {
@@ -131,7 +136,7 @@ async fn speaks_with_the_first_available_voice_and_cleans_up_the_audio_file() {
 #[tokio::test]
 async fn rate_and_volume_combine_config_and_action() {
     let r = rig().await;
-    r.svc.set_config(TtsConfig { volume: 50, rate: 1.5, ..Default::default() }).await.expect("cfg");
+    r.svc.set_config(on_tiktok(ChatTts { volume: 50, rate: 1.5, ..Default::default() })).await.expect("cfg");
     r.svc.speak("hola", &Vars::new(), None, SpeakOptions { rate: None, volume: Some(50.0) }).await.expect("speak");
     r.svc.speak("hola", &Vars::new(), None, SpeakOptions { rate: Some(0.8), volume: None }).await.expect("speak");
     let calls = r.piper.calls.lock().expect("lock").clone();
@@ -163,12 +168,12 @@ async fn an_explicit_voice_picks_another_engine() {
 async fn role_based_voices_use_the_event_variables() {
     let r = rig().await;
     r.svc
-        .set_config(TtsConfig {
+        .set_config(on_tiktok(ChatTts {
             voice_mode: VoiceMode::ByRole,
             default_voice: Some("piper:a".into()),
             role_voices: crate::tts::policy::RoleVoices { moderator: Some("sapi:z".into()), ..Default::default() },
             ..Default::default()
-        })
+        }))
         .await
         .expect("cfg");
     let mod_vars: Vars = [("ismoderator".to_string(), "true".to_string())].into();
@@ -221,10 +226,14 @@ async fn config_is_saved_sanitized_applied_and_reloaded() {
     let r = rig().await;
     let saved = r
         .svc
-        .set_config(TtsConfig { rate: 10.0, command: Some("!TTS".into()), piper_path: Some("C:/mi/piper.exe".into()), ..Default::default() })
+        .set_config(TtsConfig {
+            tiktok: ChatTts { rate: 10.0, command: Some("!TTS".into()), ..Default::default() },
+            piper_path: Some("C:/mi/piper.exe".into()),
+            ..Default::default()
+        })
         .await
         .expect("cfg");
-    assert_eq!((saved.rate, saved.command.as_deref()), (2.0, Some("tts")));
+    assert_eq!((saved.tiktok.rate, saved.tiktok.command.as_deref()), (2.0, Some("tts")));
     assert_eq!(r.paths.read().expect("lock").exe, PathBuf::from("C:/mi/piper.exe"));
     assert_eq!(r.paths.read().expect("lock").voices_dir, PathBuf::from("/app/voices"), "sin ruta propia usa la de la app");
 
@@ -232,9 +241,9 @@ async fn config_is_saved_sanitized_applied_and_reloaded() {
     assert_eq!(r.paths.read().expect("lock").exe, PathBuf::from("/app/piper"));
 
     r.svc.set_config(saved.clone()).await.expect("cfg");
-    r.svc.set_config(TtsConfig { enabled: true, ..Default::default() }).await.expect("cfg");
+    r.svc.set_config(on_tiktok(ChatTts { enabled: true, ..Default::default() })).await.expect("cfg");
     r.svc.load_config().await.expect("load");
-    assert!(r.svc.config().enabled);
+    assert!(r.svc.config().tiktok.enabled);
 }
 
 #[tokio::test]
@@ -280,7 +289,7 @@ async fn stale_audio_from_a_previous_session_is_removed_on_startup() {
 #[tokio::test]
 async fn chat_is_read_through_the_queue_using_the_template() {
     let r = rig().await;
-    r.svc.set_config(TtsConfig { enabled: true, user_cooldown_ms: 0, ..Default::default() }).await.expect("cfg");
+    r.svc.set_config(on_tiktok(ChatTts { enabled: true, user_cooldown_ms: 0, ..Default::default() })).await.expect("cfg");
     r.bus.publish(chat("hola a todos"));
     settle().await;
     let calls = r.piper.calls.lock().expect("lock").clone();
@@ -295,7 +304,7 @@ async fn chat_is_ignored_when_disabled_and_other_events_never_speak() {
     let mut follow = sample_event("f1");
     follow.kind = EventType::Follow;
     follow.chat = None;
-    r.svc.set_config(TtsConfig { enabled: true, ..Default::default() }).await.expect("cfg");
+    r.svc.set_config(on_tiktok(ChatTts { enabled: true, ..Default::default() })).await.expect("cfg");
     r.bus.publish(follow);
     settle().await;
     assert!(r.piper.calls.lock().expect("lock").is_empty());
@@ -305,7 +314,7 @@ async fn chat_is_ignored_when_disabled_and_other_events_never_speak() {
 async fn command_mode_reads_only_what_follows_the_command() {
     let r = rig().await;
     r.svc
-        .set_config(TtsConfig { enabled: true, command: Some("tts".into()), user_cooldown_ms: 0, ..Default::default() })
+        .set_config(on_tiktok(ChatTts { enabled: true, command: Some("tts".into()), user_cooldown_ms: 0, ..Default::default() }))
         .await
         .expect("cfg");
     r.bus.publish(chat("charla normal"));
@@ -487,4 +496,59 @@ async fn a_failing_local_voice_does_not_fall_back_to_the_network() {
     piper.fail = true;
     let r = rig_with(piper, false).await;
     assert!(r.svc.speak("hola", &Vars::new(), None, SpeakOptions::default()).await.is_err());
+}
+
+#[tokio::test]
+async fn each_platform_reads_with_its_own_voice_rate_and_volume() {
+    let r = rig().await;
+    r.svc
+        .set_config(TtsConfig {
+            tiktok: ChatTts { default_voice: Some("piper:a".into()), rate: 1.2, volume: 100, ..Default::default() },
+            twitch: ChatTts { default_voice: Some("sapi:z".into()), rate: 0.8, volume: 40, ..Default::default() },
+            ..Default::default()
+        })
+        .await
+        .expect("cfg");
+    let tiktok: Vars = [("platform".to_string(), "tiktok".to_string())].into();
+    let twitch: Vars = [("platform".to_string(), "twitch".to_string())].into();
+    r.svc.speak("hola", &tiktok, None, SpeakOptions::default()).await.expect("speak");
+    r.svc.speak("hola", &twitch, None, SpeakOptions::default()).await.expect("speak");
+    assert_eq!(r.piper.calls.lock().expect("lock").len(), 1);
+    let sapi = r.sapi.calls.lock().expect("lock").clone();
+    assert_eq!((sapi.len(), sapi[0].rate), (1, 0.8));
+    let played = r.audio.played.lock().expect("lock").clone();
+    assert!((played[0].1 - 1.0).abs() < 1e-6 && (played[1].1 - 0.4).abs() < 1e-6, "{played:?}");
+}
+
+#[tokio::test]
+async fn twitch_chat_follows_the_twitch_section_only() {
+    let r = rig().await;
+    r.svc
+        .set_config(TtsConfig {
+            tiktok: ChatTts { enabled: false, ..Default::default() },
+            twitch: ChatTts { enabled: true, user_cooldown_ms: 0, template: "En Twitch {nickname}: {text}".into(), ..Default::default() },
+            ..Default::default()
+        })
+        .await
+        .expect("cfg");
+    r.bus.publish(chat("hola desde tiktok"));
+    let mut tw = chat("hola desde twitch");
+    tw.id = "t1".into();
+    tw.platform = crate::events::Platform::Twitch;
+    r.bus.publish(tw);
+    settle().await;
+    let calls = r.piper.calls.lock().expect("lock").clone();
+    assert_eq!(calls.len(), 1, "{calls:?}");
+    assert_eq!(calls[0].text, "En Twitch Ana: hola desde twitch");
+}
+
+#[tokio::test]
+async fn a_config_saved_before_the_split_applies_to_both_platforms() {
+    let r = rig().await;
+    r.db.set_setting(KEY_TTS_CONFIG, r#"{"enabled":true,"rate":1.4,"voiceMode":"byRole","piperPath":null}"#).await.expect("set");
+    r.svc.load_config().await.expect("load");
+    let c = r.svc.config();
+    assert!(c.tiktok.enabled && c.twitch.enabled);
+    assert_eq!((c.tiktok.rate, c.twitch.rate), (1.4, 1.4));
+    assert_eq!(c.twitch.voice_mode, VoiceMode::ByRole);
 }

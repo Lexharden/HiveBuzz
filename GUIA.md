@@ -117,7 +117,9 @@ Los usuarios se reconocen por su @ (sin importar mayúsculas ni el `@`), y puede
   (o el mensaje, o lo salta). Ajusta la sensibilidad mirando el medidor y usa audífonos.
 - **Plantillas de reglas**: en *Reglas → 📋 Plantillas* añade con un clic agradecimientos, bienvenida, !discord, !redes…
   - *Lectura del chat*: lee comentarios con filtros (solo `!tts`, roles, donadores recientes, usuarios ignorados).
-  - Filtros de groserías, enlaces, emojis, letras repetidas y límite de caracteres. Voz única, por rol o aleatoria por usuario.
+  - Filtros de groserías, enlaces, emojis, letras repetidas y límite de caracteres. Voz única, por rol, aleatoria por usuario o aleatoria en cada mensaje.
+  - **TikTok y Twitch van por separado**: elige la plataforma arriba y cada una tiene su lectura, voces, velocidad, volumen
+    y filtros (con *Copiar a…* pasas una configuración a la otra). Las reglas usan la de la plataforma de quien las dispara.
   - Botón **Saltar** para cortar lo que está sonando.
 
 ---

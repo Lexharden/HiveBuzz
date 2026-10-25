@@ -171,7 +171,7 @@ export interface Media {
 
 // ---- TTS (espejo de src-tauri/src/tts/policy.rs) ----
 
-export type VoiceMode = "single" | "byRole" | "randomPerUser";
+export type VoiceMode = "single" | "byRole" | "randomPerUser" | "randomPerMessage";
 
 export interface FilterConfig {
   profanityEnabled: boolean;
@@ -183,7 +183,8 @@ export interface FilterConfig {
   maxChars: number;
 }
 
-export interface TtsConfig {
+/** Lectura del chat y voces de una plataforma (cada una tiene la suya). */
+export interface ChatTts {
   enabled: boolean;
   command: string | null;
   rolesAny: Role[];
@@ -202,6 +203,11 @@ export interface TtsConfig {
   randomVoices: string[];
   rate: number;
   volume: number;
+}
+
+export interface TtsConfig {
+  tiktok: ChatTts;
+  twitch: ChatTts;
   piperPath: string | null;
   piperVoicesDir: string | null;
   micGuard: MicGuard;

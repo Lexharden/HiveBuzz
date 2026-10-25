@@ -379,7 +379,8 @@
     "mode": {
       "single": "A single voice",
       "byRole": "By role",
-      "randomPerUser": "Random per user"
+      "randomPerUser": "Random per user",
+      "randomPerMessage": "Random on every message"
     },
     "defaultVoice": "Default voice",
     "rate": "Speed",
@@ -387,7 +388,7 @@
     "randomPool": "Voices to distribute",
     "randomPoolHint": "Each user always gets the same voice from this list.",
     "filtersTitle": "Text filters",
-    "filtersHint": "Applied to everything that is read, whether from chat or from a rule.",
+    "filtersHint": "Applied to everything read on this platform, whether it comes from the chat or from a rule.",
     "skipLinks": "Remove links",
     "stripEmojis": "Remove emojis",
     "profanity": "Profanity filter",
@@ -441,7 +442,16 @@
       "starting": "Opening the microphone…",
       "mutedHint": "The microphone is almost silent. Say something: if the bar doesn't move, check it isn't muted (button on the mic or headset) and its volume in Windows → Settings → Sound → Input. If your headset has a mic, pick it above.",
       "unsaved": "You're testing without saving: press Save so the voice uses it."
-    }
+    },
+    "platformTitle": "Platform",
+    "platformHint": "TikTok and Twitch each have their own chat reading, voices, speed, volume and filters. Pick which one you are editing; the voice test uses it too. Rules use the settings of the platform of the viewer that triggers them.",
+    "platform": {
+      "tiktok": "TikTok",
+      "twitch": "Twitch"
+    },
+    "copyTo": "Copy to {{to}}",
+    "copyConfirm": "{{to}}'s settings (reading, voices and filters) will be replaced with {{from}}'s. Continue?",
+    "randomPoolMessageHint": "Every message is read with a voice picked at random from this list."
   },
   "overlay": {
     "alerts": "Alerts",
@@ -1211,7 +1221,7 @@
       "tts": {
         "what": "Have HiveBuzz read messages out loud (text to speech).",
         "i1": "Free voices without internet (Piper) and the system ones.",
-        "i2": "It can read chat with filters: commands only, subscribers, moderators…",
+        "i2": "Reads the TikTok chat and the Twitch chat separately, each with its own voice (or random voices), speed and filters: commands only, subscribers, moderators…",
         "i3": "Filters for profanity, links and emojis.",
         "i4": "A «Skip» button to cut what's playing."
       },

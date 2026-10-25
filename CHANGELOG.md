@@ -4,6 +4,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.4.1] - 2026-10-25
+
+### Mejorado
+- **Voz (TTS) separada por plataforma**: TikTok y Twitch tienen cada una su propia lectura del chat, voz predeterminada, voces por rol o aleatorias, velocidad, volumen y filtros. En *Voz* eliges la plataforma que editas (con *Copiar a…* pasas una configuración a la otra) y la prueba de voz suena con la elegida. Las reglas con «Texto a voz» usan la configuración de la plataforma del espectador que las dispara. Tu configuración actual se copia a las dos, así que nada cambia hasta que las separes.
+- **Nuevo modo de voz «Aleatoria en cada mensaje»**: elige una voz distinta de tu lista en cada lectura (además de «Aleatoria por usuario», que mantiene la misma voz por persona).
+- **Las voces de Edge-TTS vuelven a funcionar**: Microsoft empezó a rechazar la conexión (error 403 / «200 OK» vacío) porque el servidor nuevo exige las cabeceras `Accept` y `Accept-Encoding`, que faltaban. Comprobado contra el servicio real. Si algún servidor falla, el error ahora dice qué respondió cada uno.
+- **Respaldo de Edge-TTS más fiel a los roles**: si Edge-TTS falla y se lee con una voz local, ya no todas las voces caen en la misma: cada voz de Edge se sustituye siempre por la misma voz local, así los roles o las voces aleatorias siguen sonando distintos.
+
 ## [0.4.0] - 2026-10-21
 
 ### Novedades

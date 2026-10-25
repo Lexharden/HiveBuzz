@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 use super::filters::{clean, Cleaned, FilterConfig};
-use crate::events::{EventType, LiveEvent};
+use crate::events::{EventType, LiveEvent, Platform};
 use crate::rules::model::Role;
 use crate::rules::template::{event_vars, Vars};
 
@@ -20,6 +20,8 @@ pub enum VoiceMode {
     ByRole,
     /// Una voz de la lista, fija para cada usuario (siempre la misma para la misma persona).
     RandomPerUser,
+    /// Una voz de la lista distinta en cada mensaje.
+    RandomPerMessage,
 }
 
 /// Qué hacer con la lectura en curso cuando el streamer habla.
@@ -87,9 +89,11 @@ pub struct RoleVoices {
     pub follower: Option<String>,
 }
 
+/// Lectura del chat y voces de UNA plataforma. TikTok y Twitch tienen cada una la suya, así el chat de
+/// cada una puede leerse con otro filtro, otra plantilla, otra voz o velocidad.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TtsConfig {
+pub struct ChatTts {
     /// Lee el chat automáticamente (las acciones `tts` de las reglas funcionan igualmente).
     #[serde(default)]
     pub enabled: bool,
@@ -137,14 +141,52 @@ pub struct TtsConfig {
     /// Volumen, 0–100.
     #[serde(default = "default_volume")]
     pub volume: u8,
+}
+
+/// Configuración del TTS: una sección por plataforma y lo que es común a las dos (Piper y micrófono).
+///
+/// Las configuraciones guardadas antes de separar las plataformas tenían todo en el nivel superior: al
+/// leerlas se copian a TikTok y a Twitch, de modo que nada cambia hasta que el usuario las separa.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", from = "RawTtsConfig")]
+pub struct TtsConfig {
+    pub tiktok: ChatTts,
+    pub twitch: ChatTts,
     /// Ruta de `piper(.exe)`; vacío = el que instala la app.
-    #[serde(default)]
     pub piper_path: Option<String>,
     /// Carpeta de voces `.onnx` de Piper; vacío = la de la app.
-    #[serde(default)]
     pub piper_voices_dir: Option<String>,
-    #[serde(default)]
     pub mic_guard: MicGuard,
+}
+
+/// Forma en disco: la actual (`tiktok`/`twitch`) o la anterior (todo plano, que va en `legacy`).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawTtsConfig {
+    #[serde(default)]
+    tiktok: Option<ChatTts>,
+    #[serde(default)]
+    twitch: Option<ChatTts>,
+    #[serde(default)]
+    piper_path: Option<String>,
+    #[serde(default)]
+    piper_voices_dir: Option<String>,
+    #[serde(default)]
+    mic_guard: MicGuard,
+    #[serde(flatten)]
+    legacy: ChatTts,
+}
+
+impl From<RawTtsConfig> for TtsConfig {
+    fn from(raw: RawTtsConfig) -> Self {
+        Self {
+            tiktok: raw.tiktok.unwrap_or_else(|| raw.legacy.clone()),
+            twitch: raw.twitch.unwrap_or(raw.legacy),
+            piper_path: raw.piper_path,
+            piper_voices_dir: raw.piper_voices_dir,
+            mic_guard: raw.mic_guard,
+        }
+    }
 }
 
 fn yes() -> bool {
@@ -166,14 +208,27 @@ fn default_volume() -> u8 {
     100
 }
 
-impl Default for TtsConfig {
+impl Default for ChatTts {
     fn default() -> Self {
         // Pasar por serde garantiza una única fuente de verdad para los valores por defecto.
         serde_json::from_str("{}").unwrap_or_else(|_| unreachable!("todos los campos tienen valor por defecto"))
     }
 }
 
-impl TtsConfig {
+impl Default for TtsConfig {
+    fn default() -> Self {
+        Self::from(RawTtsConfig {
+            tiktok: None,
+            twitch: None,
+            piper_path: None,
+            piper_voices_dir: None,
+            mic_guard: MicGuard::default(),
+            legacy: ChatTts::default(),
+        })
+    }
+}
+
+impl ChatTts {
     /// Corrige valores fuera de rango (por ediciones manuales o importaciones).
     pub fn sanitized(mut self) -> Self {
         self.rate = if self.rate.is_finite() { self.rate.clamp(0.5, 2.0) } else { 1.0 };
@@ -192,8 +247,24 @@ impl TtsConfig {
             self.template = default_template();
         }
         self.max_wait_ms = self.max_wait_ms.clamp(1_000, 600_000);
+        self
+    }
+}
+
+impl TtsConfig {
+    pub fn sanitized(mut self) -> Self {
+        self.tiktok = self.tiktok.sanitized();
+        self.twitch = self.twitch.sanitized();
         self.mic_guard = self.mic_guard.sanitized();
         self
+    }
+
+    /// La sección de la plataforma de un evento.
+    pub fn for_platform(&self, platform: Platform) -> &ChatTts {
+        match platform {
+            Platform::Tiktok => &self.tiktok,
+            Platform::Twitch => &self.twitch,
+        }
     }
 }
 
@@ -242,7 +313,7 @@ impl ChatMemory {
     }
 }
 
-pub fn decide_chat(cfg: &TtsConfig, ev: &LiveEvent, mem: &mut ChatMemory, now_ms: i64) -> ChatDecision {
+pub fn decide_chat(cfg: &ChatTts, ev: &LiveEvent, mem: &mut ChatMemory, now_ms: i64) -> ChatDecision {
     if !cfg.enabled || ev.kind != EventType::Chat {
         return ChatDecision::Skip("desactivado");
     }
@@ -319,7 +390,7 @@ pub fn decide_chat(cfg: &TtsConfig, ev: &LiveEvent, mem: &mut ChatMemory, now_ms
 
 /// FNV-1a: estable entre ejecuciones (a diferencia de `DefaultHasher`), así cada usuario
 /// conserva su voz aunque se reinicie la app.
-fn stable_hash(s: &str) -> u64 {
+pub(super) fn stable_hash(s: &str) -> u64 {
     let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     for b in s.bytes() {
         h ^= u64::from(b);
@@ -328,13 +399,20 @@ fn stable_hash(s: &str) -> u64 {
     h
 }
 
+/// Índice al azar en `0..n` (`n > 0`).
+fn random_index(n: usize) -> usize {
+    let bytes = uuid::Uuid::new_v4().into_bytes();
+    let r = u64::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7]]);
+    (r % n as u64) as usize
+}
+
 fn flag(vars: &Vars, key: &str) -> bool {
     vars.get(key).is_some_and(|v| v == "true")
 }
 
 /// Decide la voz: la pedida explícitamente > la del modo (rol / aleatoria por usuario) >
 /// la predeterminada > la primera disponible. Solo devuelve voces que existan.
-pub fn resolve_voice(cfg: &TtsConfig, vars: &Vars, available: &[VoiceInfo], explicit: Option<&str>) -> Option<String> {
+pub fn resolve_voice(cfg: &ChatTts, vars: &Vars, available: &[VoiceInfo], explicit: Option<&str>) -> Option<String> {
     let exists = |id: &str| available.iter().any(|v| v.id == id);
     let pick = |id: Option<&String>| id.filter(|i| exists(i)).cloned();
 
@@ -351,6 +429,10 @@ pub fn resolve_voice(cfg: &TtsConfig, vars: &Vars, available: &[VoiceInfo], expl
             }
             .or_else(|| if flag(vars, "issubscriber") { pick(cfg.role_voices.subscriber.as_ref()) } else { None })
             .or_else(|| if flag(vars, "isfollower") { pick(cfg.role_voices.follower.as_ref()) } else { None })
+        }
+        VoiceMode::RandomPerMessage => {
+            let pool: Vec<&String> = cfg.random_voices.iter().filter(|v| exists(v)).collect();
+            (!pool.is_empty()).then(|| pool[random_index(pool.len())].clone())
         }
         VoiceMode::RandomPerUser => {
             let pool: Vec<&String> = cfg.random_voices.iter().filter(|v| exists(v)).collect();
@@ -378,11 +460,11 @@ mod tests {
         e
     }
 
-    fn cfg() -> TtsConfig {
-        TtsConfig { enabled: true, user_cooldown_ms: 0, ..Default::default() }
+    fn cfg() -> ChatTts {
+        ChatTts { enabled: true, user_cooldown_ms: 0, ..Default::default() }
     }
 
-    fn decide(c: &TtsConfig, ev: &LiveEvent) -> ChatDecision {
+    fn decide(c: &ChatTts, ev: &LiveEvent) -> ChatDecision {
         decide_chat(c, ev, &mut ChatMemory::default(), 1_000_000)
     }
 
@@ -395,7 +477,7 @@ mod tests {
 
     #[test]
     fn disabled_reads_nothing() {
-        let c = TtsConfig { enabled: false, ..cfg() };
+        let c = ChatTts { enabled: false, ..cfg() };
         assert_eq!(skip_reason(decide(&c, &chat("hola"))), "desactivado");
     }
 
@@ -414,13 +496,13 @@ mod tests {
     #[test]
     fn bang_messages_from_other_bots_are_ignored() {
         assert_eq!(skip_reason(decide(&cfg(), &chat("!puntos"))), "comando de otro bot");
-        let c = TtsConfig { ignore_bang_commands: false, ..cfg() };
+        let c = ChatTts { ignore_bang_commands: false, ..cfg() };
         assert!(matches!(decide(&c, &chat("!puntos")), ChatDecision::Speak { .. }));
     }
 
     #[test]
     fn command_mode_reads_only_the_arguments() {
-        let c = TtsConfig { command: Some("tts".into()), ..cfg() }.sanitized();
+        let c = ChatTts { command: Some("tts".into()), ..cfg() }.sanitized();
         match decide(&c, &chat("!TTS  buenas noches ")) {
             ChatDecision::Speak { text, .. } => assert_eq!(text, "buenas noches"),
             other => panic!("{other:?}"),
@@ -432,13 +514,13 @@ mod tests {
 
     #[test]
     fn role_and_level_filters() {
-        let c = TtsConfig { roles_any: vec![Role::Moderator, Role::Subscriber], ..cfg() };
+        let c = ChatTts { roles_any: vec![Role::Moderator, Role::Subscriber], ..cfg() };
         let mut ev = chat("hola");
         assert_eq!(skip_reason(decide(&c, &ev)), "no cumple el rol o nivel");
         ev.user.is_subscriber = true;
         assert!(matches!(decide(&c, &ev), ChatDecision::Speak { .. }));
 
-        let lvl = TtsConfig { min_gifter_level: Some(10), min_team_level: Some(2), ..cfg() };
+        let lvl = ChatTts { min_gifter_level: Some(10), min_team_level: Some(2), ..cfg() };
         let mut ev = chat("hola");
         ev.user.gifter_level = Some(10);
         assert!(matches!(decide(&lvl, &ev), ChatDecision::Skip(_)), "falta nivel de equipo");
@@ -448,7 +530,7 @@ mod tests {
 
     #[test]
     fn recent_donors_filter_uses_the_gift_window() {
-        let c = TtsConfig { recent_donors_minutes: Some(10), ..cfg() };
+        let c = ChatTts { recent_donors_minutes: Some(10), ..cfg() };
         let mut mem = ChatMemory::default();
         let ev = chat("gracias por el directo");
         let now = 10_000_000;
@@ -465,7 +547,7 @@ mod tests {
 
     #[test]
     fn user_cooldown_only_counts_messages_that_were_read() {
-        let c = TtsConfig { user_cooldown_ms: 5_000, ..cfg() };
+        let c = ChatTts { user_cooldown_ms: 5_000, ..cfg() };
         let mut mem = ChatMemory::default();
         assert!(matches!(decide_chat(&c, &chat("uno"), &mut mem, 0), ChatDecision::Speak { .. }));
         assert_eq!(skip_reason(decide_chat(&c, &chat("dos"), &mut mem, 4_999)), "cooldown del usuario");
@@ -478,7 +560,7 @@ mod tests {
 
     #[test]
     fn ignored_users_are_never_read() {
-        let c = TtsConfig { ignore_users: vec!["@ANA".into()], ..cfg() }.sanitized();
+        let c = ChatTts { ignore_users: vec!["@ANA".into()], ..cfg() }.sanitized();
         assert_eq!(skip_reason(decide(&c, &chat("hola"))), "usuario ignorado");
     }
 
@@ -511,7 +593,7 @@ mod tests {
 
     #[test]
     fn sanitized_fixes_out_of_range_values() {
-        let c = TtsConfig {
+        let c = ChatTts {
             rate: 9.0,
             volume: 250,
             command: Some(" !TTS ".into()),
@@ -524,18 +606,41 @@ mod tests {
         assert_eq!(c.command.as_deref(), Some("tts"));
         assert_eq!(c.template, "{nickname} dice: {text}");
         assert_eq!(c.max_wait_ms, 1_000);
-        assert_eq!(TtsConfig { rate: f64::NAN, ..Default::default() }.sanitized().rate, 1.0);
-        assert_eq!(TtsConfig { command: Some("!".into()), ..Default::default() }.sanitized().command, None);
+        assert_eq!(ChatTts { rate: f64::NAN, ..Default::default() }.sanitized().rate, 1.0);
+        assert_eq!(ChatTts { command: Some("!".into()), ..Default::default() }.sanitized().command, None);
     }
 
     #[test]
     fn config_defaults_and_partial_json() {
-        let d = TtsConfig::default();
+        let d = ChatTts::default();
         assert!(!d.enabled && d.rate == 1.0 && d.volume == 100 && d.ignore_bang_commands);
-        let c: TtsConfig = serde_json::from_str(r#"{"enabled": true, "voiceMode": "byRole"}"#).expect("parsea");
+        let c: ChatTts = serde_json::from_str(r#"{"enabled": true, "voiceMode": "byRole"}"#).expect("parsea");
         assert!(c.enabled);
         assert_eq!(c.voice_mode, VoiceMode::ByRole);
         assert_eq!(c.template, "{nickname} dice: {text}");
+    }
+
+    #[test]
+    fn a_flat_config_from_before_the_split_is_copied_to_both_platforms() {
+        let old = r#"{"enabled": true, "command": "tts", "rate": 1.3, "defaultVoice": "piper:a", "micGuard": {"enabled": true}}"#;
+        let c: TtsConfig = serde_json::from_str(old).expect("parsea");
+        assert_eq!(c.tiktok, c.twitch);
+        assert!(c.tiktok.enabled && c.tiktok.command.as_deref() == Some("tts") && c.tiktok.rate == 1.3);
+        assert_eq!(c.tiktok.default_voice.as_deref(), Some("piper:a"));
+        assert!(c.mic_guard.enabled, "lo común sigue en el nivel superior");
+    }
+
+    #[test]
+    fn a_split_config_keeps_each_platform_apart() {
+        let new = r#"{"tiktok": {"enabled": true, "rate": 1.5}, "twitch": {"defaultVoice": "sapi:c"}}"#;
+        let c: TtsConfig = serde_json::from_str(new).expect("parsea");
+        assert!(c.tiktok.enabled && !c.twitch.enabled);
+        assert_eq!((c.tiktok.rate, c.twitch.rate), (1.5, 1.0));
+        assert_eq!(c.for_platform(Platform::Twitch).default_voice.as_deref(), Some("sapi:c"));
+        assert_eq!(c.for_platform(Platform::Tiktok).default_voice, None);
+        // Lo que se guarda no arrastra campos planos antiguos.
+        let json = serde_json::to_value(&c).expect("json");
+        assert!(json.get("enabled").is_none() && json["tiktok"]["enabled"] == true);
     }
 
     // ---- Voces ----
@@ -556,23 +661,23 @@ mod tests {
 
     #[test]
     fn explicit_voice_wins_when_it_exists() {
-        let c = TtsConfig { default_voice: Some("piper:a".into()), ..Default::default() };
+        let c = ChatTts { default_voice: Some("piper:a".into()), ..Default::default() };
         assert_eq!(resolve_voice(&c, &vars(&[]), &voices(), Some("sapi:c")).as_deref(), Some("sapi:c"));
         assert_eq!(resolve_voice(&c, &vars(&[]), &voices(), Some("fantasma:x")).as_deref(), Some("piper:a"));
     }
 
     #[test]
     fn falls_back_to_default_then_to_the_first_available() {
-        let c = TtsConfig { default_voice: Some("edge:d".into()), ..Default::default() };
+        let c = ChatTts { default_voice: Some("edge:d".into()), ..Default::default() };
         assert_eq!(resolve_voice(&c, &vars(&[]), &voices(), None).as_deref(), Some("edge:d"));
-        let missing = TtsConfig { default_voice: Some("piper:no-existe".into()), ..Default::default() };
+        let missing = ChatTts { default_voice: Some("piper:no-existe".into()), ..Default::default() };
         assert_eq!(resolve_voice(&missing, &vars(&[]), &voices(), None).as_deref(), Some("piper:a"));
         assert_eq!(resolve_voice(&missing, &vars(&[]), &[], None), None);
     }
 
     #[test]
     fn by_role_prefers_moderator_over_subscriber_over_follower() {
-        let c = TtsConfig {
+        let c = ChatTts {
             voice_mode: VoiceMode::ByRole,
             default_voice: Some("piper:a".into()),
             role_voices: RoleVoices {
@@ -591,7 +696,7 @@ mod tests {
 
     #[test]
     fn random_per_user_is_stable_and_spreads_users() {
-        let c = TtsConfig {
+        let c = ChatTts {
             voice_mode: VoiceMode::RandomPerUser,
             random_voices: vec!["piper:a".into(), "piper:b".into(), "sapi:c".into(), "ghost:x".into()],
             ..Default::default()
@@ -601,6 +706,21 @@ mod tests {
         let distinct: std::collections::HashSet<_> = (0..200).map(|i| voice_of(&format!("u{i}"))).collect();
         assert_eq!(distinct.len(), 3, "usa todas las voces válidas y descarta las inexistentes: {distinct:?}");
         assert!(!distinct.contains("ghost:x"));
+    }
+
+    #[test]
+    fn random_per_message_uses_only_valid_voices_and_varies() {
+        let c = ChatTts {
+            voice_mode: VoiceMode::RandomPerMessage,
+            random_voices: vec!["piper:a".into(), "piper:b".into(), "ghost:x".into()],
+            default_voice: Some("edge:d".into()),
+            ..Default::default()
+        };
+        let seen: std::collections::HashSet<_> =
+            (0..200).map(|_| resolve_voice(&c, &vars(&[("userid", "u1")]), &voices(), None).expect("voz")).collect();
+        assert_eq!(seen, ["piper:a", "piper:b"].iter().map(|s| (*s).to_string()).collect(), "distintas aunque sea el mismo usuario");
+        let empty = ChatTts { random_voices: vec![], ..c };
+        assert_eq!(resolve_voice(&empty, &vars(&[]), &voices(), None).as_deref(), Some("edge:d"), "sin lista usa la predeterminada");
     }
 
     #[test]

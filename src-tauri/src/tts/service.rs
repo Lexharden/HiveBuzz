@@ -11,13 +11,14 @@ use tokio::sync::broadcast::error::RecvError;
 use super::engine::{split_voice_id, SynthRequest, TtsEngine};
 use super::filters::{clean, Cleaned};
 use super::piper::PiperPaths;
-use super::policy::{decide_chat, resolve_voice, ChatDecision, ChatMemory, MicGuard, MicGuardMode, TtsConfig, VoiceInfo};
+use super::policy::{decide_chat, resolve_voice, stable_hash, ChatDecision, ChatMemory, MicGuard, MicGuardMode, TtsConfig, VoiceInfo};
 use crate::actions::clock::Clock;
 use crate::actions::queue::{ActionQueue, NewJob, Outcome};
 use crate::audio::{AudioBackend, TAG_TTS};
 use crate::bus::EventBus;
 use crate::db::Db;
 use crate::error::{AppError, Result};
+use crate::events::Platform;
 use crate::mic::{MicSettings, SpeechDetector};
 use crate::rules::model::{ActionSpec, PlanMode, Step};
 use crate::rules::template::Vars;
@@ -187,7 +188,9 @@ impl TtsService {
     /// Limpia, sintetiza y reproduce `text`. Un texto filtrado no es un error: simplemente no se lee.
     pub async fn speak(&self, text: &str, vars: &Vars, voice: Option<&str>, opts: SpeakOptions) -> Result<()> {
         let cfg = self.config();
-        let spoken = match clean(text, &cfg.filters) {
+        // La plataforma de quien dispara la lectura decide filtros, voz, velocidad y volumen.
+        let chat = cfg.for_platform(platform_of(vars));
+        let spoken = match clean(text, &chat.filters) {
             Cleaned::Say(s) => s,
             Cleaned::Skip(reason) => {
                 tracing::debug!(reason, "TTS: texto descartado");
@@ -196,7 +199,7 @@ impl TtsService {
         };
 
         let voices = self.voices().await;
-        let voice_id = resolve_voice(&cfg, vars, &voices, voice).ok_or_else(|| {
+        let voice_id = resolve_voice(chat, vars, &voices, voice).ok_or_else(|| {
             AppError::Invalid("no hay voces de TTS disponibles: instala Piper o usa las de Windows (SAPI)".into())
         })?;
         let (engine_id, voice_name) = split_voice_id(&voice_id).ok_or_else(|| AppError::Invalid(format!("voz no válida: {voice_id}")))?;
@@ -208,14 +211,14 @@ impl TtsService {
         let request = SynthRequest {
             text: spoken,
             voice: voice_name.to_string(),
-            rate: opts.rate.unwrap_or(cfg.rate).clamp(0.5, 2.0),
+            rate: opts.rate.unwrap_or(chat.rate).clamp(0.5, 2.0),
             out_dir: self.cache_dir.clone(),
         };
         let path = match engine.synthesize(&request).await {
             Ok(path) => path,
             // Los motores de red (Edge) fallan sin culpa de nadie —sin internet, servicio caído—: si hay una voz
             // local se lee con ella en vez de perder el mensaje.
-            Err(e) if engine_id == "edge" => match self.local_fallback(&voices) {
+            Err(e) if engine_id == "edge" => match self.local_fallback(&voices, voice_name) {
                 Some((fallback, voice)) => {
                     tracing::warn!(error = %e, voz = %voice, "Edge-TTS falló; se lee con una voz local");
                     fallback.synthesize(&SynthRequest { voice, ..request }).await?
@@ -226,19 +229,26 @@ impl TtsService {
         };
 
         #[allow(clippy::cast_possible_truncation)]
-        let volume = (f64::from(cfg.volume) / 100.0 * opts.volume.unwrap_or(100.0).clamp(0.0, 100.0) / 100.0) as f32;
+        let volume = (f64::from(chat.volume) / 100.0 * opts.volume.unwrap_or(100.0).clamp(0.0, 100.0) / 100.0) as f32;
         let played = self.play_guarded(path.clone(), volume, &cfg.mic_guard).await;
         // El audio temporal se borra siempre, haya salido bien o no.
         let _ = tokio::fs::remove_file(&path).await;
         played
     }
 
-    /// Primera voz local (Piper o SAPI) disponible, con su motor, para cuando falla un motor de red.
-    fn local_fallback(&self, voices: &[VoiceInfo]) -> Option<(Arc<dyn TtsEngine>, String)> {
-        voices.iter().filter(|v| v.engine != "edge").find_map(|v| {
-            let (engine_id, name) = split_voice_id(&v.id)?;
-            Some((Arc::clone(self.engines.get(engine_id)?), name.to_string()))
-        })
+    /// Voz local (Piper o SAPI) para cuando falla un motor de red. Se elige según la voz que falló, así
+    /// las voces por rol o aleatorias siguen sonando distintas entre sí en vez de caer todas en la misma.
+    fn local_fallback(&self, voices: &[VoiceInfo], failed_voice: &str) -> Option<(Arc<dyn TtsEngine>, String)> {
+        let usable: Vec<(Arc<dyn TtsEngine>, String)> = voices
+            .iter()
+            .filter(|v| v.engine != "edge")
+            .filter_map(|v| {
+                let (engine_id, name) = split_voice_id(&v.id)?;
+                Some((Arc::clone(self.engines.get(engine_id)?), name.to_string()))
+            })
+            .collect();
+        let at = usize::try_from(stable_hash(failed_voice) % (usable.len().max(1) as u64)).unwrap_or(0);
+        usable.into_iter().nth(at)
     }
 
     /// Reproduce sin hablar encima del streamer: espera a que calle para empezar y, si empieza a
@@ -324,6 +334,7 @@ impl TtsService {
 
     async fn on_event(&self, ev: &crate::events::LiveEvent) {
         let cfg = self.config();
+        let chat_cfg = cfg.for_platform(ev.platform);
         let now = self.clock.now_ms();
         let decision = {
             let mut mem = self.memory.lock().unwrap_or_else(PoisonError::into_inner);
@@ -333,7 +344,7 @@ impl TtsService {
             if (*n).is_multiple_of(PRUNE_EVERY) {
                 mem.prune(now, MEMORY_KEEP_MS);
             }
-            decide_chat(&cfg, ev, &mut mem, now)
+            decide_chat(chat_cfg, ev, &mut mem, now)
         };
         let ChatDecision::Speak { vars, .. } = decision else {
             if let ChatDecision::Skip(reason) = decision {
@@ -351,10 +362,10 @@ impl TtsService {
         let job = NewJob {
             rule_id: "tts:chat".into(),
             mode: PlanMode::Sequence,
-            steps: vec![Step { delay_ms: 0, action: ActionSpec::new("tts", json!({ "text": cfg.template })) }],
+            steps: vec![Step { delay_ms: 0, action: ActionSpec::new("tts", json!({ "text": chat_cfg.template })) }],
             vars,
             priority: 0,
-            ttl_ms: cfg.max_wait_ms,
+            ttl_ms: chat_cfg.max_wait_ms,
             refund: None,
         };
         match queue.enqueue(job).await {
@@ -362,6 +373,14 @@ impl TtsService {
             Ok(_) => tracing::debug!(user = %job_user, "TTS: chat encolado"),
             Err(e) => tracing::warn!(error = %e, "TTS: no se pudo encolar un mensaje"),
         }
+    }
+}
+
+/// Plataforma que indican las variables de la lectura (`{platform}`); sin ella, TikTok.
+fn platform_of(vars: &Vars) -> Platform {
+    match vars.get("platform").map(String::as_str) {
+        Some("twitch") => Platform::Twitch,
+        _ => Platform::Tiktok,
     }
 }
 

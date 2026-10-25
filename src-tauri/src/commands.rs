@@ -427,8 +427,9 @@ pub fn mic_preview(state: State<'_, AppState>, guard: Option<crate::tts::policy:
 
 /// Lee un texto con la configuración actual (sin pasar por la cola).
 #[tauri::command]
-pub async fn tts_preview(state: State<'_, AppState>, text: String, voice: Option<String>) -> Result<()> {
-    let vars = [("nickname".to_string(), "Prueba".to_string())].into();
+pub async fn tts_preview(state: State<'_, AppState>, text: String, voice: Option<String>, platform: Option<crate::events::Platform>) -> Result<()> {
+    let platform = platform.unwrap_or_default();
+    let vars = [("nickname".to_string(), "Prueba".to_string()), ("platform".to_string(), platform.as_str().to_string())].into();
     state.tts.speak(&text, &vars, voice.as_deref().filter(|v| !v.is_empty()), SpeakOptions::default()).await
 }
 

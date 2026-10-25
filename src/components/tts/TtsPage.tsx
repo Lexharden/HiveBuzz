@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, onInstallProgress, pickFile } from "../../lib/api";
-import type { InstallProgress, Role, TtsConfig, TtsStatus, VoiceInfo, VoiceMode } from "../../lib/types";
+import { PLATFORMS } from "../../lib/types";
+import type { ChatTts, InstallProgress, Platform, Role, TtsConfig, TtsStatus, VoiceInfo, VoiceMode } from "../../lib/types";
 import { voiceLabel } from "../../lib/voices";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
 import { MicGuardCard } from "./MicGuardCard";
@@ -22,6 +23,8 @@ export function TtsPage() {
   const [testText, setTestText] = useState("Hola, esta es una prueba de voz.");
   const [testVoice, setTestVoice] = useState("");
   const [catalogLang, setCatalogLang] = useState<CatalogLang>("es");
+  /** Plataforma cuyas opciones de lectura y voz se están editando (y con la que suena la prueba). */
+  const [platform, setPlatform] = useState<Platform>("tiktok");
   const { run, error, busy } = useAction();
   const alive = useRef(true);
 
@@ -57,8 +60,11 @@ export function TtsPage() {
     setSaved(false);
     setConfig((c) => (c ? { ...c, ...p } : c));
   };
-  const patchFilters = (p: Partial<TtsConfig["filters"]>) => patch({ filters: { ...config.filters, ...p } });
-  const toggleRole = (r: Role, on: boolean) => patch({ rolesAny: on ? [...config.rolesAny, r] : config.rolesAny.filter((x) => x !== r) });
+  const chat = config[platform];
+  const patchChat = (p: Partial<ChatTts>) => patch({ [platform]: { ...config[platform], ...p } });
+  const patchFilters = (p: Partial<ChatTts["filters"]>) => patchChat({ filters: { ...chat.filters, ...p } });
+  const toggleRole = (r: Role, on: boolean) => patchChat({ rolesAny: on ? [...chat.rolesAny, r] : chat.rolesAny.filter((x) => x !== r) });
+  const other: Platform = platform === "tiktok" ? "twitch" : "tiktok";
   const voiceOptions = [{ value: "", label: t("tts.noVoice") }, ...voices.map((v) => ({ value: v.id, label: voiceLabel(v) }))];
   const pct = progress?.total ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : null;
 
@@ -193,102 +199,128 @@ export function TtsPage() {
           </Field>
         </div>
         <div className="mt-3 flex gap-2">
-          <Btn variant="primary" disabled={!testText.trim()} onClick={() => run(() => api.ttsPreview(testText, testVoice || undefined))}>
+          <Btn variant="primary" disabled={!testText.trim()} onClick={() => run(() => api.ttsPreview(testText, testVoice || undefined, platform))}>
             ▶ {t("tts.speak")}
           </Btn>
           <Btn onClick={() => api.ttsSkip()}>⏭ {t("tts.skip")}</Btn>
         </div>
       </Card>
 
-      <Card title={t("tts.chatReader")} hint={t("tts.chatReaderHint")}>
+      <Card title={t("tts.platformTitle")} hint={t("tts.platformHint")}>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex gap-1">
+            {PLATFORMS.map((pl) => (
+              <button
+                key={pl}
+                onClick={() => setPlatform(pl)}
+                className={`rounded-full px-3 py-1 text-xs ${platform === pl ? "bg-amber-400 text-brand-900" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"}`}
+              >
+                {t(`tts.platform.${pl}`)}
+              </button>
+            ))}
+          </div>
+          <Btn
+            onClick={() => {
+              if (window.confirm(t("tts.copyConfirm", { from: t(`tts.platform.${platform}`), to: t(`tts.platform.${other}`) }))) {
+                patch({ [other]: { ...chat } });
+              }
+            }}
+          >
+            {t("tts.copyTo", { to: t(`tts.platform.${other}`) })}
+          </Btn>
+        </div>
+      </Card>
+
+      <Card title={`${t("tts.chatReader")} · ${t(`tts.platform.${platform}`)}`} hint={t("tts.chatReaderHint")}>
         <div className="space-y-3">
-          <Checkbox checked={config.enabled} onChange={(enabled) => patch({ enabled })} label={t("tts.enabled")} />
+          <Checkbox checked={chat.enabled} onChange={(enabled) => patchChat({ enabled })} label={t("tts.enabled")} />
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("tts.command")} hint={t("tts.commandHint")}>
-              <TextInput value={config.command ?? ""} onChange={(v) => patch({ command: v.trim() === "" ? null : v })} placeholder="tts" />
+              <TextInput value={chat.command ?? ""} onChange={(v) => patchChat({ command: v.trim() === "" ? null : v })} placeholder="tts" />
             </Field>
             <Field label={t("tts.template")} hint={t("tts.templateHint")}>
-              <TextInput value={config.template} onChange={(template) => patch({ template })} />
+              <TextInput value={chat.template} onChange={(template) => patchChat({ template })} />
             </Field>
           </div>
           <Field label={t("tts.roles")} hint={t("tts.rolesHint")}>
             <div className="flex gap-4">
               {ROLES.map((r) => (
-                <Checkbox key={r} checked={config.rolesAny.includes(r)} onChange={(on) => toggleRole(r, on)} label={t(`role.${r}`)} />
+                <Checkbox key={r} checked={chat.rolesAny.includes(r)} onChange={(on) => toggleRole(r, on)} label={t(`role.${r}`)} />
               ))}
             </div>
           </Field>
           <div className="grid grid-cols-4 gap-3">
             <Field label={t("cond.minTeam")} hint={t("cond.minTeamHint")}>
-              <NumberInput value={config.minTeamLevel} min={0} onChange={(v) => patch({ minTeamLevel: v })} />
+              <NumberInput value={chat.minTeamLevel} min={0} onChange={(v) => patchChat({ minTeamLevel: v })} />
             </Field>
             <Field label={t("cond.minGifter")} hint={t("cond.minGifterHint")}>
-              <NumberInput value={config.minGifterLevel} min={0} onChange={(v) => patch({ minGifterLevel: v })} />
+              <NumberInput value={chat.minGifterLevel} min={0} onChange={(v) => patchChat({ minGifterLevel: v })} />
             </Field>
             <Field label={t("tts.recentDonors")} hint={t("tts.recentDonorsHint")}>
-              <NumberInput value={config.recentDonorsMinutes} min={1} onChange={(v) => patch({ recentDonorsMinutes: v })} />
+              <NumberInput value={chat.recentDonorsMinutes} min={1} onChange={(v) => patchChat({ recentDonorsMinutes: v })} />
             </Field>
             <Field label={t("tts.userCooldown")}>
-              <NumberInput value={config.userCooldownMs / 1000} min={0} onChange={(v) => patch({ userCooldownMs: Math.round((v ?? 0) * 1000) })} />
+              <NumberInput value={chat.userCooldownMs / 1000} min={0} onChange={(v) => patchChat({ userCooldownMs: Math.round((v ?? 0) * 1000) })} />
             </Field>
           </div>
           <Field label={t("tts.ignoreUsers")} hint={t("tts.ignoreUsersHint")}>
             <TextInput
-              value={config.ignoreUsers.join(", ")}
-              onChange={(v) => patch({ ignoreUsers: v.split(",").map((u) => u.trim()).filter(Boolean) })}
+              value={chat.ignoreUsers.join(", ")}
+              onChange={(v) => patchChat({ ignoreUsers: v.split(",").map((u) => u.trim()).filter(Boolean) })}
             />
           </Field>
-          <Checkbox checked={config.ignoreBangCommands} onChange={(ignoreBangCommands) => patch({ ignoreBangCommands })} label={t("tts.ignoreBang")} />
+          <Checkbox checked={chat.ignoreBangCommands} onChange={(ignoreBangCommands) => patchChat({ ignoreBangCommands })} label={t("tts.ignoreBang")} />
         </div>
       </Card>
 
-      <Card title={t("tts.voices")}>
+      <Card title={`${t("tts.voices")} · ${t(`tts.platform.${platform}`)}`}>
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-3">
             <Field label={t("tts.voiceMode")}>
               <Select<VoiceMode>
-                value={config.voiceMode}
-                onChange={(voiceMode) => patch({ voiceMode })}
+                value={chat.voiceMode}
+                onChange={(voiceMode) => patchChat({ voiceMode })}
                 options={[
                   { value: "single", label: t("tts.mode.single") },
                   { value: "byRole", label: t("tts.mode.byRole") },
                   { value: "randomPerUser", label: t("tts.mode.randomPerUser") },
+                  { value: "randomPerMessage", label: t("tts.mode.randomPerMessage") },
                 ]}
               />
             </Field>
             <Field label={t("tts.defaultVoice")}>
-              <Select value={config.defaultVoice ?? ""} onChange={(v) => patch({ defaultVoice: v || null })} options={voiceOptions} />
+              <Select value={chat.defaultVoice ?? ""} onChange={(v) => patchChat({ defaultVoice: v || null })} options={voiceOptions} />
             </Field>
             <div className="grid grid-cols-2 gap-2">
               <Field label={t("tts.rate")}>
-                <NumberInput value={config.rate} min={0.5} max={2} step={0.1} onChange={(v) => patch({ rate: v ?? 1 })} />
+                <NumberInput value={chat.rate} min={0.5} max={2} step={0.1} onChange={(v) => patchChat({ rate: v ?? 1 })} />
               </Field>
               <Field label={t("tts.volume")}>
-                <NumberInput value={config.volume} min={0} max={100} onChange={(v) => patch({ volume: v ?? 100 })} />
+                <NumberInput value={chat.volume} min={0} max={100} onChange={(v) => patchChat({ volume: v ?? 100 })} />
               </Field>
             </div>
           </div>
-          {config.voiceMode === "byRole" && (
+          {chat.voiceMode === "byRole" && (
             <div className="grid grid-cols-3 gap-3">
               {ROLES.map((r) => (
                 <Field key={r} label={t(`role.${r}`)}>
                   <Select
-                    value={config.roleVoices[r] ?? ""}
-                    onChange={(v) => patch({ roleVoices: { ...config.roleVoices, [r]: v || null } })}
+                    value={chat.roleVoices[r] ?? ""}
+                    onChange={(v) => patchChat({ roleVoices: { ...chat.roleVoices, [r]: v || null } })}
                     options={voiceOptions}
                   />
                 </Field>
               ))}
             </div>
           )}
-          {config.voiceMode === "randomPerUser" && (
-            <Field label={t("tts.randomPool")} hint={t("tts.randomPoolHint")}>
+          {(chat.voiceMode === "randomPerUser" || chat.voiceMode === "randomPerMessage") && (
+            <Field label={t("tts.randomPool")} hint={t(chat.voiceMode === "randomPerUser" ? "tts.randomPoolHint" : "tts.randomPoolMessageHint")}>
               <div className="grid max-h-36 grid-cols-2 gap-1 overflow-y-auto rounded-md border border-zinc-800 p-2">
                 {voices.map((v) => (
                   <Checkbox
                     key={v.id}
-                    checked={config.randomVoices.includes(v.id)}
-                    onChange={(on) => patch({ randomVoices: on ? [...config.randomVoices, v.id] : config.randomVoices.filter((x) => x !== v.id) })}
+                    checked={chat.randomVoices.includes(v.id)}
+                    onChange={(on) => patchChat({ randomVoices: on ? [...chat.randomVoices, v.id] : chat.randomVoices.filter((x) => x !== v.id) })}
                     label={voiceLabel(v)}
                   />
                 ))}
@@ -304,23 +336,23 @@ export function TtsPage() {
         onChange={(p) => patch({ micGuard: { ...config.micGuard, ...p } })}
       />
 
-      <Card title={t("tts.filtersTitle")} hint={t("tts.filtersHint")}>
+      <Card title={`${t("tts.filtersTitle")} · ${t(`tts.platform.${platform}`)}`} hint={t("tts.filtersHint")}>
         <div className="space-y-3">
           <div className="flex flex-wrap gap-5">
-            <Checkbox checked={config.filters.skipLinks} onChange={(skipLinks) => patchFilters({ skipLinks })} label={t("tts.skipLinks")} />
-            <Checkbox checked={config.filters.stripEmojis} onChange={(stripEmojis) => patchFilters({ stripEmojis })} label={t("tts.stripEmojis")} />
-            <Checkbox checked={config.filters.profanityEnabled} onChange={(profanityEnabled) => patchFilters({ profanityEnabled })} label={t("tts.profanity")} />
+            <Checkbox checked={chat.filters.skipLinks} onChange={(skipLinks) => patchFilters({ skipLinks })} label={t("tts.skipLinks")} />
+            <Checkbox checked={chat.filters.stripEmojis} onChange={(stripEmojis) => patchFilters({ stripEmojis })} label={t("tts.stripEmojis")} />
+            <Checkbox checked={chat.filters.profanityEnabled} onChange={(profanityEnabled) => patchFilters({ profanityEnabled })} label={t("tts.profanity")} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <Field label={t("tts.maxChars")}>
-              <NumberInput value={config.filters.maxChars} min={10} max={1000} onChange={(v) => patchFilters({ maxChars: v ?? 200 })} />
+              <NumberInput value={chat.filters.maxChars} min={10} max={1000} onChange={(v) => patchFilters({ maxChars: v ?? 200 })} />
             </Field>
             <Field label={t("tts.maxRepeat")} hint={t("tts.maxRepeatHint")}>
-              <NumberInput value={config.filters.maxRepeat} min={0} max={20} onChange={(v) => patchFilters({ maxRepeat: v ?? 3 })} />
+              <NumberInput value={chat.filters.maxRepeat} min={0} max={20} onChange={(v) => patchFilters({ maxRepeat: v ?? 3 })} />
             </Field>
             <Field label={t("tts.profanityMode")}>
               <Select
-                value={config.filters.profanityMode}
+                value={chat.filters.profanityMode}
                 onChange={(profanityMode) => patchFilters({ profanityMode })}
                 options={[
                   { value: "skip", label: t("tts.profanitySkip") },
@@ -329,11 +361,11 @@ export function TtsPage() {
               />
             </Field>
           </div>
-          {config.filters.profanityEnabled && (
+          {chat.filters.profanityEnabled && (
             <Field label={t("tts.profanityWords")} hint={t("tts.profanityWordsHint")}>
               <textarea
                 rows={3}
-                value={config.filters.profanityWords.join(", ")}
+                value={chat.filters.profanityWords.join(", ")}
                 onChange={(e) => patchFilters({ profanityWords: e.target.value.split(/[,\n]/).map((w) => w.trim()).filter(Boolean) })}
                 className="w-full rounded-md border border-zinc-700 bg-zinc-950 p-2 text-sm outline-none focus:border-amber-400"
               />

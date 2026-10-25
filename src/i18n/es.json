@@ -379,7 +379,8 @@
     "mode": {
       "single": "Una sola voz",
       "byRole": "Por rol",
-      "randomPerUser": "Aleatoria por usuario"
+      "randomPerUser": "Aleatoria por usuario",
+      "randomPerMessage": "Aleatoria en cada mensaje"
     },
     "defaultVoice": "Voz predeterminada",
     "rate": "Velocidad",
@@ -387,7 +388,7 @@
     "randomPool": "Voces a repartir",
     "randomPoolHint": "Cada usuario recibe siempre la misma voz de esta lista.",
     "filtersTitle": "Filtros de texto",
-    "filtersHint": "Se aplican a todo lo que se lee, venga del chat o de una regla.",
+    "filtersHint": "Se aplican a todo lo que se lee en esta plataforma, venga del chat o de una regla.",
     "skipLinks": "Quitar enlaces",
     "stripEmojis": "Quitar emojis",
     "profanity": "Filtro de groserías",
@@ -441,7 +442,16 @@
       "starting": "Abriendo el micrófono…",
       "mutedHint": "El micrófono llega casi en silencio. Habla un poco: si la barra no se mueve, revisa que no esté silenciado (botón del propio micrófono o de los audífonos) y su volumen en Windows → Configuración → Sonido → Entrada. Si tus audífonos tienen micrófono, elígelo arriba.",
       "unsaved": "Estás probando sin guardar: pulsa Guardar para que la voz lo use."
-    }
+    },
+    "platformTitle": "Plataforma",
+    "platformHint": "TikTok y Twitch tienen cada una su lectura del chat, voces, velocidad, volumen y filtros. Elige cuál estás editando; la prueba de voz también usa la elegida. Las reglas usan la configuración de la plataforma del espectador que las dispara.",
+    "platform": {
+      "tiktok": "TikTok",
+      "twitch": "Twitch"
+    },
+    "copyTo": "Copiar a {{to}}",
+    "copyConfirm": "Se reemplazará la configuración de {{to}} (lectura, voces y filtros) por la de {{from}}. ¿Continuar?",
+    "randomPoolMessageHint": "Cada mensaje se lee con una voz de esta lista elegida al azar."
   },
   "overlay": {
     "alerts": "Alertas",
@@ -1211,7 +1221,7 @@
       "tts": {
         "what": "Que HiveBuzz lea mensajes en voz alta (texto a voz).",
         "i1": "Voces gratis sin internet (Piper) y las del sistema.",
-        "i2": "Puede leer el chat con filtros: solo comandos, suscriptores, moderadores…",
+        "i2": "Lee el chat de TikTok y el de Twitch por separado, cada uno con su voz (o voces aleatorias), velocidad y filtros: solo comandos, suscriptores, moderadores…",
         "i3": "Filtros de groserías, enlaces y emojis.",
         "i4": "Botón «Saltar» para cortar lo que está sonando."
       },
