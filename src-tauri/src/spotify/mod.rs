@@ -1,5 +1,6 @@
 //! Spotify: autenticación OAuth con PKCE (sin servidor propio ni secreto de cliente), peticiones de
-//! canciones por chat (`!sr`) y el overlay «Sonando ahora».
+//! canciones por chat (`!sr`), control del reproductor (saltar, pausa, volumen, por chat, reglas o
+//! botones), la cola de próximas canciones y los overlays «Sonando ahora» y «Próximas canciones».
 //!
 //! Cada streamer crea su propia app en el panel de desarrolladores de Spotify (una app en «modo
 //! desarrollo» solo admite las cuentas que su dueño añade a mano), copia su Client ID en la interfaz y
@@ -20,6 +21,8 @@ pub const KEY_SPOTIFY_CONFIG: &str = "spotify_config";
 pub const KEY_SPOTIFY_REFRESH: &str = "spotify_refresh_token";
 /// Canal retenido que lee el overlay «Sonando ahora».
 pub const CHANNEL: &str = "nowplaying";
+/// Canal del overlay «Próximas canciones»: la lista (retenida) y el aviso de mostrarla (`!cola`).
+pub const QUEUE_CHANNEL: &str = "songqueue";
 /// Ruta (en el servidor local) a la que Spotify devuelve al usuario tras autorizar.
 pub const CALLBACK_PATH: &str = "/spotify/callback";
 pub const SCOPES: &str = "user-read-playback-state user-modify-playback-state user-read-currently-playing";
@@ -75,6 +78,8 @@ pub struct SongConfig {
     pub blocked_terms: Vec<String>,
     /// `@usuario` que no pueden pedir.
     pub blocked_users: Vec<String>,
+    /// Rechaza una canción que ya espera en la cola o que sonó hace poco.
+    pub no_repeat: bool,
 }
 
 impl Default for SongConfig {
@@ -89,7 +94,75 @@ impl Default for SongConfig {
             max_duration_s: 600,
             blocked_terms: Vec::new(),
             blocked_users: Vec::new(),
+            no_repeat: true,
         }
+    }
+}
+
+/// Control del reproductor por chat: saltar, pausa, volumen y ver la cola.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ControlConfig {
+    pub enabled: bool,
+    /// Quién puede saltar, pausar y cambiar el volumen (los moderadores siempre).
+    pub min_role: MinRole,
+    pub skip_commands: Vec<String>,
+    pub pause_commands: Vec<String>,
+    pub resume_commands: Vec<String>,
+    pub volume_commands: Vec<String>,
+    /// Cualquiera puede pedir ver la cola con estos comandos (sale en el overlay «Próximas canciones»).
+    pub queue_commands: Vec<String>,
+    /// Votos que hacen falta para saltar la canción cuando quien escribe no tiene permiso (0 = sin votación).
+    pub skip_votes: u32,
+    /// Cuánto sube o baja `!volumen +` / `!volumen -`.
+    pub volume_step: u8,
+    /// Segundos que el overlay muestra la cola tras un `!cola`.
+    pub queue_show_s: u64,
+}
+
+impl Default for ControlConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            min_role: MinRole::Moderator,
+            skip_commands: vec!["skip".into(), "siguiente".into()],
+            pause_commands: vec!["pausa".into(), "pause".into()],
+            resume_commands: vec!["play".into(), "reanudar".into()],
+            volume_commands: vec!["volumen".into(), "volume".into()],
+            queue_commands: vec!["cola".into(), "queue".into()],
+            skip_votes: 0,
+            volume_step: 10,
+            queue_show_s: 15,
+        }
+    }
+}
+
+/// Una orden al reproductor (desde botones, reglas o el chat).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlOp {
+    Next,
+    Previous,
+    Pause,
+    Resume,
+    /// Volumen absoluto, 0 a 100.
+    VolumeSet(u8),
+    /// Sube o baja el volumen (en puntos porcentuales).
+    VolumeChange(i32),
+}
+
+impl ControlOp {
+    /// `(op, valor)` de la interfaz o de una regla → orden. `value` solo cuenta en los de volumen.
+    pub fn parse(op: &str, value: Option<i64>) -> crate::error::Result<Self> {
+        let need = |v: Option<i64>| v.ok_or_else(|| AppError::Invalid("falta el valor del volumen".into()));
+        Ok(match op {
+            "next" => Self::Next,
+            "previous" => Self::Previous,
+            "pause" => Self::Pause,
+            "resume" => Self::Resume,
+            "volumeSet" => Self::VolumeSet(u8::try_from(need(value)?.clamp(0, 100)).unwrap_or(100)),
+            "volumeChange" => Self::VolumeChange(i32::try_from(need(value)?.clamp(-100, 100)).unwrap_or(0)),
+            other => return Err(AppError::Invalid(format!("orden de Spotify desconocida: «{other}»"))),
+        })
     }
 }
 
@@ -99,6 +172,7 @@ pub struct SpotifyConfig {
     /// Client ID de la app de Spotify del usuario (público: PKCE no usa secreto).
     pub client_id: String,
     pub song: SongConfig,
+    pub control: ControlConfig,
 }
 
 /// Client ID de la app de Spotify de HiveBuzz, fijado al compilar con la variable de entorno
@@ -144,6 +218,13 @@ impl SpotifyConfig {
         s.user_cooldown_s = s.user_cooldown_s.min(3_600);
         s.max_duration_s = s.max_duration_s.clamp(30, 3_600 * 3);
         s.cost_points = s.cost_points.min(1_000_000_000);
+        let c = &mut self.control;
+        for list in [&mut c.skip_commands, &mut c.pause_commands, &mut c.resume_commands, &mut c.volume_commands, &mut c.queue_commands] {
+            *list = clean_list(list, &['!'], true, 24);
+        }
+        c.skip_votes = c.skip_votes.min(1_000);
+        c.volume_step = c.volume_step.clamp(1, 50);
+        c.queue_show_s = c.queue_show_s.clamp(3, 300);
         self
     }
 

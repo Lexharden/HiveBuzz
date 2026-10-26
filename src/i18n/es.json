@@ -217,7 +217,8 @@
     "tcpSend": "Comando TCP",
     "wsSend": "Comando WebSocket",
     "pressKeys": "Simular teclas",
-    "obs": "OBS Studio"
+    "obs": "OBS Studio",
+    "spotify": "Controlar Spotify"
   },
   "action": {
     "sounds": "Sonido(s)",
@@ -325,7 +326,22 @@
     "keyModeHint": "Para vídeos sin transparencia: quita el fondo negro o el verde dentro del propio overlay (sirve también en TikTok LIVE Studio). Solo afecta a vídeos.",
     "keyNone": "Dejarlo como está",
     "keyBlack": "Quitar el fondo negro",
-    "keyGreen": "Quitar el fondo verde"
+    "keyGreen": "Quitar el fondo verde",
+    "spotifyOp": "Qué hacer",
+    "spotifyOps": {
+      "next": "Saltar a la siguiente",
+      "previous": "Volver a la anterior",
+      "pause": "Pausar",
+      "resume": "Reanudar",
+      "volumeSet": "Fijar el volumen",
+      "volumeChange": "Subir o bajar el volumen"
+    },
+    "spotifyVolume": "Volumen (0–100)",
+    "spotifyVolumeHint": "Porcentaje al que se deja el volumen.",
+    "spotifyDelta": "Cambio de volumen",
+    "spotifyDeltaHint": "Positivo sube, negativo baja (p. ej. -10).",
+    "videoVolume": "Volumen del vídeo",
+    "videoVolumeHint": "Si el vídeo trae audio, suena en el overlay (0 = mudo). En OBS: activa «Controlar audio mediante OBS» en la fuente Navegador para llevarlo a su propio canal."
   },
   "myinstants": {
     "title": "Buscar en MyInstants",
@@ -479,7 +495,8 @@
     "poll": "Encuesta",
     "nowplaying": "Sonando ahora",
     "jar": "Jarrón de regalos",
-    "alertScreen": "Alertas · Pantalla {{n}}"
+    "alertScreen": "Alertas · Pantalla {{n}}",
+    "songqueue": "Próximas canciones"
   },
   "overlays": {
     "jarFill": "Llenar",
@@ -602,7 +619,9 @@
     "autoFollow": "Alerta automática de follows",
     "autoSubscribe": "Alerta automática de suscripciones",
     "autoShare": "Alerta automática de shares",
-    "autoDurationSec": "Duración de las alertas automáticas (s)"
+    "autoDurationSec": "Duración de las alertas automáticas (s)",
+    "queueMode": "Cuándo se ve",
+    "queueShowSec": "Segundos visible tras !cola"
   },
   "jarOpt": {
     "jar": "Jarrón",
@@ -903,7 +922,31 @@
     "step3": "En «Redirect URIs» pega la dirección que aparece abajo y guarda.",
     "step4": "En «Settings → User Management» añade el nombre y el correo de tu cuenta de Spotify (sin esto Spotify responde «403 Forbidden»).",
     "step5": "Copia el «Client ID» de tu app, pégalo abajo, pulsa Guardar y después «Conectar con Spotify».",
-    "forbiddenHelp": "¿Sale «403»? La cuenta con la que conectaste no está en «User Management» de la app, o la cuenta dueña de la app no tiene Premium (Spotify lo exige a las apps en modo desarrollo). Si cambias de Client ID tendrás que volver a conectar."
+    "forbiddenHelp": "¿Sale «403»? La cuenta con la que conectaste no está en «User Management» de la app, o la cuenta dueña de la app no tiene Premium (Spotify lo exige a las apps en modo desarrollo). Si cambias de Client ID tendrás que volver a conectar.",
+    "nothingPlaying": "No suena nada ahora mismo.",
+    "prev": "Anterior",
+    "pause": "Pausar",
+    "resume": "Reanudar",
+    "next": "Siguiente",
+    "volDown": "Bajar volumen",
+    "volUp": "Subir volumen",
+    "queueTitle": "Próximas canciones",
+    "queueEmpty": "La cola está vacía.",
+    "controlTitle": "Control por chat (saltar, pausa, volumen, cola)",
+    "controlEnabled": "Activar los comandos de control",
+    "controlHint": "Los moderadores siempre pueden. Las respuestas quedan en el registro: HiveBuzz no escribe en el chat. Con !cola cualquiera hace que el overlay «Próximas canciones» muestre la lista unos segundos.",
+    "controlRole": "Quién puede saltar, pausar y cambiar el volumen",
+    "skipVotes": "Votos para saltar",
+    "skipVotesHint": "0 = solo quien tenga permiso. Con un número, cualquiera puede votar !skip y al llegar a ese número se salta.",
+    "volumeStep": "Paso del volumen (+ / −)",
+    "queueShowS": "Segundos que se ve la cola tras !cola",
+    "cmdSkip": "Comandos de saltar",
+    "cmdPause": "Comandos de pausa",
+    "cmdResume": "Comandos de reanudar",
+    "cmdVolume": "Comandos de volumen",
+    "cmdQueue": "Comandos de la cola",
+    "cmdQueueHint": "Los puede usar cualquiera.",
+    "noRepeat": "No repetir: rechazar canciones que ya están en la cola o sonaron hace poco"
   },
   "system": {
     "save": "Guardar",
@@ -1223,7 +1266,7 @@
       },
       "overlays": {
         "what": "Lo que tu audiencia ve en pantalla: alertas, chat, metas…",
-        "i1": "Alertas, chat, regalos, metas, timer, ruleta, encuestas y «Sonando ahora».",
+        "i1": "Alertas, chat, regalos, metas, timer, ruleta, encuestas y «Sonando ahora». También «Próximas canciones».",
         "i2": "Cada uno tiene su dirección: cópiala en OBS como fuente «Navegador».",
         "i3": "Cambia colores, fuente, tamaño y posición viendo la vista previa en vivo.",
         "i4": "Puedes mostrar de qué plataforma viene cada mensaje."
@@ -1498,5 +1541,9 @@
     "noneYet": "Aún no hay grupos: créalos en Puntos y grupos → Grupos.",
     "deleted": "grupo eliminado",
     "deletedHint": "Este grupo ya no existe; pulsa para quitarlo de la regla."
+  },
+  "queueMode": {
+    "always": "Siempre que haya canciones",
+    "onCommand": "Solo al pedirla con !cola"
   }
 }

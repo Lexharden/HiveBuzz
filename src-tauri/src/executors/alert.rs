@@ -12,6 +12,9 @@
 //!
 //! Pantalla (`screen`, 1 por defecto): cada pantalla es un overlay distinto con su estilo y su cola, así que
 //! alertas de pantallas distintas se ven a la vez. Si la pantalla ya no existe se usa la 1.
+//! Sonido del vídeo (`videoVolume`, 0–100, por defecto 100): si el vídeo de la biblioteca trae audio, suena en
+//! el overlay (0 lo silencia). En OBS, el audio sale por el escritorio o, si activas «Controlar audio mediante
+//! OBS» en la fuente Navegador, por su propio canal del mezclador.
 //! Fondo del vídeo (`keyMode`): `black` quita el fondo negro y `green` el verde, para vídeos sin canal alfa.
 //! Ajustes de esta alerta sobre el estilo de su pantalla: `animation` (`pop`/`slide`/`fade`) y `scale` (40–250 %).
 //!
@@ -87,6 +90,7 @@ impl ActionExecutor for OverlayAlertExecutor {
         #[allow(clippy::cast_precision_loss)]
         opt_number(params, "screen", 1.0, MAX_ALERT_SCREENS as f64)?;
         opt_number(params, "scale", 40.0, 250.0)?;
+        opt_number(params, "videoVolume", 0.0, 100.0)?;
         if let Some(k) = text_param(params, "keyMode") {
             if !["black", "green"].contains(&k) {
                 return Err(AppError::Invalid("fondo de vídeo desconocido".into()));
@@ -153,6 +157,7 @@ impl ActionExecutor for OverlayAlertExecutor {
             "durationMs": duration_ms,
             "animation": text_param(params, "animation"),
             "keyMode": text_param(params, "keyMode"),
+            "videoVolume": opt_number(params, "videoVolume", 0.0, 100.0)?.unwrap_or(100.0),
             "scale": opt_number(params, "scale", 40.0, 250.0)?,
         });
         self.hub.publish(channel, payload);
@@ -390,6 +395,7 @@ mod tests {
         let m = rx.recv().await.expect("msg");
         assert_eq!((m.data["animation"].clone(), m.data["scale"].as_f64()), (json!("slide"), Some(150.0)));
         assert!(m.data["keyMode"].is_null());
+        assert_eq!(m.data["videoVolume"].as_f64(), Some(100.0), "los vídeos suenan por defecto");
         r.exec.execute(&ctx(), &params(json!({"text": "x", "wait": false, "keyMode": "green"}))).await.expect("exec");
         assert_eq!(rx.recv().await.expect("msg").data["keyMode"], "green");
         let v = |p: Value| r.exec.validate(&params(p));
@@ -398,6 +404,8 @@ mod tests {
         assert!(v(json!({"text": "x", "scale": 10})).is_err());
         assert!(v(json!({"text": "x", "animation": "spin"})).is_err());
         assert!(v(json!({"text": "x", "keyMode": "blue"})).is_err());
+        assert!(v(json!({"text": "x", "videoVolume": 101})).is_err());
+        assert!(v(json!({"text": "x", "videoVolume": 0})).is_ok());
         assert!(v(json!({"text": "x", "keyMode": "black"})).is_ok());
         assert!(v(json!({"text": "x", "keyMode": ""})).is_ok());
         assert!(v(json!({"text": "x", "screen": 20, "scale": 250, "animation": "fade"})).is_ok());

@@ -49,6 +49,8 @@ export function defaultAction(type: string): ActionSpec {
       return { type, title: "{nickname}", text: "", durationMs: 5000, wait: true };
     case "tts":
       return { type, text: "Gracias {nickname}" };
+    case "spotify":
+      return { type, op: "next" };
     case "goalAdjust":
       return { type, goalId: "", op: "add", amount: 1 };
     case "timerControl":

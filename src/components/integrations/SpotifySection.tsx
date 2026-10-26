@@ -1,7 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { systemApi as api, type SpotifyConfig, type SpotifyStatus } from "../../lib/system";
+import { systemApi as api, type SpotifyConfig, type SpotifyOp, type SpotifyOverview, type SpotifyStatus } from "../../lib/system";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
 
 const DASHBOARD_URL = "https://developer.spotify.com/dashboard";
@@ -12,6 +12,55 @@ const parseList = (raw: string): string[] =>
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+
+/** Reproductor: botones de control, lo que suena y las próximas canciones. */
+function PlayerPanel({ onError }: { onError: (e: unknown) => void }) {
+  const { t } = useTranslation();
+  const [view, setView] = useState<SpotifyOverview | null>(null);
+  const refresh = useCallback(() => void api.spotifyOverview().then(setView).catch(() => undefined), []);
+  useEffect(() => {
+    refresh();
+    const timer = setInterval(refresh, 2000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
+  const send = (op: SpotifyOp, value?: number) => {
+    void api
+      .spotifyControl(op, value)
+      .catch(onError)
+      // Spotify tarda un instante en reflejar el cambio.
+      .finally(() => setTimeout(refresh, 700));
+  };
+  const playing = view?.playing ?? null;
+  return (
+    <div className="space-y-2 rounded-md border border-zinc-800 p-3">
+      <p className="text-sm text-zinc-200">
+        {playing ? `${playing.isPlaying ? "▶" : "⏸"} ${playing.track.name} — ${playing.track.artists.join(", ")}` : t("spotify.nothingPlaying")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Btn onClick={() => send("previous")} title={t("spotify.prev")}>⏮</Btn>
+        <Btn onClick={() => send("pause")} title={t("spotify.pause")}>⏸</Btn>
+        <Btn onClick={() => send("resume")} title={t("spotify.resume")}>▶</Btn>
+        <Btn onClick={() => send("next")} title={t("spotify.next")}>⏭</Btn>
+        <Btn onClick={() => send("volumeChange", -10)} title={t("spotify.volDown")}>🔉 −</Btn>
+        <Btn onClick={() => send("volumeChange", 10)} title={t("spotify.volUp")}>🔊 +</Btn>
+      </div>
+      <p className="text-xs text-zinc-500">{t("spotify.queueTitle")}</p>
+      {view && view.queue.length > 0 ? (
+        <ol className="list-decimal space-y-0.5 pl-5 text-xs text-zinc-300">
+          {view.queue.slice(0, 8).map((q, i) => (
+            <li key={`${q.track.uri}-${i}`}>
+              {q.track.name} — {q.track.artists.join(", ")}
+              {q.requestedBy && <span className="text-amber-400"> · @{q.requestedBy}</span>}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-xs text-zinc-500">{t("spotify.queueEmpty")}</p>
+      )}
+    </div>
+  );
+}
 
 export function SpotifySection() {
   const { t } = useTranslation();
@@ -32,6 +81,7 @@ export function SpotifySection() {
   if (!cfg) return null;
   const song = cfg.song;
   const setSong = (patch: Partial<typeof song>) => setCfg({ ...cfg, song: { ...song, ...patch } });
+  const setControl = (patch: Partial<typeof cfg.control>) => setCfg({ ...cfg, control: { ...cfg.control, ...patch } });
   const save = (next: SpotifyConfig) =>
     run(async () => {
       setCfg(await api.spotifySetConfig(next));
@@ -86,6 +136,54 @@ export function SpotifySection() {
           </div>
         )}
 
+        {connected && <PlayerPanel onError={(e) => setMsg(String(e))} />}
+
+        {connected && (
+          <details className="rounded-md border border-zinc-800 p-3">
+            <summary className="cursor-pointer text-sm text-zinc-300">{t("spotify.controlTitle")}</summary>
+            <div className="mt-3 space-y-3">
+              <Checkbox checked={cfg.control.enabled} onChange={(enabled) => setControl({ enabled })} label={t("spotify.controlEnabled")} />
+              <p className="text-xs text-zinc-500">{t("spotify.controlHint")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Field label={t("spotify.controlRole")}>
+                  <Select
+                    value={cfg.control.minRole}
+                    onChange={(minRole) => setControl({ minRole })}
+                    options={(["everyone", "follower", "subscriber", "moderator"] as const).map((r) => ({ value: r, label: t(`spotify.roles.${r}`) }))}
+                  />
+                </Field>
+                <Field label={t("spotify.skipVotes")} hint={t("spotify.skipVotesHint")}>
+                  <NumberInput value={cfg.control.skipVotes} min={0} max={1000} onChange={(v) => setControl({ skipVotes: v ?? 0 })} />
+                </Field>
+                <Field label={t("spotify.volumeStep")}>
+                  <NumberInput value={cfg.control.volumeStep} min={1} max={50} onChange={(v) => setControl({ volumeStep: v ?? 10 })} />
+                </Field>
+                <Field label={t("spotify.queueShowS")}>
+                  <NumberInput value={cfg.control.queueShowS} min={3} max={300} onChange={(v) => setControl({ queueShowS: v ?? 15 })} />
+                </Field>
+                <Field label={t("spotify.cmdSkip")}>
+                  <TextInput value={lines(cfg.control.skipCommands)} onChange={(v) => setControl({ skipCommands: parseList(v) })} />
+                </Field>
+                <Field label={t("spotify.cmdPause")}>
+                  <TextInput value={lines(cfg.control.pauseCommands)} onChange={(v) => setControl({ pauseCommands: parseList(v) })} />
+                </Field>
+                <Field label={t("spotify.cmdResume")}>
+                  <TextInput value={lines(cfg.control.resumeCommands)} onChange={(v) => setControl({ resumeCommands: parseList(v) })} />
+                </Field>
+                <Field label={t("spotify.cmdVolume")}>
+                  <TextInput value={lines(cfg.control.volumeCommands)} onChange={(v) => setControl({ volumeCommands: parseList(v) })} />
+                </Field>
+                <Field label={t("spotify.cmdQueue")} hint={t("spotify.cmdQueueHint")}>
+                  <TextInput value={lines(cfg.control.queueCommands)} onChange={(v) => setControl({ queueCommands: parseList(v) })} />
+                </Field>
+              </div>
+              <Btn variant="primary" disabled={busy} onClick={() => save(cfg).then(() => setMsg(t("integrations.saved")))}>
+                {t("integrations.save")}
+              </Btn>
+            </div>
+          </details>
+        )}
+
         {connected && (
           <details className="rounded-md border border-zinc-800 p-3">
             <summary className="cursor-pointer text-sm text-zinc-300">{t("spotify.options")}</summary>
@@ -108,6 +206,7 @@ export function SpotifySection() {
                   <NumberInput value={song.userCooldownS} min={0} max={3600} onChange={(v) => setSong({ userCooldownS: v ?? 0 })} />
                 </Field>
               </div>
+              <Checkbox checked={song.noRepeat} onChange={(noRepeat) => setSong({ noRepeat })} label={t("spotify.noRepeat")} />
               <details>
                 <summary className="cursor-pointer text-xs text-zinc-400">{t("spotify.moreOptions")}</summary>
                 <div className="mt-2 grid grid-cols-2 gap-2">

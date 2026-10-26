@@ -25,6 +25,8 @@ export function ActionParams({ action, onChange, sounds, media, voices, goals, t
       return <AlertParams {...{ action, onChange, media, sounds }} />;
     case "tts":
       return <TtsParams {...{ action, onChange, voices }} />;
+    case "spotify":
+      return <SpotifyParams {...{ action, onChange }} />;
     case "goalAdjust":
       return <GoalAdjustParams {...{ action, onChange, goals }} />;
     case "timerControl":
@@ -196,6 +198,9 @@ function AlertParams({ action, onChange, media, sounds }: Pick<Props, "action" |
           <TextInput value={str(action, "imageUrl")} onChange={(v) => onChange(set(action, "imageUrl", v))} placeholder="{giftimage}" />
         </Field>
       </div>
+      <Field label={t("action.videoVolume")} hint={t("action.videoVolumeHint")}>
+        <NumberInput value={num(action, "videoVolume") ?? 100} min={0} max={100} onChange={(v) => onChange(set(action, "videoVolume", v))} />
+      </Field>
       <Field label={t("action.keyMode")} hint={t("action.keyModeHint")}>
         <Select
           value={str(action, "keyMode")}
@@ -226,6 +231,28 @@ function AlertParams({ action, onChange, media, sounds }: Pick<Props, "action" |
           <Checkbox checked={bool(action, "wait", true)} onChange={(v) => onChange(set(action, "wait", v))} label={t("action.wait")} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function SpotifyParams({ action, onChange }: Pick<Props, "action" | "onChange">) {
+  const { t } = useTranslation();
+  const op = str(action, "op") || "next";
+  const volume = op === "volumeSet" || op === "volumeChange";
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <Field label={t("action.spotifyOp")}>
+        <Select
+          value={op}
+          onChange={(v) => onChange(set(set(action, "op", v), "value", v === "volumeSet" ? 50 : v === "volumeChange" ? 10 : null))}
+          options={["next", "previous", "pause", "resume", "volumeSet", "volumeChange"].map((o) => ({ value: o, label: t(`action.spotifyOps.${o}`) }))}
+        />
+      </Field>
+      {volume && (
+        <Field label={t(op === "volumeSet" ? "action.spotifyVolume" : "action.spotifyDelta")} hint={t(op === "volumeSet" ? "action.spotifyVolumeHint" : "action.spotifyDeltaHint")}>
+          <NumberInput value={num(action, "value") ?? 0} min={op === "volumeSet" ? 0 : -100} max={100} onChange={(v) => onChange(set(action, "value", v))} />
+        </Field>
+      )}
     </div>
   );
 }

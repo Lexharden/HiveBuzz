@@ -79,6 +79,13 @@
     return canvas;
   }
 
+  // Si el navegador no deja reproducir con sonido sin que el usuario toque la página, el vídeo sale mudo
+  // antes que no salir.
+  function playWithSound(video) {
+    var p = video.play();
+    if (p && p.catch) p.catch(function () { video.muted = true; video.play().catch(function () {}); });
+  }
+
   function build(a) {
     // La animación y la escala de la propia alerta mandan sobre las de la pantalla.
     var anim = /^(pop|slide|fade)$/.test(a.animation) ? a.animation : (cfg.animation || "pop");
@@ -90,13 +97,19 @@
       var node;
       if (m.kind === "video") {
         node = HB.el("video", "media");
-        node.src = src; node.autoplay = true; node.loop = true; node.muted = true; node.playsInline = true;
+        node.src = src; node.autoplay = true; node.loop = true; node.playsInline = true;
+        // El audio propio del vídeo: volumen de la alerta (por defecto 100; 0 lo silencia).
+        var vol = a.videoVolume === undefined || a.videoVolume === null ? 100 : HB.clamp(Number(a.videoVolume) || 0, 0, 100);
+        node.muted = vol <= 0;
+        node.volume = vol / 100;
         a.videoNode = node;
         if (a.keyMode === "black" || a.keyMode === "green") {
           // El vídeo se reproduce fuera de la página y lo que se ve es el canvas ya sin fondo.
           var shown = keyedVideo(node, a.keyMode);
-          node.play().catch(function () {});
+          playWithSound(node);
           node = shown;
+        } else {
+          playWithSound(node);
         }
       } else {
         node = HB.el("img", "media");

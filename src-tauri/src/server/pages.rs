@@ -23,6 +23,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("wheel", include_str!("../../../overlays/wheel/index.html")),
     ("poll", include_str!("../../../overlays/poll/index.html")),
     ("nowplaying", include_str!("../../../overlays/nowplaying/index.html")),
+    ("songqueue", include_str!("../../../overlays/songqueue/index.html")),
     ("jar", include_str!("../../../overlays/jar/index.html")),
 ];
 

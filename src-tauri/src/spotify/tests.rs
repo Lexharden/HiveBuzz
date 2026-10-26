@@ -7,7 +7,7 @@ use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
-use super::api::{parse_track, track_id_from_ref, HttpSpotify, Playing, SpotifyApi, Track};
+use super::api::{parse_track, track_id_from_ref, HttpSpotify, PlayerCmd, Playing, SpotifyApi, Track};
 use super::auth::SpotifyAuth;
 use super::service::SongService;
 use super::*;
@@ -439,6 +439,10 @@ struct FakeApi {
     queued: StdMutex<Vec<String>>,
     find: StdMutex<Option<Track>>,
     playing: StdMutex<Option<Playing>>,
+    /// Órdenes de control recibidas, volumen del dispositivo y cola que devuelve Spotify.
+    commands: StdMutex<Vec<PlayerCmd>>,
+    volume: StdMutex<Option<u8>>,
+    upcoming: StdMutex<Vec<Track>>,
 }
 
 impl FakeApi {
@@ -448,6 +452,9 @@ impl FakeApi {
             queued: StdMutex::new(Vec::new()),
             find: StdMutex::new(parse_track(&track_json(ID1, "La Bamba", "Ritchie Valens", 120_000))),
             playing: StdMutex::new(None),
+            commands: StdMutex::new(Vec::new()),
+            volume: StdMutex::new(Some(50)),
+            upcoming: StdMutex::new(Vec::new()),
         })
     }
 }
@@ -466,6 +473,16 @@ impl SpotifyApi for FakeApi {
     }
     async fn now_playing(&self) -> std::result::Result<Option<Playing>, ApiError> {
         Ok(self.playing.lock().unwrap().clone())
+    }
+    async fn control(&self, op: PlayerCmd) -> std::result::Result<(), ApiError> {
+        self.commands.lock().unwrap().push(op);
+        Ok(())
+    }
+    async fn volume(&self) -> std::result::Result<Option<u8>, ApiError> {
+        Ok(*self.volume.lock().unwrap())
+    }
+    async fn queue_list(&self) -> std::result::Result<Vec<Track>, ApiError> {
+        Ok(self.upcoming.lock().unwrap().clone())
     }
 }
 
@@ -516,6 +533,8 @@ async fn rig(tweak: impl FnOnce(&mut SongConfig)) -> Rig {
     let mut cfg = SpotifyConfig { client_id: "cid".into(), ..SpotifyConfig::default() };
     cfg.song.enabled = true;
     cfg.song.user_cooldown_s = 0;
+    // La mayoría de pruebas piden siempre la misma canción: las de «no repetir» lo activan a propósito.
+    cfg.song.no_repeat = false;
     tweak(&mut cfg.song);
     svc.set_config(cfg).await.unwrap();
     Rig { svc, api, wallet, said: StdMutex::default(), clock, hub }
@@ -728,4 +747,264 @@ async fn song_requests_from_twitch_are_queued_too() {
     ev.platform = Platform::Twitch;
     assert!(r.on_event(&ev).await);
     assert_eq!(r.api.queued.lock().unwrap().len(), 1, "la canción entra a la cola");
+}
+
+// ------------------------------------------------------------ control del reproductor y cola
+
+#[tokio::test]
+async fn player_commands_use_the_right_endpoints() {
+    let (api, seen) = http_api(Box::new(|r| if r.path.starts_with("/token") { token_ok() } else { (204, vec![], String::new()) })).await;
+    for op in [PlayerCmd::Next, PlayerCmd::Previous, PlayerCmd::Pause, PlayerCmd::Resume, PlayerCmd::Volume(40), PlayerCmd::Volume(250)] {
+        api.control(op).await.unwrap();
+    }
+    let got: Vec<(String, String)> = seen.lock().unwrap().iter().filter(|r| r.path.starts_with("/v1/")).map(|r| (r.method.clone(), r.path.clone())).collect();
+    let expected = [
+        ("POST", "/v1/me/player/next"),
+        ("POST", "/v1/me/player/previous"),
+        ("PUT", "/v1/me/player/pause"),
+        ("PUT", "/v1/me/player/play"),
+        ("PUT", "/v1/me/player/volume?volume_percent=40"),
+        ("PUT", "/v1/me/player/volume?volume_percent=100"),
+    ];
+    assert_eq!(got, expected.map(|(m, p)| (m.to_string(), p.to_string())));
+}
+
+#[tokio::test]
+async fn player_command_errors_are_translated() {
+    let body = json!({ "error": { "status": 403, "message": "Player command failed: Premium required", "reason": "PREMIUM_REQUIRED" } }).to_string();
+    let (api, _) = http_api(Box::new(move |r| if r.path.starts_with("/token") { token_ok() } else { (403, vec![], body.clone()) })).await;
+    assert_eq!(api.control(PlayerCmd::Next).await, Err(ApiError::PremiumRequired));
+}
+
+#[tokio::test]
+async fn volume_and_queue_are_parsed() {
+    let player = json!({ "is_playing": true, "device": { "volume_percent": 35 } }).to_string();
+    let queue = json!({ "currently_playing": track_json(ID1, "Suena", "A", 1), "queue": [
+        track_json(ID2, "Siguiente", "B", 1000),
+        { "id": "ep", "name": "Un episodio", "type": "episode" }
+    ]})
+    .to_string();
+    let (api, _) = http_api(Box::new(move |r| match r.path.as_str() {
+        p if p.starts_with("/token") => token_ok(),
+        "/v1/me/player/queue" => (200, vec![], queue.clone()),
+        _ => (200, vec![], player.clone()),
+    }))
+    .await;
+    assert_eq!(api.volume().await, Ok(Some(35)));
+    let q = api.queue_list().await.unwrap();
+    assert_eq!(q.len(), 1, "los episodios no cuentan");
+    assert_eq!(q[0].name, "Siguiente");
+    let (api, _) = http_api(Box::new(|r| if r.path.starts_with("/token") { token_ok() } else { (204, vec![], String::new()) })).await;
+    assert_eq!(api.volume().await, Ok(None), "sin dispositivo activo");
+    assert_eq!(api.queue_list().await, Ok(Vec::new()));
+}
+
+async fn control_rig(tweak: impl FnOnce(&mut ControlConfig)) -> Rig {
+    let r = rig(|_| {}).await;
+    let mut cfg = r.svc.config();
+    cfg.control.enabled = true;
+    tweak(&mut cfg.control);
+    r.svc.set_config(cfg).await.unwrap();
+    r
+}
+
+fn mod_ev(id: &str, user: &str, text: &str) -> LiveEvent {
+    let mut ev = chat_ev(id, user, text);
+    ev.user.is_moderator = true;
+    ev
+}
+
+#[tokio::test]
+async fn moderators_skip_pause_resume_and_change_the_volume() {
+    let r = control_rig(|_| {}).await;
+    for (i, text) in ["!skip", "!pausa", "!play", "!volumen 30", "!volumen +", "!volumen -", "!volumen -5", "!volumen +5"].into_iter().enumerate() {
+        assert!(r.on_event(&mod_ev(&i.to_string(), "mod", text)).await, "{text}");
+    }
+    assert_eq!(
+        *r.api.commands.lock().unwrap(),
+        [
+            PlayerCmd::Next,
+            PlayerCmd::Pause,
+            PlayerCmd::Resume,
+            PlayerCmd::Volume(30),
+            PlayerCmd::Volume(60),
+            PlayerCmd::Volume(40),
+            PlayerCmd::Volume(45),
+            PlayerCmd::Volume(55),
+        ]
+    );
+    assert!(r.said()[0].contains("saltó"), "{:?}", r.said());
+}
+
+#[tokio::test]
+async fn viewers_cannot_control_the_player_and_a_bad_volume_explains_the_usage() {
+    let r = control_rig(|_| {}).await;
+    for text in ["!skip", "!pausa", "!play", "!volumen 10"] {
+        assert!(r.on_event(&chat_ev("x", "ana", text)).await);
+    }
+    assert!(r.api.commands.lock().unwrap().is_empty());
+    assert!(r.said().iter().all(|s| s.contains("no tienes permiso")), "{:?}", r.said());
+    assert!(r.on_event(&mod_ev("y", "mod", "!volumen mucho")).await);
+    assert!(r.said().last().unwrap().contains("uso: !volumen"));
+    assert!(r.api.commands.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn control_commands_do_nothing_while_disabled() {
+    let r = rig(|_| {}).await;
+    assert!(!r.on_event(&mod_ev("1", "mod", "!skip")).await);
+    assert!(r.api.commands.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn the_minimum_role_for_control_can_be_relaxed() {
+    let r = control_rig(|c| c.min_role = MinRole::Everyone).await;
+    assert!(r.on_event(&chat_ev("1", "ana", "!pausa")).await);
+    assert_eq!(*r.api.commands.lock().unwrap(), [PlayerCmd::Pause]);
+}
+
+#[tokio::test]
+async fn enough_votes_skip_the_song_and_each_viewer_counts_once() {
+    let r = control_rig(|c| c.skip_votes = 3).await;
+    let track = parse_track(&track_json(ID1, "La Bamba", "Ritchie Valens", 120_000)).unwrap();
+    *r.api.playing.lock().unwrap() = Some(Playing { track, progress_ms: 0, is_playing: true });
+    r.svc.poll_once().await;
+    r.on_event(&chat_ev("1", "ana", "!skip")).await;
+    r.on_event(&chat_ev("2", "ana", "!skip")).await;
+    r.on_event(&chat_ev("3", "bob", "!skip")).await;
+    assert!(r.api.commands.lock().unwrap().is_empty(), "dos votantes distintos no bastan");
+    assert!(r.said()[1].contains("1/3"), "el voto repetido no suma: {:?}", r.said());
+    r.on_event(&chat_ev("4", "eva", "!skip")).await;
+    assert_eq!(*r.api.commands.lock().unwrap(), [PlayerCmd::Next]);
+    // Los votos se vacían: hacen falta otros tres.
+    r.on_event(&chat_ev("5", "ana", "!skip")).await;
+    assert_eq!(r.api.commands.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn votes_do_not_carry_over_to_the_next_song() {
+    let r = control_rig(|c| c.skip_votes = 2).await;
+    let set = |id: &str| *r.api.playing.lock().unwrap() = Some(Playing { track: parse_track(&track_json(id, "x", "y", 1000)).unwrap(), progress_ms: 0, is_playing: true });
+    set(ID1);
+    r.svc.poll_once().await;
+    r.on_event(&chat_ev("1", "ana", "!skip")).await;
+    set(ID2);
+    r.svc.poll_once().await;
+    r.on_event(&chat_ev("2", "bob", "!skip")).await;
+    assert!(r.api.commands.lock().unwrap().is_empty(), "el voto de ana era de la otra canción");
+}
+
+#[tokio::test]
+async fn the_queue_command_asks_the_overlay_to_show_the_list() {
+    let r = control_rig(|c| c.queue_show_s = 20).await;
+    *r.api.upcoming.lock().unwrap() = vec![parse_track(&track_json(ID2, "Siguiente", "B", 1000)).unwrap()];
+    let track = parse_track(&track_json(ID1, "Suena", "A", 1000)).unwrap();
+    *r.api.playing.lock().unwrap() = Some(Playing { track, progress_ms: 0, is_playing: true });
+    r.svc.poll_once().await;
+    let mut rx = r.hub.subscribe();
+    assert!(r.on_event(&chat_ev("1", "ana", "!cola")).await, "cualquiera puede pedir ver la cola");
+    let m = rx.recv().await.unwrap();
+    assert_eq!((m.channel.as_str(), m.data["kind"].clone(), m.data["seconds"].clone()), (QUEUE_CHANNEL, json!("show"), json!(20)));
+    assert!(r.said()[0].contains("Siguiente"), "{:?}", r.said());
+}
+
+#[tokio::test]
+async fn the_queue_is_published_with_who_asked_for_each_song() {
+    let r = rig(|_| {}).await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    *r.api.upcoming.lock().unwrap() = vec![
+        parse_track(&track_json(ID1, "La Bamba", "Ritchie Valens", 120_000)).unwrap(),
+        parse_track(&track_json(ID2, "De Spotify", "Alguien", 1000)).unwrap(),
+    ];
+    let other = parse_track(&track_json("1111111111111111111111", "Suena", "A", 1000)).unwrap();
+    *r.api.playing.lock().unwrap() = Some(Playing { track: other, progress_ms: 0, is_playing: true });
+    r.svc.poll_once().await;
+    let msg = r.hub.retained().into_iter().find(|m| m.channel == QUEUE_CHANNEL).unwrap();
+    assert_eq!(msg.data["kind"], "queue");
+    let items = msg.data["items"].as_array().unwrap();
+    assert_eq!(items.len(), 2);
+    assert_eq!((items[0]["title"].clone(), items[0]["requestedBy"].clone()), (json!("La Bamba"), json!("ana")));
+    assert_eq!(items[1]["requestedBy"], json!(null), "la añadida desde Spotify no tiene quien la pidió");
+    assert_eq!(r.svc.overview().queue.len(), 2);
+
+    // Sin canción sonando, la cola se vacía.
+    *r.api.playing.lock().unwrap() = None;
+    r.svc.poll_once().await;
+    let msg = r.hub.retained().into_iter().find(|m| m.channel == QUEUE_CHANNEL).unwrap();
+    assert!(msg.data["items"].as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn the_queue_is_only_reread_when_the_song_changes_or_after_a_while() {
+    let r = rig(|_| {}).await;
+    let playing = parse_track(&track_json(ID1, "Suena", "A", 1000)).unwrap();
+    *r.api.playing.lock().unwrap() = Some(Playing { track: playing, progress_ms: 0, is_playing: true });
+    r.svc.poll_once().await;
+    *r.api.upcoming.lock().unwrap() = vec![parse_track(&track_json(ID2, "Nueva", "B", 1000)).unwrap()];
+    r.svc.poll_once().await;
+    assert!(r.svc.overview().queue.is_empty(), "no se vuelve a leer a los pocos segundos");
+    r.clock.advance(20_000);
+    r.svc.poll_once().await;
+    assert_eq!(r.svc.overview().queue.len(), 1);
+}
+
+#[tokio::test]
+async fn songs_already_requested_playing_or_recently_played_are_rejected_when_asked() {
+    let r = rig(|c| c.no_repeat = true).await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("2", "bob", "!sr x")).await;
+    assert_eq!(r.api.queued.lock().unwrap().len(), 1);
+    assert!(r.said()[1].contains("ya está en la cola"), "{:?}", r.said());
+
+    // Suena otra y la pedida termina: sigue contando como «sonó hace poco».
+    let set = |id: &str| *r.api.playing.lock().unwrap() = Some(Playing { track: parse_track(&track_json(id, "x", "y", 1000)).unwrap(), progress_ms: 0, is_playing: true });
+    set(ID1);
+    r.svc.poll_once().await;
+    set(ID2);
+    r.svc.poll_once().await;
+    r.on_event(&chat_ev("3", "eva", "!sr x")).await;
+    assert_eq!(r.api.queued.lock().unwrap().len(), 1, "{:?}", r.said());
+
+    // Y un rechazo no deja al espectador esperando el cooldown.
+    let r = rig(|c| {
+        c.no_repeat = true;
+        c.user_cooldown_s = 600;
+    })
+    .await;
+    r.on_event(&chat_ev("1", "ana", "!sr x")).await;
+    r.on_event(&chat_ev("2", "bob", "!sr x")).await;
+    *r.api.find.lock().unwrap() = parse_track(&track_json(ID2, "Otra", "B", 1000));
+    r.on_event(&chat_ev("3", "bob", "!sr otra")).await;
+    assert_eq!(r.api.queued.lock().unwrap().len(), 2, "{:?}", r.said());
+}
+
+#[tokio::test]
+async fn control_settings_are_sanitized() {
+    let r = rig(|_| {}).await;
+    let mut cfg = r.svc.config();
+    cfg.control.skip_commands = vec!["!Skip".into(), " ".into(), "skip".into()];
+    cfg.control.volume_step = 0;
+    cfg.control.queue_show_s = 9_999;
+    cfg.control.skip_votes = 5_000_000;
+    let got = r.svc.set_config(cfg).await.unwrap().control;
+    assert_eq!(got.skip_commands, ["skip"]);
+    assert_eq!((got.volume_step, got.queue_show_s, got.skip_votes), (1, 300, 1_000));
+}
+
+#[test]
+fn control_operations_parse_from_the_ui_and_rules() {
+    assert_eq!(ControlOp::parse("volumeChange", Some(-300)).unwrap(), ControlOp::VolumeChange(-100));
+    assert_eq!(ControlOp::parse("previous", None).unwrap(), ControlOp::Previous);
+    assert!(ControlOp::parse("volumeSet", None).is_err());
+    assert!(ControlOp::parse("nope", None).is_err());
+}
+
+#[tokio::test]
+async fn manual_control_adjusts_the_volume_relative_to_the_device() {
+    let r = rig(|_| {}).await;
+    r.svc.control(ControlOp::VolumeChange(-70)).await.unwrap();
+    r.svc.control(ControlOp::Next).await.unwrap();
+    assert_eq!(*r.api.commands.lock().unwrap(), [PlayerCmd::Volume(0), PlayerCmd::Next]);
+    *r.api.volume.lock().unwrap() = None;
+    assert!(r.svc.control(ControlOp::VolumeChange(10)).await.is_err(), "sin dispositivo no se puede subir el volumen");
 }

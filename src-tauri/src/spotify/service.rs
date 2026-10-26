@@ -1,6 +1,7 @@
-//! Peticiones de canciones por chat (`!sr`) y estado de «Sonando ahora».
+//! Peticiones de canciones por chat (`!sr`), control del reproductor, cola de próximas canciones y
+//! estado de «Sonando ahora».
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 use std::time::Duration;
 
@@ -8,9 +9,11 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::error::RecvError;
 
-use super::api::{Playing, SpotifyApi, Track};
+use super::api::{PlayerCmd, Playing, SpotifyApi, Track};
 use super::auth::SpotifyAuth;
-use super::{default_client_id, effective_client_id, ApiError, MinRole, SpotifyConfig, CHANNEL, KEY_SPOTIFY_CONFIG};
+use super::{
+    default_client_id, effective_client_id, ApiError, ControlConfig, ControlOp, MinRole, SpotifyConfig, CHANNEL, KEY_SPOTIFY_CONFIG, QUEUE_CHANNEL,
+};
 use crate::actions::clock::Clock;
 use crate::bus::EventBus;
 use crate::db::Db;
@@ -27,6 +30,11 @@ const POLL_PLAYING: Duration = Duration::from_secs(4);
 const POLL_IDLE: Duration = Duration::from_secs(10);
 const POLL_ERROR: Duration = Duration::from_secs(20);
 const POLL_DISCONNECTED: Duration = Duration::from_secs(5);
+/// La cola de Spotify se vuelve a leer al cambiar de canción y, si no, cada tanto (alguien puede añadir desde Spotify).
+const QUEUE_REFRESH_MS: i64 = 15_000;
+/// Canciones que se recuerdan como «sonó hace poco» para no repetirlas.
+const RECENT_MAX: usize = 30;
+const MAX_VOTERS: usize = 2_000;
 
 #[derive(Debug, Clone)]
 struct Request {
@@ -43,6 +51,39 @@ struct State {
     playing: Option<Playing>,
     /// Última vez que se publicó el estado, para no repetir lo mismo en cada sondeo.
     published: Option<(String, bool)>,
+    /// Próximas canciones (última lectura de la cola de Spotify) y cuándo/por qué canción se leyó.
+    queue: Vec<QueueItem>,
+    queue_at_ms: i64,
+    queue_for: Option<String>,
+    /// Canciones que sonaron hace poco (la más reciente al final).
+    recent: VecDeque<String>,
+    /// Quién votó saltar la canción actual.
+    votes: HashSet<String>,
+    votes_for: Option<String>,
+}
+
+/// Una canción de la cola de Spotify y quién la pidió (si fue por HiveBuzz).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueueItem {
+    pub track: Track,
+    pub requested_by: Option<String>,
+}
+
+/// Lo que muestra el panel del reproductor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Overview {
+    pub playing: Option<Playing>,
+    pub queue: Vec<QueueItem>,
+}
+
+fn queue_payload(items: &[QueueItem]) -> Value {
+    let items: Vec<Value> = items
+        .iter()
+        .map(|i| json!({ "title": i.track.name, "artist": i.track.artist_line(), "image": i.track.image, "requestedBy": i.requested_by }))
+        .collect();
+    json!({ "kind": "queue", "items": items })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -145,6 +186,29 @@ impl SongService {
         self.lock().playing.clone()
     }
 
+    /// Reproductor y cola tal como los vio el último sondeo.
+    pub fn overview(&self) -> Overview {
+        let st = self.lock();
+        Overview { playing: st.playing.clone(), queue: st.queue.clone() }
+    }
+
+    /// Ejecuta una orden al reproductor (botones, reglas o chat).
+    pub async fn control(&self, op: ControlOp) -> Result<()> {
+        let cmd = match op {
+            ControlOp::Next => PlayerCmd::Next,
+            ControlOp::Previous => PlayerCmd::Previous,
+            ControlOp::Pause => PlayerCmd::Pause,
+            ControlOp::Resume => PlayerCmd::Resume,
+            ControlOp::VolumeSet(v) => PlayerCmd::Volume(v.min(100)),
+            ControlOp::VolumeChange(delta) => {
+                let current = self.api.volume().await.map_err(AppError::from)?.ok_or(ApiError::NoDevice).map_err(AppError::from)?;
+                let next = (i32::from(current) + delta).clamp(0, 100);
+                PlayerCmd::Volume(u8::try_from(next).unwrap_or(100))
+            }
+        };
+        self.api.control(cmd).await.map_err(AppError::from)
+    }
+
     /// Pide una canción desde la UI (prueba): sin roles, coste ni cooldown.
     pub async fn manual_queue(&self, query: &str) -> Result<Track> {
         let q: String = query.trim().chars().take(MAX_QUERY_CHARS).collect();
@@ -163,12 +227,86 @@ impl SongService {
         }
         let chat = ev.chat.as_ref()?;
         let cfg = self.config();
-        if !cfg.song.enabled {
+        if !cfg.song.enabled && !cfg.control.enabled {
             return None;
         }
         let (name, rest) = split_command(&chat.text)?;
-        cfg.song.commands.contains(&name).then_some(())?;
-        Some(self.request(&ev.user, rest).await)
+        if cfg.song.enabled && cfg.song.commands.contains(&name) {
+            return Some(self.request(&ev.user, rest).await);
+        }
+        if cfg.control.enabled {
+            return self.control_command(&cfg.control, &name, rest, &ev.user).await;
+        }
+        None
+    }
+
+    /// Comandos de control del reproductor. `None` si `name` no es uno de ellos.
+    async fn control_command(&self, c: &ControlConfig, name: &str, rest: &str, user: &User) -> Option<String> {
+        let me = who(user);
+        let has = |list: &[String]| list.iter().any(|n| n == name);
+        let allowed = user.is_moderator || role_ok(c.min_role, user);
+        let denied = || format!("{me} no tienes permiso para eso.");
+        let done = |r: Result<()>, ok: &str| match r {
+            Ok(()) => format!("{me} {ok}"),
+            Err(e) => format!("{me} {e}"),
+        };
+
+        if has(&c.skip_commands) {
+            if allowed {
+                return Some(done(self.control(ControlOp::Next).await, "saltó la canción."));
+            }
+            if c.skip_votes == 0 {
+                return Some(denied());
+            }
+            let uid = if user.id.is_empty() { user.unique_id.clone() } else { user.id.clone() };
+            let votes = {
+                let mut st = self.lock();
+                if st.votes.len() < MAX_VOTERS {
+                    st.votes.insert(uid);
+                }
+                u32::try_from(st.votes.len()).unwrap_or(u32::MAX)
+            };
+            if votes < c.skip_votes {
+                return Some(format!("{me} voto para saltar: {votes}/{}.", c.skip_votes));
+            }
+            self.lock().votes.clear();
+            return Some(done(self.control(ControlOp::Next).await, "votación completa: se salta la canción."));
+        }
+        if has(&c.pause_commands) {
+            return Some(if allowed { done(self.control(ControlOp::Pause).await, "pausó la música.") } else { denied() });
+        }
+        if has(&c.resume_commands) {
+            return Some(if allowed { done(self.control(ControlOp::Resume).await, "reanudó la música.") } else { denied() });
+        }
+        if has(&c.volume_commands) {
+            if !allowed {
+                return Some(denied());
+            }
+            let step = i32::from(c.volume_step);
+            let arg = rest.trim();
+            let op = match arg {
+                "+" => Some(ControlOp::VolumeChange(step)),
+                "-" => Some(ControlOp::VolumeChange(-step)),
+                _ => arg.parse::<i32>().ok().map(|n| {
+                    if arg.starts_with('+') || arg.starts_with('-') {
+                        ControlOp::VolumeChange(n.clamp(-100, 100))
+                    } else {
+                        ControlOp::VolumeSet(u8::try_from(n.clamp(0, 100)).unwrap_or(100))
+                    }
+                }),
+            };
+            let Some(op) = op else {
+                let cmd = c.volume_commands.first().map_or("volumen", String::as_str);
+                return Some(format!("{me} uso: !{cmd} <0-100> o !{cmd} + / -"));
+            };
+            return Some(done(self.control(op).await, "cambió el volumen."));
+        }
+        if has(&c.queue_commands) {
+            self.hub.publish(QUEUE_CHANNEL, json!({ "kind": "show", "seconds": c.queue_show_s }));
+            let next: Vec<String> = self.lock().queue.iter().take(3).map(|i| format!("«{}»", i.track.name)).collect();
+            return Some(if next.is_empty() { format!("{me} la cola está vacía.") } else { format!("{me} próximas: {}", next.join(", ")) });
+        }
+        None
     }
 
     /// Procesa una petición y devuelve su resultado en una frase.
@@ -222,6 +360,11 @@ impl SongService {
         if track.duration_ms > s.max_duration_s.saturating_mul(1000) {
             return format!("{me} esa canción dura demasiado (máximo {} min).", s.max_duration_s / 60);
         }
+        if s.no_repeat && self.already_there(&track.uri) {
+            // El intento rechazado no debe dejar al espectador esperando el cooldown.
+            self.lock().last_by_user.remove(&uid);
+            return format!("{me} esa canción ya está en la cola o sonó hace poco.");
+        }
 
         let charged = if s.cost_points > 0 && !user.id.is_empty() {
             match self.wallet.spend(&user.id, s.cost_points, "canción").await {
@@ -257,6 +400,15 @@ impl SongService {
         format!("{me} 🎵 añadida «{}» — {}", track.name, track.artist_line())
     }
 
+    /// ¿Ya está pedida, en la cola de Spotify, sonando o sonó hace poco?
+    fn already_there(&self, uri: &str) -> bool {
+        let st = self.lock();
+        st.pending.iter().any(|r| r.uri == uri)
+            || st.queue.iter().any(|i| i.track.uri == uri)
+            || st.recent.iter().any(|r| r == uri)
+            || st.playing.as_ref().is_some_and(|p| p.track.uri == uri)
+    }
+
     fn friendly(e: &ApiError) -> String {
         match e {
             ApiError::NoDevice => "no hay Spotify activo ahora mismo.".into(),
@@ -276,6 +428,17 @@ impl SongService {
             let mut st = self.lock();
             let prev_uri = st.playing.as_ref().map(|p| p.track.uri.clone());
             let cur_uri = playing.as_ref().map(|p| p.track.uri.clone());
+            if let Some(prev) = prev_uri.as_ref().filter(|p| Some(*p) != cur_uri.as_ref()) {
+                if st.recent.len() >= RECENT_MAX {
+                    st.recent.pop_front();
+                }
+                st.recent.push_back(prev.clone());
+            }
+            // Los votos para saltar valen solo para la canción en la que se emitieron.
+            if st.votes_for != cur_uri {
+                st.votes.clear();
+                st.votes_for = cur_uri.clone();
+            }
             // Cuando la canción cambia, la que acaba de terminar ya no cuenta como pendiente.
             if let Some(prev) = prev_uri.filter(|p| Some(p) != cur_uri.as_ref()) {
                 if let Some(i) = st.pending.iter().position(|r| r.uri == prev) {
@@ -326,22 +489,78 @@ impl SongService {
         }
     }
 
+    /// Lee la cola de Spotify al cambiar de canción y cada `QUEUE_REFRESH_MS`; sin canción la vacía.
+    async fn refresh_queue(&self, current: Option<String>) {
+        if current.is_none() {
+            self.apply_queue(Vec::new());
+            return;
+        }
+        let now = self.clock.now_ms();
+        {
+            let st = self.lock();
+            if st.queue_for == current && now - st.queue_at_ms < QUEUE_REFRESH_MS {
+                return;
+            }
+        }
+        match self.api.queue_list().await {
+            Ok(tracks) => {
+                {
+                    let mut st = self.lock();
+                    st.queue_for = current;
+                    st.queue_at_ms = now;
+                }
+                self.apply_queue(tracks);
+            }
+            Err(e) => tracing::debug!(error = %e, "no se pudo leer la cola de Spotify"),
+        }
+    }
+
+    /// Guarda la cola (con quién pidió cada canción) y la publica si cambió.
+    pub fn apply_queue(&self, tracks: Vec<Track>) {
+        let payload = {
+            let mut st = self.lock();
+            let items: Vec<QueueItem> = tracks
+                .into_iter()
+                .map(|track| {
+                    let requested_by = st.pending.iter().find(|r| r.uri == track.uri).map(|r| r.unique_id.clone()).filter(|u| !u.is_empty());
+                    QueueItem { track, requested_by }
+                })
+                .collect();
+            if st.queue == items {
+                return;
+            }
+            st.queue = items;
+            queue_payload(&st.queue)
+        };
+        self.hub.publish_retained(QUEUE_CHANNEL, payload);
+    }
+
+    /// Vuelve a publicar la cola real (tras una prueba del overlay con datos de ejemplo).
+    pub fn republish_queue(&self) {
+        let payload = queue_payload(&self.lock().queue);
+        self.hub.publish_retained(QUEUE_CHANNEL, payload);
+    }
+
     /// Un sondeo. Devuelve cuánto esperar hasta el siguiente.
     pub async fn poll_once(&self) -> Duration {
         let configured = !effective_client_id(&self.config().client_id, default_client_id()).is_empty() && self.auth.is_connected();
         if !configured {
             self.apply_playing(None);
+            self.apply_queue(Vec::new());
             return POLL_DISCONNECTED;
         }
         match self.api.now_playing().await {
             Ok(p) => {
                 let playing = p.as_ref().is_some_and(|p| p.is_playing);
+                let uri = p.as_ref().map(|p| p.track.uri.clone());
                 self.apply_playing(p);
+                self.refresh_queue(uri).await;
                 if playing { POLL_PLAYING } else { POLL_IDLE }
             }
             Err(ApiError::RateLimited(s)) => Duration::from_secs(s),
             Err(ApiError::NotConnected) => {
                 self.apply_playing(None);
+                self.apply_queue(Vec::new());
                 POLL_DISCONNECTED
             }
             // No se arregla solo (cuenta no registrada en la app): que el overlay no se quede con la última canción.

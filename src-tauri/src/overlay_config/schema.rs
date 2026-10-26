@@ -417,6 +417,23 @@ fn other_overlays() -> Vec<OverlayDef> {
             },
         },
         OverlayDef {
+            id: "songqueue",
+            name: "overlay.songqueue",
+            screen: None,
+            fields: {
+                let mut f = common_style("top-left", true);
+                f.push(num("width", "field.width", Group::Style, 380.0, 220.0, 1000.0, 10.0));
+                f.push(num("coverSize", "field.coverSize", Group::Style, 44.0, 24.0, 120.0, 2.0));
+                f.push(text("title", "field.title", B, "Próximas canciones", 60));
+                f.push(select("mode", "field.queueMode", B, "always", &[("always", "queueMode.always"), ("onCommand", "queueMode.onCommand")]));
+                f.push(num("showSec", "field.queueShowSec", B, 15.0, 3.0, 300.0, 1.0));
+                f.push(num("maxItems", "field.maxItems", B, 5.0, 1.0, 10.0, 1.0));
+                f.push(boolean("showCover", "field.showCover", B, true));
+                f.push(boolean("showRequester", "field.showRequester", B, true));
+                f
+            },
+        },
+        OverlayDef {
             id: "jar",
             name: "overlay.jar",
             screen: None,
@@ -476,7 +493,7 @@ mod tests {
         let ids: Vec<_> = registry().iter().map(|d| d.id).collect();
         let (alerts, rest): (Vec<&str>, Vec<&str>) = ids.iter().copied().partition(|i| i.starts_with("alerts"));
         assert_eq!(alerts.len(), MAX_ALERT_SCREENS);
-        assert_eq!(rest, ["feed", "chat", "gifts", "leaderboard", "goals", "timer", "counters", "wheel", "poll", "nowplaying", "jar"]);
+        assert_eq!(rest, ["feed", "chat", "gifts", "leaderboard", "goals", "timer", "counters", "wheel", "poll", "nowplaying", "songqueue", "jar"]);
         assert_eq!(ids.iter().collect::<HashSet<_>>().len(), ids.len());
     }
 

@@ -9,6 +9,7 @@ pub mod netcmd;
 pub mod obs;
 pub mod points;
 pub mod sound;
+pub mod spotify;
 pub mod tts;
 pub mod webhook;
 

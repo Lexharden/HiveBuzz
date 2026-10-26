@@ -65,7 +65,7 @@ Cada pantalla trae una frase que explica para qué sirve.
 4. En OBS: *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080. TikTok LIVE Studio puede decir
    «enlace no válido» con estas direcciones locales: prueba el botón *Copiar (localhost)* o usa la cámara virtual de OBS.
 5. ⚠️ La URL lleva tu token: **no la compartas**.
-6. **Pantallas de alertas**: hay 5 de fábrica (*Alertas · Pantalla 1…5*) y puedes crear hasta 20 con *+ Añadir pantalla* (o quitar la última). Cada una es un overlay distinto con su propia URL, su estilo (posición, tamaño, fuente, animación…) y su propia cola: añade varias como *Navegador* en OBS, colócalas en sitios distintos y las alertas de pantallas diferentes se ven a la vez. En la acción *Alerta en overlay* eliges la **Pantalla** donde sale y, si quieres, cambias la animación o el tamaño de esa alerta. Solo la pantalla 1 muestra sola regalos, follows y suscripciones. Si quitas una pantalla, las reglas que la usaban pasan a la 1. Para vídeos sin transparencia, la acción tiene *Fondo del vídeo*: quita el fondo negro o el verde sin filtros de OBS.
+6. **Pantallas de alertas**: hay 5 de fábrica (*Alertas · Pantalla 1…5*) y puedes crear hasta 20 con *+ Añadir pantalla* (o quitar la última). Cada una es un overlay distinto con su propia URL, su estilo (posición, tamaño, fuente, animación…) y su propia cola: añade varias como *Navegador* en OBS, colócalas en sitios distintos y las alertas de pantallas diferentes se ven a la vez. En la acción *Alerta en overlay* eliges la **Pantalla** donde sale y, si quieres, cambias la animación o el tamaño de esa alerta. Solo la pantalla 1 muestra sola regalos, follows y suscripciones. Si quitas una pantalla, las reglas que la usaban pasan a la 1. Los vídeos con audio suenan en el overlay (*Volumen del vídeo* en la acción; en OBS, activa «Controlar audio mediante OBS» en la fuente Navegador para llevarlo a su propio canal). Para vídeos sin transparencia, la acción tiene *Fondo del vídeo*: quita el fondo negro o el verde sin filtros de OBS.
 7. **Jarrón de regalos**: lleva su propia cuenta de monedas (no necesita meta). En Overlays → Jarrón de regalos fija el *objetivo*, suma, llena o vacía a mano, y personaliza forma, colores, olas, burbujas, textos y efecto al llenarse. Con «Una meta de monedas» como origen sigue una meta de «Metas y timers».
    Los dólares son una **estimación**: monedas × la tasa que pongas (0,005 por defecto, aprox. lo que recibe el creador
    tras la comisión de TikTok). No incluyen impuestos ni cambios del programa de pagos; no los uses como ingresos reales.
@@ -178,7 +178,11 @@ Los usuarios se reconocen por su @ (sin importar mayúsculas ni el `@`), y puede
 2. Tus espectadores escriben `!sr nombre o enlace de la canción` y se agrega a tu cola; `!song` dice qué suena.
    (Quién puede pedir, coste en puntos, máximo por persona, etc. están en "Opciones de las peticiones", con
    valores razonables ya puestos.)
-3. Añade el overlay **Sonando ahora** a OBS.
+3. Añade el overlay **Sonando ahora** a OBS. Con **Próximas canciones** también se ve la cola (siempre, o solo unos segundos cuando alguien escribe `!cola`).
+- **Reproductor** (Integraciones → Spotify): botones para saltar, volver, pausar, reanudar y subir o bajar el volumen, y la lista de lo que viene.
+- **Control por chat** (opcional, desactivado de fábrica): `!skip`, `!pausa`, `!play`, `!volumen 30` / `!volumen +` / `!volumen -` para moderadores (o el rol que elijas) y `!cola` para todos. Con *Votos para saltar* mayor que 0, cualquiera puede votar `!skip`. Las respuestas quedan en el registro: HiveBuzz no escribe en el chat.
+- **Reglas**: la acción *Controlar Spotify* salta, pausa, reanuda o cambia el volumen (p. ej. «si llega una rosa, saltar la canción»).
+- *No repetir*: rechaza una canción que ya está en la cola o sonó hace poco.
 4. Requisitos de Spotify: tener Spotify abierto y reproduciendo, y cuenta **Premium** (sin Premium no se puede encolar).
 - Si aparece **"403 Forbidden"**, tu cuenta no está en *User Management* de la app de Spotify (o la cuenta dueña
   de la app no tiene Premium). Añádela y vuelve a conectar.

@@ -538,6 +538,20 @@ pub fn test_overlay(state: State<'_, AppState>, id: String) -> Result<()> {
             state.sim.emit(SimKind::Gift);
             state.sim.emit(SimKind::BigGift);
         }
+        "songqueue" => {
+            // Un ejemplo que no se retiene; a los pocos segundos se vuelve a publicar la cola real.
+            let item = |t: &str, a: &str, by: Option<&str>| json!({ "title": t, "artist": a, "image": null, "requestedBy": by });
+            state.hub.publish(
+                "songqueue",
+                json!({ "kind": "queue", "items": [item("Canción de ejemplo", "Artista", Some("luna")), item("Otra canción", "Banda", None), item("Una más", "Alguien", Some("sol"))] }),
+            );
+            state.hub.publish("songqueue", json!({ "kind": "show", "seconds": 8 }));
+            let spotify = std::sync::Arc::clone(&state.spotify);
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(9)).await;
+                spotify.republish_queue();
+            });
+        }
         "nowplaying" => {
             // Un ejemplo que no se retiene; a los pocos segundos se vuelve a publicar el estado real.
             state.hub.publish(

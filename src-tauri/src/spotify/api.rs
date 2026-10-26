@@ -48,7 +48,26 @@ pub trait SpotifyApi: Send + Sync {
     async fn find_track(&self, query: &str) -> Result<Option<Track>, ApiError>;
     async fn queue(&self, track: &Track) -> Result<(), ApiError>;
     async fn now_playing(&self) -> Result<Option<Playing>, ApiError>;
+    /// Saltar, anterior, pausa, reanudar o fijar el volumen.
+    async fn control(&self, op: PlayerCmd) -> Result<(), ApiError>;
+    /// Volumen actual del dispositivo activo (`None` si no hay uno).
+    async fn volume(&self) -> Result<Option<u8>, ApiError>;
+    /// Las próximas canciones de la cola, en orden.
+    async fn queue_list(&self) -> Result<Vec<Track>, ApiError>;
 }
+
+/// Órdenes simples al reproductor (el volumen relativo lo resuelve el servicio).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlayerCmd {
+    Next,
+    Previous,
+    Pause,
+    Resume,
+    Volume(u8),
+}
+
+/// Cuántas canciones de la cola se leen como máximo.
+const MAX_QUEUE_LIST: usize = 20;
 
 /// Extrae el id de una canción de `https://open.spotify.com/track/ID?...` o `spotify:track:ID`.
 pub fn track_id_from_ref(text: &str) -> Option<String> {
@@ -115,7 +134,7 @@ impl HttpSpotify {
                 .request(method.clone(), format!("{}{path_and_query}", self.base))
                 .header(AUTHORIZATION, format!("Bearer {token}"))
                 .header(ACCEPT, "application/json");
-            if method == reqwest::Method::POST {
+            if method == reqwest::Method::POST || method == reqwest::Method::PUT {
                 req = req.header(reqwest::header::CONTENT_LENGTH, "0");
             }
             let resp = req.send().await.map_err(|e| ApiError::Other(format!("no se pudo contactar con Spotify: {}", e.without_url())))?;
@@ -178,6 +197,48 @@ impl SpotifyApi for HttpSpotify {
             Ok(())
         } else {
             Err(Self::error_for(status, &body, retry))
+        }
+    }
+
+    async fn control(&self, op: PlayerCmd) -> Result<(), ApiError> {
+        use reqwest::Method;
+        let (method, path) = match op {
+            PlayerCmd::Next => (Method::POST, "/me/player/next".to_string()),
+            PlayerCmd::Previous => (Method::POST, "/me/player/previous".to_string()),
+            PlayerCmd::Pause => (Method::PUT, "/me/player/pause".to_string()),
+            PlayerCmd::Resume => (Method::PUT, "/me/player/play".to_string()),
+            PlayerCmd::Volume(v) => (Method::PUT, format!("/me/player/volume?volume_percent={}", v.min(100))),
+        };
+        let (status, body, retry) = self.send(method, &path).await?;
+        if status.is_success() {
+            Ok(())
+        } else {
+            Err(Self::error_for(status, &body, retry))
+        }
+    }
+
+    async fn volume(&self) -> Result<Option<u8>, ApiError> {
+        let (status, body, retry) = self.send(reqwest::Method::GET, "/me/player").await?;
+        match status {
+            StatusCode::NO_CONTENT => Ok(None),
+            StatusCode::OK => {
+                let v: Value = serde_json::from_str(&body).map_err(|_| ApiError::Other("respuesta ilegible".into()))?;
+                Ok(v.pointer("/device/volume_percent").and_then(Value::as_u64).map(|p| u8::try_from(p.min(100)).unwrap_or(100)))
+            }
+            _ => Err(Self::error_for(status, &body, retry)),
+        }
+    }
+
+    async fn queue_list(&self) -> Result<Vec<Track>, ApiError> {
+        let (status, body, retry) = self.send(reqwest::Method::GET, "/me/player/queue").await?;
+        match status {
+            StatusCode::NO_CONTENT => Ok(Vec::new()),
+            StatusCode::OK => {
+                let v: Value = serde_json::from_str(&body).map_err(|_| ApiError::Other("respuesta ilegible".into()))?;
+                // Los episodios de podcast no son canciones: `parse_track` los descarta.
+                Ok(v.get("queue").and_then(Value::as_array).map(|q| q.iter().filter_map(parse_track).take(MAX_QUEUE_LIST).collect()).unwrap_or_default())
+            }
+            _ => Err(Self::error_for(status, &body, retry)),
         }
     }
 

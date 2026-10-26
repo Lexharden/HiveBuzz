@@ -7,7 +7,7 @@ import { Preview } from "./Preview";
 import { SchemaForm } from "./SchemaForm";
 
 /** Overlays que tienen botón «probar» (los demás muestran datos reales). */
-const TESTABLE = new Set(["chat", "feed", "gifts", "nowplaying", "jar"]);
+const TESTABLE = new Set(["chat", "feed", "gifts", "nowplaying", "songqueue", "jar"]);
 /** Las pantallas de alertas (`alerts`, `alerts2`…) también se pueden probar. */
 const isTestable = (d: OverlayDef) => TESTABLE.has(d.id) || d.screen !== undefined;
 /** Cuánto se espera antes de enviar un cambio (mientras se arrastra un color o se teclea). */

@@ -65,7 +65,7 @@ describe("alertas", () => {
     expect(alerts(p.root)).toHaveLength(0);
   });
 
-  it("usa medios locales con token, y vídeo silenciado", () => {
+  it("usa medios locales con token, y el vídeo suena salvo que se silencie", () => {
     const p = load("alerts");
     p.send(config("alerts", cfg));
     p.send(overlayMsg("alerts", alert({ media: { kind: "image", url: "/media/abc.gif" } })));
@@ -79,8 +79,21 @@ describe("alertas", () => {
     v.send(overlayMsg("alerts", alert({ media: { kind: "video", url: "/media/clip.mp4" } })));
     const video = v.root.querySelector("video") as HTMLVideoElement | null;
     expect(video?.getAttribute("src")).toBe("/media/clip.mp4?token=tok");
-    expect(video?.muted).toBe(true);
+    expect(video?.muted).toBe(false);
+    expect(video?.volume).toBe(1);
     v.win.close();
+
+    const q = load("alerts");
+    q.send(config("alerts", cfg));
+    q.send(overlayMsg("alerts", alert({ media: { kind: "video", url: "/media/clip.mp4" }, videoVolume: 0 })));
+    expect((q.root.querySelector("video") as HTMLVideoElement).muted).toBe(true);
+    q.win.close();
+
+    const h = load("alerts");
+    h.send(config("alerts", cfg));
+    h.send(overlayMsg("alerts", alert({ media: { kind: "video", url: "/media/clip.mp4" }, videoVolume: 40 })));
+    expect((h.root.querySelector("video") as HTMLVideoElement).volume).toBe(0.4);
+    h.win.close();
   });
 
   it("SEGURIDAD: rutas de medios peligrosas y URLs no HTTPS no se cargan", () => {

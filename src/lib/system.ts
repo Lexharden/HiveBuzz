@@ -97,11 +97,34 @@ export interface SongConfig {
   maxDurationS: number;
   blockedTerms: string[];
   blockedUsers: string[];
+  noRepeat: boolean;
+}
+
+export interface ControlConfig {
+  enabled: boolean;
+  minRole: SongConfig["minRole"];
+  skipCommands: string[];
+  pauseCommands: string[];
+  resumeCommands: string[];
+  volumeCommands: string[];
+  queueCommands: string[];
+  skipVotes: number;
+  volumeStep: number;
+  queueShowS: number;
 }
 
 export interface SpotifyConfig {
   clientId: string;
   song: SongConfig;
+  control: ControlConfig;
+}
+
+/** Orden al reproductor: los dos de volumen llevan valor (0–100 para fijar, ±100 para subir o bajar). */
+export type SpotifyOp = "next" | "previous" | "pause" | "resume" | "volumeSet" | "volumeChange";
+
+export interface SpotifyOverview {
+  playing: { track: SpotifyTrack; progressMs: number; isPlaying: boolean } | null;
+  queue: { track: SpotifyTrack; requestedBy: string | null }[];
 }
 
 export interface SpotifyStatus {
@@ -175,6 +198,8 @@ export const systemApi = {
   spotifyConnect: () => invoke<void>("spotify_connect"),
   spotifyDisconnect: () => invoke<void>("spotify_disconnect"),
   spotifyQueueTest: (query: string) => invoke<SpotifyTrack>("spotify_queue_test", { query }),
+  spotifyControl: (op: SpotifyOp, value?: number) => invoke<void>("spotify_control", { op, value }),
+  spotifyOverview: () => invoke<SpotifyOverview>("spotify_overview"),
 };
 
 export const onUpdateProgress = (cb: (p: UpdateProgress) => void): Promise<UnlistenFn> =>

@@ -99,6 +99,7 @@ async fn every_overlay_page_is_served_with_security_headers() {
         ("wheel", "Ruleta"),
         ("poll", "Encuesta"),
         ("nowplaying", "Sonando ahora"),
+        ("songqueue", "Próximas canciones"),
         ("jar", "Jarrón"),
     ];
     for (name, marker) in expected {

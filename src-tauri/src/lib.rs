@@ -264,6 +264,8 @@ pub fn run() {
             commands_spotify::spotify_connect,
             commands_spotify::spotify_disconnect,
             commands_spotify::spotify_queue_test,
+            commands_spotify::spotify_control,
+            commands_spotify::spotify_overview,
         ])
         .build(tauri::generate_context!());
 

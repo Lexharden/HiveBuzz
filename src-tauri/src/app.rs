@@ -27,6 +27,7 @@ use crate::interact::poll::PollService;
 use crate::interact::wheel::WheelService;
 use crate::executors::internal::{GoalAdjustExecutor, TimerControlExecutor};
 use crate::executors::sound::PlaySoundExecutor;
+use crate::executors::spotify::SpotifyExecutor;
 use crate::executors::tts::TtsExecutor;
 use crate::goals::service::{GoalService, GoalTiming};
 use crate::jar::JarService;
@@ -286,6 +287,7 @@ impl AppState {
         registry.register(Arc::new(PlaySoundExecutor::new(Arc::clone(&sounds), Arc::clone(&audio))));
         registry.register(Arc::new(OverlayAlertExecutor::new(Arc::clone(&media), hub.clone(), Arc::clone(&sounds), Arc::clone(&audio), overlay_cfg.clone())));
         registry.register(Arc::new(TtsExecutor::new(Arc::clone(&tts))));
+        registry.register(Arc::new(SpotifyExecutor::new(Arc::clone(&spotify))));
         registry.register(Arc::new(GoalAdjustExecutor::new(Arc::clone(&goals))));
         registry.register(Arc::new(TimerControlExecutor::new(Arc::clone(&timers))));
         registry.register(Arc::new(PointsAdjustExecutor::new(Arc::clone(&points))));

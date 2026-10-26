@@ -4,6 +4,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.4.3] - 2026-10-26
+
+### Añadido
+- **Los vídeos de la biblioteca suenan**: si el vídeo trae audio, ahora se oye en el overlay de alertas (antes salía siempre mudo). Cada alerta tiene *Volumen del vídeo* (0 = mudo). En OBS, activa «Controlar audio mediante OBS» en la fuente Navegador si quieres su propio canal en el mezclador.
+- **Spotify: reproductor y control**. Botones en *Integraciones → Spotify* para saltar, volver, pausar, reanudar y cambiar el volumen, con la lista de próximas canciones (y quién pidió cada una).
+- **Control por chat** (opcional): `!skip`, `!pausa`, `!play`, `!volumen N` / `+` / `-` para moderadores (o el rol que elijas) y `!cola` para todos. Con *Votos para saltar* el público puede votar `!skip`. Todos los comandos son configurables.
+- **Nueva acción de regla «Controlar Spotify»**: saltar, volver, pausar, reanudar, fijar el volumen o subirlo/bajarlo.
+- **Nuevo overlay «Próximas canciones»**: muestra la cola de Spotify, siempre o solo unos segundos cuando alguien escribe `!cola`.
+- **No repetir canciones**: las peticiones rechazan una canción que ya está en la cola o sonó hace poco (activado de fábrica).
+
 ## [0.4.2] - 2026-10-25
 
 ### Añadido

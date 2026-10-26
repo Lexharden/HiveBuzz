@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>HiveBuzz · Próximas canciones</title>
+<!--HB_COMMON-->
+<style>
+  .sq { padding: 10px 14px; }
+  .sq .head { font-weight: 800; color: var(--hb-accent); margin-bottom: 6px; }
+  .sq .row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+  .sq .n { width: 1.4em; text-align: center; opacity: 0.6; flex: none; }
+  .sq .cover { width: var(--sq-cover, 44px); height: var(--sq-cover, 44px); border-radius: 6px; object-fit: cover; flex: none; }
+  .sq .info { min-width: 0; flex: 1; }
+  .sq .title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sq .artist { font-size: 0.85em; opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sq .by { font-size: 0.75em; color: var(--hb-accent); }
+</style>
+</head>
+<body data-anchor="top-left">
+<div id="hb-root"></div>
+<div id="hb-dot" title="Sin conexión con HiveBuzz"></div>
+<script>
+(function () {
+  "use strict";
+  var cfg = { width: 380, coverSize: 44, title: "Próximas canciones", mode: "always", showSec: 15, maxItems: 5, showCover: true, showRequester: true };
+  var items = [];
+  var shownUntil = 0;   // modo «al pedirla»: hasta cuándo se ve
+  var hideTimer = null;
+  var root = document.getElementById("hb-root");
+  var card = HB.el("div", "hb-card sq");
+  card.style.animation = "none";
+  card.style.display = "none";
+  root.appendChild(card);
+
+  function visible() {
+    if (!items.length) return false;
+    return cfg.mode === "always" || Date.now() < shownUntil;
+  }
+
+  function render() {
+    if (!visible()) { card.style.display = "none"; return; }
+    card.style.display = "";
+    card.style.width = cfg.width + "px";
+    card.style.setProperty("--sq-cover", cfg.coverSize + "px");
+    while (card.firstChild) card.removeChild(card.firstChild);
+    if (cfg.title) card.appendChild(HB.el("div", "head", cfg.title));
+    items.slice(0, cfg.maxItems).forEach(function (it, i) {
+      var row = HB.el("div", "row");
+      row.appendChild(HB.el("div", "n", i + 1));
+      if (cfg.showCover) {
+        var cover = HB.img(it.image, "cover");
+        if (cover) row.appendChild(cover);
+      }
+      var info = HB.el("div", "info");
+      info.appendChild(HB.el("div", "title", it.title));
+      info.appendChild(HB.el("div", "artist", it.artist));
+      if (cfg.showRequester && it.requestedBy) info.appendChild(HB.el("div", "by", HB.t("np.requestedBy", { user: "@" + it.requestedBy })));
+      row.appendChild(info);
+      card.appendChild(row);
+    });
+  }
+
+  function show(seconds) {
+    var s = HB.clamp(Number(seconds) || cfg.showSec, 3, 300);
+    shownUntil = Date.now() + s * 1000;
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(render, s * 1000 + 50);
+    render();
+  }
+
+  HB.start({
+    id: "songqueue",
+    onConfig: function (c) { cfg = c; render(); },
+    onOverlay: function (channel, d) {
+      if (channel !== "songqueue" || !d) return;
+      if (d.kind === "queue" && Array.isArray(d.items)) {
+        items = d.items.filter(function (i) { return i && typeof i.title === "string"; });
+        render();
+      } else if (d.kind === "show") {
+        show(d.seconds);
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>

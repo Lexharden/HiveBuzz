@@ -217,7 +217,8 @@
     "tcpSend": "TCP command",
     "wsSend": "WebSocket command",
     "pressKeys": "Simulate keys",
-    "obs": "OBS Studio"
+    "obs": "OBS Studio",
+    "spotify": "Control Spotify"
   },
   "action": {
     "sounds": "Sound(s)",
@@ -325,7 +326,22 @@
     "keyModeHint": "For videos without transparency: removes the black or green background inside the overlay itself (works in TikTok LIVE Studio too). Videos only.",
     "keyNone": "Leave as is",
     "keyBlack": "Remove black background",
-    "keyGreen": "Remove green background"
+    "keyGreen": "Remove green background",
+    "spotifyOp": "What to do",
+    "spotifyOps": {
+      "next": "Skip to the next one",
+      "previous": "Go back to the previous one",
+      "pause": "Pause",
+      "resume": "Resume",
+      "volumeSet": "Set the volume",
+      "volumeChange": "Raise or lower the volume"
+    },
+    "spotifyVolume": "Volume (0–100)",
+    "spotifyVolumeHint": "Percentage the volume is set to.",
+    "spotifyDelta": "Volume change",
+    "spotifyDeltaHint": "Positive raises, negative lowers (e.g. -10).",
+    "videoVolume": "Video volume",
+    "videoVolumeHint": "If the video has audio it plays in the overlay (0 = muted). In OBS: enable «Control audio via OBS» on the Browser source to give it its own mixer channel."
   },
   "myinstants": {
     "title": "Search MyInstants",
@@ -479,7 +495,8 @@
     "poll": "Poll",
     "nowplaying": "Now playing",
     "jar": "Gift jar",
-    "alertScreen": "Alerts · Screen {{n}}"
+    "alertScreen": "Alerts · Screen {{n}}",
+    "songqueue": "Upcoming songs"
   },
   "overlays": {
     "jarFill": "Fill",
@@ -602,7 +619,9 @@
     "autoFollow": "Automatic follow alerts",
     "autoSubscribe": "Automatic subscription alerts",
     "autoShare": "Automatic share alerts",
-    "autoDurationSec": "Automatic alert duration (s)"
+    "autoDurationSec": "Automatic alert duration (s)",
+    "queueMode": "When it shows",
+    "queueShowSec": "Seconds visible after !queue"
   },
   "jarOpt": {
     "jar": "Jar",
@@ -903,7 +922,31 @@
     "step3": "Paste the address shown below into “Redirect URIs” and save.",
     "step4": "In “Settings → User Management” add the name and email of your Spotify account (without this Spotify answers “403 Forbidden”).",
     "step5": "Copy your app's “Client ID”, paste it below, click Save and then “Connect with Spotify”.",
-    "forbiddenHelp": "Getting “403”? The account you connected isn't in the app's “User Management”, or the app owner's account has no Premium (Spotify requires it for apps in development mode). If you change the Client ID you'll need to connect again."
+    "forbiddenHelp": "Getting “403”? The account you connected isn't in the app's “User Management”, or the app owner's account has no Premium (Spotify requires it for apps in development mode). If you change the Client ID you'll need to connect again.",
+    "nothingPlaying": "Nothing is playing right now.",
+    "prev": "Previous",
+    "pause": "Pause",
+    "resume": "Resume",
+    "next": "Next",
+    "volDown": "Volume down",
+    "volUp": "Volume up",
+    "queueTitle": "Upcoming songs",
+    "queueEmpty": "The queue is empty.",
+    "controlTitle": "Chat control (skip, pause, volume, queue)",
+    "controlEnabled": "Enable the control commands",
+    "controlHint": "Moderators can always. Replies go to the log: HiveBuzz does not write in chat. With !queue anyone makes the «Upcoming songs» overlay show the list for a few seconds.",
+    "controlRole": "Who can skip, pause and change the volume",
+    "skipVotes": "Votes to skip",
+    "skipVotesHint": "0 = only whoever has permission. With a number, anyone can vote !skip and the song is skipped when it is reached.",
+    "volumeStep": "Volume step (+ / −)",
+    "queueShowS": "Seconds the queue shows after !queue",
+    "cmdSkip": "Skip commands",
+    "cmdPause": "Pause commands",
+    "cmdResume": "Resume commands",
+    "cmdVolume": "Volume commands",
+    "cmdQueue": "Queue commands",
+    "cmdQueueHint": "Anyone can use them.",
+    "noRepeat": "No repeats: reject songs already in the queue or played recently"
   },
   "system": {
     "save": "Save",
@@ -1223,7 +1266,7 @@
       },
       "overlays": {
         "what": "What your audience sees on screen: alerts, chat, goals…",
-        "i1": "Alerts, chat, gifts, goals, timer, wheel, polls and «Now playing».",
+        "i1": "Alerts, chat, gifts, goals, timer, wheel, polls and «Now playing». Also «Upcoming songs».",
         "i2": "Each one has its own address: copy it into OBS as a «Browser» source.",
         "i3": "Change colors, font, size and position while watching the live preview.",
         "i4": "You can show which platform each message comes from."
@@ -1498,5 +1541,9 @@
     "noneYet": "No groups yet: create them in Points & groups → Groups.",
     "deleted": "deleted group",
     "deletedHint": "This group no longer exists; click to remove it from the rule."
+  },
+  "queueMode": {
+    "always": "Whenever there are songs",
+    "onCommand": "Only when asked with !queue"
   }
 }

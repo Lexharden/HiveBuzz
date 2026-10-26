@@ -6,8 +6,8 @@ use tauri_plugin_opener::OpenerExt;
 use crate::app::AppState;
 use crate::error::{AppError, Result};
 use crate::spotify::api::Track;
-use crate::spotify::service::SpotifyStatus;
-use crate::spotify::{SpotifyConfig, CALLBACK_PATH};
+use crate::spotify::service::{Overview, SpotifyStatus};
+use crate::spotify::{ControlOp, SpotifyConfig, CALLBACK_PATH};
 
 fn redirect_uri(port: u16) -> String {
     format!("http://127.0.0.1:{port}{CALLBACK_PATH}")
@@ -49,4 +49,16 @@ pub fn spotify_disconnect(state: State<'_, AppState>) -> Result<()> {
 #[tauri::command]
 pub async fn spotify_queue_test(state: State<'_, AppState>, query: String) -> Result<Track> {
     state.spotify.manual_queue(&query).await
+}
+
+/// Orden al reproductor desde los botones de la app: `next`, `previous`, `pause`, `resume`, `volumeSet`, `volumeChange`.
+#[tauri::command]
+pub async fn spotify_control(state: State<'_, AppState>, op: String, value: Option<i64>) -> Result<()> {
+    state.spotify.control(ControlOp::parse(&op, value)?).await
+}
+
+/// Lo que suena y lo que viene (último sondeo), para el panel del reproductor.
+#[tauri::command]
+pub fn spotify_overview(state: State<'_, AppState>) -> Overview {
+    state.spotify.overview()
 }
