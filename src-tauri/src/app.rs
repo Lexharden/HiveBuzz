@@ -284,7 +284,7 @@ impl AppState {
         // Ejecutores: aquí se enchufan; agregar uno nuevo no toca el núcleo.
         let mut registry = ExecutorRegistry::new();
         registry.register(Arc::new(PlaySoundExecutor::new(Arc::clone(&sounds), Arc::clone(&audio))));
-        registry.register(Arc::new(OverlayAlertExecutor::new(Arc::clone(&media), hub.clone(), Arc::clone(&sounds), Arc::clone(&audio))));
+        registry.register(Arc::new(OverlayAlertExecutor::new(Arc::clone(&media), hub.clone(), Arc::clone(&sounds), Arc::clone(&audio), overlay_cfg.clone())));
         registry.register(Arc::new(TtsExecutor::new(Arc::clone(&tts))));
         registry.register(Arc::new(GoalAdjustExecutor::new(Arc::clone(&goals))));
         registry.register(Arc::new(TimerControlExecutor::new(Arc::clone(&timers))));

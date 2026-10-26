@@ -312,7 +312,20 @@
     "obsVisible": "Mostrar (desmarcado = ocultar)",
     "obsEnabled": "Activar (desmarcado = desactivar)",
     "obsRevert": "Revertir tras (ms)",
-    "obsRevertHint": "Vacío = se queda así"
+    "obsRevertHint": "Vacío = se queda así",
+    "screen": "Pantalla",
+    "screenHint": "Cada pantalla es un overlay aparte (una fuente «Navegador» en OBS) con su estilo y su propia cola: alertas de pantallas distintas se ven a la vez.",
+    "screenOption": "Pantalla {{n}}",
+    "screenGone": "ya no existe: usa la 1",
+    "animation": "Animación",
+    "animationDefault": "La de la pantalla",
+    "alertScale": "Tamaño (%)",
+    "alertScaleHint": "Vacío = el de la pantalla.",
+    "keyMode": "Fondo del vídeo",
+    "keyModeHint": "Para vídeos sin transparencia: quita el fondo negro o el verde dentro del propio overlay (sirve también en TikTok LIVE Studio). Solo afecta a vídeos.",
+    "keyNone": "Dejarlo como está",
+    "keyBlack": "Quitar el fondo negro",
+    "keyGreen": "Quitar el fondo verde"
   },
   "myinstants": {
     "title": "Buscar en MyInstants",
@@ -465,7 +478,8 @@
     "wheel": "Ruleta",
     "poll": "Encuesta",
     "nowplaying": "Sonando ahora",
-    "jar": "Jarrón de regalos"
+    "jar": "Jarrón de regalos",
+    "alertScreen": "Alertas · Pantalla {{n}}"
   },
   "overlays": {
     "jarFill": "Llenar",
@@ -485,7 +499,10 @@
     "copyFailed": "No se pudo copiar al portapapeles.",
     "previewHintTest": "Vista previa a 1920×1080. Usa «Probar» para mandarle contenido de ejemplo.",
     "previewHintLive": "Vista previa a 1920×1080. Este overlay muestra datos reales.",
-    "testSent": "Prueba enviada al overlay"
+    "testSent": "Prueba enviada al overlay",
+    "addScreen": "+ Añadir pantalla",
+    "removeScreen": "Quitar la última",
+    "removeScreenConfirm": "Se quitará la pantalla {{n}} de alertas y se perderá su estilo. Las reglas que la usen pasarán a mostrar sus alertas en la pantalla 1. ¿Continuar?"
   },
   "field": {
     "fontFamily": "Fuente",

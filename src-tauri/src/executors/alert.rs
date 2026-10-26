@@ -10,7 +10,12 @@
 //! audio salen a la vez aunque haya otras alertas en cola. Si el overlay no está abierto, suena tras unos
 //! segundos de todos modos.
 //!
-//! Las alertas se muestran de una en una (grupo serial): el overlay no las superpone.
+//! Pantalla (`screen`, 1 por defecto): cada pantalla es un overlay distinto con su estilo y su cola, así que
+//! alertas de pantallas distintas se ven a la vez. Si la pantalla ya no existe se usa la 1.
+//! Fondo del vídeo (`keyMode`): `black` quita el fondo negro y `green` el verde, para vídeos sin canal alfa.
+//! Ajustes de esta alerta sobre el estilo de su pantalla: `animation` (`pop`/`slide`/`fade`) y `scale` (40–250 %).
+//!
+//! Dentro de una pantalla las alertas se muestran de una en una: el overlay no las superpone.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,9 +30,10 @@ use crate::audio::{AudioBackend, TAG_SOUND};
 use crate::error::{AppError, Result};
 use crate::media::MediaLibrary;
 use crate::overlay::OverlayHub;
+use crate::overlay_config::schema::{alert_screen_id, MAX_ALERT_SCREENS};
+use crate::overlay_config::OverlayConfigService;
 use crate::sounds::SoundLibrary;
 
-pub const CHANNEL: &str = "alerts";
 const DEFAULT_DURATION_MS: f64 = 5000.0;
 /// Cuánto se espera el aviso del overlay antes de reproducir el sonido igualmente.
 const ACK_TIMEOUT: Duration = Duration::from_secs(15);
@@ -37,12 +43,19 @@ pub struct OverlayAlertExecutor {
     hub: OverlayHub,
     sounds: Arc<SoundLibrary>,
     audio: Arc<dyn AudioBackend>,
+    screens: OverlayConfigService,
 }
 
 impl OverlayAlertExecutor {
-    pub fn new(media: Arc<MediaLibrary>, hub: OverlayHub, sounds: Arc<SoundLibrary>, audio: Arc<dyn AudioBackend>) -> Self {
-        Self { media, hub, sounds, audio }
+    pub fn new(media: Arc<MediaLibrary>, hub: OverlayHub, sounds: Arc<SoundLibrary>, audio: Arc<dyn AudioBackend>, screens: OverlayConfigService) -> Self {
+        Self { media, hub, sounds, audio, screens }
     }
+}
+
+/// Pantalla pedida por la acción (1 si no dice nada o no es válida).
+fn wanted_screen(params: &Map<String, Value>) -> usize {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    params.get("screen").and_then(Value::as_f64).filter(|n| n.is_finite() && *n >= 1.0).map_or(1, |n| n as usize)
 }
 
 fn text_param<'a>(params: &'a Map<String, Value>, key: &str) -> Option<&'a str> {
@@ -59,6 +72,11 @@ impl ActionExecutor for OverlayAlertExecutor {
         Concurrency::Serial("alerts")
     }
 
+    /// Una cola por pantalla: las alertas de pantallas distintas no se esperan entre sí.
+    fn concurrency_for(&self, params: &Map<String, Value>) -> Concurrency {
+        Concurrency::Serial(alert_screen_id(wanted_screen(params)).unwrap_or("alerts"))
+    }
+
     fn validate(&self, params: &Map<String, Value>) -> Result<()> {
         let has_content = ["title", "text", "mediaId", "imageUrl"].iter().any(|k| text_param(params, k).is_some()) || !sound_ids(params).is_empty();
         if !has_content {
@@ -66,6 +84,19 @@ impl ActionExecutor for OverlayAlertExecutor {
         }
         opt_number(params, "durationMs", 500.0, 60_000.0)?;
         opt_number(params, "soundVolume", 0.0, 100.0)?;
+        #[allow(clippy::cast_precision_loss)]
+        opt_number(params, "screen", 1.0, MAX_ALERT_SCREENS as f64)?;
+        opt_number(params, "scale", 40.0, 250.0)?;
+        if let Some(k) = text_param(params, "keyMode") {
+            if !["black", "green"].contains(&k) {
+                return Err(AppError::Invalid("fondo de vídeo desconocido".into()));
+            }
+        }
+        if let Some(a) = text_param(params, "animation") {
+            if !["pop", "slide", "fade"].contains(&a) {
+                return Err(AppError::Invalid("animación desconocida".into()));
+            }
+        }
         opt_bool(params, "wait", true)?;
         opt_bool(params, "showAvatar", false)?;
         Ok(())
@@ -106,6 +137,7 @@ impl ActionExecutor for OverlayAlertExecutor {
             }
         };
 
+        let channel = self.screens.resolve_screen(wanted_screen(params)).await?;
         let id = uuid::Uuid::new_v4().to_string();
         // Se pide el aviso antes de publicar: así no puede llegar antes de que alguien lo espere.
         let shown = sound.as_ref().map(|_| self.hub.expect_ack(&id));
@@ -119,8 +151,11 @@ impl ActionExecutor for OverlayAlertExecutor {
             "media": media,
             "avatar": avatar,
             "durationMs": duration_ms,
+            "animation": text_param(params, "animation"),
+            "keyMode": text_param(params, "keyMode"),
+            "scale": opt_number(params, "scale", 40.0, 250.0)?,
         });
-        self.hub.publish(CHANNEL, payload);
+        self.hub.publish(channel, payload);
 
         if let (Some((path, volume)), Some(shown)) = (sound, shown) {
             let (audio, hub) = (Arc::clone(&self.audio), self.hub.clone());
@@ -157,6 +192,7 @@ mod tests {
         media: Arc<MediaLibrary>,
         sounds: Arc<SoundLibrary>,
         audio: Arc<FakeAudio>,
+        screens: OverlayConfigService,
         tmp: tempfile::TempDir,
     }
 
@@ -165,10 +201,11 @@ mod tests {
         let db = Db::open_memory().await.expect("db");
         let clock = Arc::new(AppClock::new());
         let media = Arc::new(MediaLibrary::new(db.clone(), tmp.path().join("m"), clock.clone()).expect("lib"));
-        let sounds = Arc::new(SoundLibrary::new(db, tmp.path().join("s"), clock).expect("sounds"));
+        let sounds = Arc::new(SoundLibrary::new(db.clone(), tmp.path().join("s"), clock).expect("sounds"));
         let audio = Arc::new(FakeAudio { duration: Duration::from_millis(10), ..Default::default() });
         let hub = OverlayHub::new(16);
-        Rig { exec: OverlayAlertExecutor::new(media.clone(), hub.clone(), sounds.clone(), audio.clone()), hub, media, sounds, audio, tmp }
+        let screens = OverlayConfigService::new(db, hub.clone());
+        Rig { exec: OverlayAlertExecutor::new(media.clone(), hub.clone(), sounds.clone(), audio.clone(), screens.clone()), hub, media, sounds, audio, screens, tmp }
     }
 
     async fn import_sound(r: &Rig) -> String {
@@ -319,5 +356,50 @@ mod tests {
     #[tokio::test]
     async fn alerts_are_shown_one_at_a_time() {
         assert_eq!(rig().await.exec.concurrency(), Concurrency::Serial("alerts"));
+    }
+
+    #[tokio::test]
+    async fn each_screen_gets_its_own_channel_and_queue() {
+        let r = rig().await;
+        let mut rx = r.hub.subscribe();
+        for (screen, channel) in [(json!(null), "alerts"), (json!(3), "alerts3"), (json!(5), "alerts5")] {
+            r.exec.execute(&ctx(), &params(json!({"text": "x", "wait": false, "screen": screen}))).await.expect("exec");
+            assert_eq!(rx.recv().await.expect("msg").channel, channel);
+        }
+        let queue = |s: Value| r.exec.concurrency_for(&params(json!({"screen": s})));
+        assert_eq!(queue(json!(1)), Concurrency::Serial("alerts"));
+        assert_eq!(queue(json!(4)), Concurrency::Serial("alerts4"));
+        assert_ne!(queue(json!(2)), queue(json!(3)));
+        assert_eq!(r.exec.concurrency_for(&params(json!({}))), Concurrency::Serial("alerts"));
+    }
+
+    #[tokio::test]
+    async fn a_screen_that_no_longer_exists_falls_back_to_the_first() {
+        let r = rig().await;
+        r.screens.set_screens(2).await.expect("n");
+        let mut rx = r.hub.subscribe();
+        r.exec.execute(&ctx(), &params(json!({"text": "x", "wait": false, "screen": 4}))).await.expect("exec");
+        assert_eq!(rx.recv().await.expect("msg").channel, "alerts");
+    }
+
+    #[tokio::test]
+    async fn per_alert_animation_and_scale_travel_with_the_alert() {
+        let r = rig().await;
+        let mut rx = r.hub.subscribe();
+        r.exec.execute(&ctx(), &params(json!({"text": "x", "wait": false, "animation": "slide", "scale": 150}))).await.expect("exec");
+        let m = rx.recv().await.expect("msg");
+        assert_eq!((m.data["animation"].clone(), m.data["scale"].as_f64()), (json!("slide"), Some(150.0)));
+        assert!(m.data["keyMode"].is_null());
+        r.exec.execute(&ctx(), &params(json!({"text": "x", "wait": false, "keyMode": "green"}))).await.expect("exec");
+        assert_eq!(rx.recv().await.expect("msg").data["keyMode"], "green");
+        let v = |p: Value| r.exec.validate(&params(p));
+        assert!(v(json!({"text": "x", "screen": 21})).is_err());
+        assert!(v(json!({"text": "x", "screen": 0})).is_err());
+        assert!(v(json!({"text": "x", "scale": 10})).is_err());
+        assert!(v(json!({"text": "x", "animation": "spin"})).is_err());
+        assert!(v(json!({"text": "x", "keyMode": "blue"})).is_err());
+        assert!(v(json!({"text": "x", "keyMode": "black"})).is_ok());
+        assert!(v(json!({"text": "x", "keyMode": ""})).is_ok());
+        assert!(v(json!({"text": "x", "screen": 20, "scale": 250, "animation": "fade"})).is_ok());
     }
 }

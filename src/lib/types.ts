@@ -287,6 +287,8 @@ export interface OverlayDef {
   id: string;
   /** Clave de i18n. */
   name: string;
+  /** Número de pantalla si es una pantalla de alertas. */
+  screen?: number;
   fields: FieldDef[];
 }
 

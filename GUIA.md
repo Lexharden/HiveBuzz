@@ -65,7 +65,8 @@ Cada pantalla trae una frase que explica para qué sirve.
 4. En OBS: *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080. TikTok LIVE Studio puede decir
    «enlace no válido» con estas direcciones locales: prueba el botón *Copiar (localhost)* o usa la cámara virtual de OBS.
 5. ⚠️ La URL lleva tu token: **no la compartas**.
-6. **Jarrón de regalos**: lleva su propia cuenta de monedas (no necesita meta). En Overlays → Jarrón de regalos fija el *objetivo*, suma, llena o vacía a mano, y personaliza forma, colores, olas, burbujas, textos y efecto al llenarse. Con «Una meta de monedas» como origen sigue una meta de «Metas y timers».
+6. **Pantallas de alertas**: hay 5 de fábrica (*Alertas · Pantalla 1…5*) y puedes crear hasta 20 con *+ Añadir pantalla* (o quitar la última). Cada una es un overlay distinto con su propia URL, su estilo (posición, tamaño, fuente, animación…) y su propia cola: añade varias como *Navegador* en OBS, colócalas en sitios distintos y las alertas de pantallas diferentes se ven a la vez. En la acción *Alerta en overlay* eliges la **Pantalla** donde sale y, si quieres, cambias la animación o el tamaño de esa alerta. Solo la pantalla 1 muestra sola regalos, follows y suscripciones. Si quitas una pantalla, las reglas que la usaban pasan a la 1. Para vídeos sin transparencia, la acción tiene *Fondo del vídeo*: quita el fondo negro o el verde sin filtros de OBS.
+7. **Jarrón de regalos**: lleva su propia cuenta de monedas (no necesita meta). En Overlays → Jarrón de regalos fija el *objetivo*, suma, llena o vacía a mano, y personaliza forma, colores, olas, burbujas, textos y efecto al llenarse. Con «Una meta de monedas» como origen sigue una meta de «Metas y timers».
    Los dólares son una **estimación**: monedas × la tasa que pongas (0,005 por defecto, aprox. lo que recibe el creador
    tras la comisión de TikTok). No incluyen impuestos ni cambios del programa de pagos; no los uses como ingresos reales.
 
@@ -95,7 +96,7 @@ Los usuarios se reconocen por su @ (sin importar mayúsculas ni el `@`), y puede
 | Acción | Para qué |
 |---|---|
 | Reproducir sonido | Sonidos de tu biblioteca (volumen por sonido; varios = al azar) |
-| Alerta en overlay | Imagen/GIF/video + texto con variables |
+| Alerta en overlay | Imagen/GIF/video + texto con variables, en la pantalla de alertas que elijas |
 | Texto a voz | Lee un texto con la voz elegida |
 | Modificar meta / Controlar timer | Sumar progreso, extender el subathon… |
 | Sumar/restar puntos | Premiar o cobrar puntos |

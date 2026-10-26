@@ -49,6 +49,12 @@ pub trait ActionExecutor: Send + Sync {
         Concurrency::Parallel
     }
 
+    /// Grupo de concurrencia de una acción concreta. Por defecto el del tipo; un ejecutor puede
+    /// repartirse en varios grupos según sus parámetros (p. ej. una cola por pantalla de alertas).
+    fn concurrency_for(&self, _params: &Map<String, Value>) -> Concurrency {
+        self.concurrency()
+    }
+
     /// Comprueba los parámetros al guardar la regla (no al ejecutarla).
     fn validate(&self, _params: &Map<String, Value>) -> Result<()> {
         Ok(())

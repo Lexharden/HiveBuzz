@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ActionSpec, Goal, Media, Sound, TimerView, VoiceInfo } from "../../lib/types";
+import { api } from "../../lib/api";
 import { voiceLabel } from "../../lib/voices";
 import { Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
 import { amountValue, bool, num, set, str, toAmount } from "./paramHelpers";
@@ -147,8 +148,34 @@ function PlaySoundParams({ action, onChange, sounds }: Pick<Props, "action" | "o
 
 function AlertParams({ action, onChange, media, sounds }: Pick<Props, "action" | "onChange" | "media" | "sounds">) {
   const { t } = useTranslation();
+  const [screens, setScreens] = useState(5);
+  useEffect(() => {
+    void api.getAlertScreens().then(setScreens).catch(() => undefined);
+  }, []);
+  // Si la regla apunta a una pantalla que ya no existe, se sigue viendo (y se avisa en la lista).
+  const current = num(action, "screen") ?? 1;
+  const count = Math.max(screens, current);
   return (
     <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        <Field label={t("action.screen")} hint={t("action.screenHint")}>
+          <Select
+            value={String(current)}
+            onChange={(v) => onChange(set(action, "screen", Number(v) === 1 ? null : Number(v)))}
+            options={Array.from({ length: count }, (_, i) => ({ value: String(i + 1), label: t("action.screenOption", { n: i + 1 }) + (i + 1 > screens ? ` (${t("action.screenGone")})` : "") }))}
+          />
+        </Field>
+        <Field label={t("action.animation")}>
+          <Select
+            value={str(action, "animation")}
+            onChange={(v) => onChange(set(action, "animation", v || null))}
+            options={[{ value: "", label: t("action.animationDefault") }, ...["pop", "slide", "fade"].map((a) => ({ value: a, label: t(`animation.${a}`) }))]}
+          />
+        </Field>
+        <Field label={t("action.alertScale")} hint={t("action.alertScaleHint")}>
+          <NumberInput value={num(action, "scale")} min={40} max={250} step={5} placeholder="100" onChange={(v) => onChange(set(action, "scale", v))} />
+        </Field>
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("action.alertTitle")}>
           <TextInput value={str(action, "title")} onChange={(v) => onChange(set(action, "title", v))} placeholder="{nickname}" />
@@ -169,6 +196,13 @@ function AlertParams({ action, onChange, media, sounds }: Pick<Props, "action" |
           <TextInput value={str(action, "imageUrl")} onChange={(v) => onChange(set(action, "imageUrl", v))} placeholder="{giftimage}" />
         </Field>
       </div>
+      <Field label={t("action.keyMode")} hint={t("action.keyModeHint")}>
+        <Select
+          value={str(action, "keyMode")}
+          onChange={(v) => onChange(set(action, "keyMode", v || null))}
+          options={[{ value: "", label: t("action.keyNone") }, { value: "black", label: t("action.keyBlack") }, { value: "green", label: t("action.keyGreen") }]}
+        />
+      </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("action.alertSound")} hint={t("action.alertSoundHint")}>
           <Select

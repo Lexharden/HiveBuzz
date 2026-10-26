@@ -44,6 +44,9 @@ pub struct OverlayDef {
     pub id: &'static str,
     /// Clave de i18n.
     pub name: &'static str,
+    /// Número de pantalla si es una pantalla de alertas.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub screen: Option<usize>,
     pub fields: Vec<FieldDef>,
 }
 
@@ -194,33 +197,68 @@ fn common_style(anchor: &'static str, with_background: bool) -> Vec<FieldDef> {
     f
 }
 
-/// Todos los overlays y sus campos.
+/// Pantallas de alertas que se pueden crear como máximo.
+pub const MAX_ALERT_SCREENS: usize = 20;
+/// Pantallas de alertas que existen de fábrica.
+pub const DEFAULT_ALERT_SCREENS: usize = 5;
+/// Id (y canal) de cada pantalla de alertas: la 1 conserva el id histórico `alerts`.
+const ALERT_IDS: [&str; MAX_ALERT_SCREENS] = [
+    "alerts", "alerts2", "alerts3", "alerts4", "alerts5", "alerts6", "alerts7", "alerts8", "alerts9", "alerts10", "alerts11", "alerts12", "alerts13", "alerts14",
+    "alerts15", "alerts16", "alerts17", "alerts18", "alerts19", "alerts20",
+];
+
+/// Id de la pantalla de alertas `n` (1 a `MAX_ALERT_SCREENS`).
+pub fn alert_screen_id(n: usize) -> Option<&'static str> {
+    n.checked_sub(1).and_then(|i| ALERT_IDS.get(i)).copied()
+}
+
+/// Número de pantalla de un id de overlay, si es una pantalla de alertas.
+pub fn alert_screen_number(id: &str) -> Option<usize> {
+    ALERT_IDS.iter().position(|a| *a == id).map(|i| i + 1)
+}
+
+/// Una pantalla de alertas. Cada una tiene su URL, su cola y su estilo propios, de modo que varias
+/// alertas pueden verse a la vez en sitios distintos. Solo la 1 reacciona sola a los eventos.
+fn alerts_def(n: usize) -> OverlayDef {
+    use Group::Behavior as B;
+    let first = n == 1;
+    let mut f = common_style("center", false);
+    f.push(num("titleSize", "field.titleSize", Group::Style, 40.0, 12.0, 160.0, 1.0));
+    f.push(num("textSize", "field.textSize", Group::Style, 30.0, 10.0, 120.0, 1.0));
+    f.push(num("mediaMaxWidth", "field.mediaMaxWidth", Group::Style, 60.0, 10.0, 100.0, 1.0));
+    f.push(select("animation", "field.animation", B, "pop", &[("pop", "animation.pop"), ("slide", "animation.slide"), ("fade", "animation.fade")]));
+    // Alertas sin reglas: el overlay reacciona solo a estos eventos. Las reglas con la acción
+    // «Mostrar alerta» siguen funcionando aparte.
+    f.push(boolean("autoGift", "field.autoGift", B, first));
+    f.push(num("minCoins", "field.autoMinCoins", B, 1.0, 0.0, 100_000.0, 1.0));
+    f.push(boolean("autoFollow", "field.autoFollow", B, first));
+    f.push(boolean("autoSubscribe", "field.autoSubscribe", B, first));
+    f.push(boolean("autoShare", "field.autoShare", B, false));
+    f.push(num("autoDurationSec", "field.autoDurationSec", B, 5.0, 1.0, 60.0, 1.0));
+    OverlayDef {
+        id: ALERT_IDS[n - 1],
+        name: if first { "overlay.alerts" } else { "overlay.alertScreen" },
+        screen: Some(n),
+        fields: f,
+    }
+}
+
+/// Todos los overlays y sus campos (incluidas las pantallas de alertas aún sin crear: el número
+/// de las que se muestran lo decide `OverlayConfigService::screens`).
 pub fn registry() -> Vec<OverlayDef> {
+    let mut all: Vec<OverlayDef> = (1..=MAX_ALERT_SCREENS).map(alerts_def).collect();
+    all.extend(other_overlays());
+    all
+}
+
+#[allow(clippy::too_many_lines)]
+fn other_overlays() -> Vec<OverlayDef> {
     use Group::Behavior as B;
     vec![
         OverlayDef {
-            id: "alerts",
-            name: "overlay.alerts",
-            fields: {
-                let mut f = common_style("center", false);
-                f.push(num("titleSize", "field.titleSize", Group::Style, 40.0, 12.0, 160.0, 1.0));
-                f.push(num("textSize", "field.textSize", Group::Style, 30.0, 10.0, 120.0, 1.0));
-                f.push(num("mediaMaxWidth", "field.mediaMaxWidth", Group::Style, 60.0, 10.0, 100.0, 1.0));
-                f.push(select("animation", "field.animation", B, "pop", &[("pop", "animation.pop"), ("slide", "animation.slide"), ("fade", "animation.fade")]));
-                // Alertas sin reglas: el overlay reacciona solo a estos eventos. Las reglas con la
-                // acción «Mostrar alerta» siguen funcionando aparte.
-                f.push(boolean("autoGift", "field.autoGift", B, true));
-                f.push(num("minCoins", "field.autoMinCoins", B, 1.0, 0.0, 100_000.0, 1.0));
-                f.push(boolean("autoFollow", "field.autoFollow", B, true));
-                f.push(boolean("autoSubscribe", "field.autoSubscribe", B, true));
-                f.push(boolean("autoShare", "field.autoShare", B, false));
-                f.push(num("autoDurationSec", "field.autoDurationSec", B, 5.0, 1.0, 60.0, 1.0));
-                f
-            },
-        },
-        OverlayDef {
             id: "feed",
             name: "overlay.feed",
+            screen: None,
             fields: {
                 let mut f = common_style("bottom-left", true);
                 f.push(num("maxItems", "field.maxItems", B, 12.0, 1.0, 40.0, 1.0));
@@ -239,6 +277,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "chat",
             name: "overlay.chat",
+            screen: None,
             fields: {
                 let mut f = common_style("bottom-left", true);
                 f.push(num("width", "field.width", Group::Style, 420.0, 200.0, 1200.0, 10.0));
@@ -257,6 +296,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "gifts",
             name: "overlay.gifts",
+            screen: None,
             fields: {
                 let mut f = common_style("top-right", true);
                 f.push(num("width", "field.width", Group::Style, 340.0, 200.0, 900.0, 10.0));
@@ -273,6 +313,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "leaderboard",
             name: "overlay.leaderboard",
+            screen: None,
             fields: {
                 let mut f = common_style("top-left", true);
                 f.push(num("width", "field.width", Group::Style, 320.0, 200.0, 900.0, 10.0));
@@ -288,6 +329,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "goals",
             name: "overlay.goals",
+            screen: None,
             fields: {
                 let mut f = common_style("bottom-right", true);
                 f.push(num("width", "field.width", Group::Style, 420.0, 200.0, 1400.0, 10.0));
@@ -303,6 +345,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "timer",
             name: "overlay.timer",
+            screen: None,
             fields: {
                 let mut f = common_style("top-right", true);
                 f.push(num("digitSize", "field.digitSize", Group::Style, 64.0, 16.0, 300.0, 1.0));
@@ -318,6 +361,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "counters",
             name: "overlay.counters",
+            screen: None,
             fields: {
                 let mut f = common_style("top-left", true);
                 f.push(boolean("showLikes", "field.showLikes", B, true));
@@ -331,6 +375,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "wheel",
             name: "overlay.wheel",
+            screen: None,
             fields: {
                 let mut f = common_style("center", false);
                 f.push(num("size", "field.wheelSize", Group::Style, 420.0, 200.0, 1000.0, 10.0));
@@ -343,6 +388,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "poll",
             name: "overlay.poll",
+            screen: None,
             fields: {
                 let mut f = common_style("top-left", true);
                 f.push(num("width", "field.width", Group::Style, 380.0, 220.0, 1000.0, 10.0));
@@ -358,6 +404,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "nowplaying",
             name: "overlay.nowplaying",
+            screen: None,
             fields: {
                 let mut f = common_style("bottom-left", true);
                 f.push(num("width", "field.width", Group::Style, 420.0, 220.0, 1000.0, 10.0));
@@ -372,6 +419,7 @@ pub fn registry() -> Vec<OverlayDef> {
         OverlayDef {
             id: "jar",
             name: "overlay.jar",
+            screen: None,
             fields: {
                 use Group::Style;
                 let mut f = common_style("bottom-left", false);
@@ -426,7 +474,9 @@ mod tests {
     #[test]
     fn registry_ids_are_unique_and_known() {
         let ids: Vec<_> = registry().iter().map(|d| d.id).collect();
-        assert_eq!(ids, ["alerts", "feed", "chat", "gifts", "leaderboard", "goals", "timer", "counters", "wheel", "poll", "nowplaying", "jar"]);
+        let (alerts, rest): (Vec<&str>, Vec<&str>) = ids.iter().copied().partition(|i| i.starts_with("alerts"));
+        assert_eq!(alerts.len(), MAX_ALERT_SCREENS);
+        assert_eq!(rest, ["feed", "chat", "gifts", "leaderboard", "goals", "timer", "counters", "wheel", "poll", "nowplaying", "jar"]);
         assert_eq!(ids.iter().collect::<HashSet<_>>().len(), ids.len());
     }
 
@@ -524,5 +574,20 @@ mod tests {
         let sel = serde_json::to_value(d.field("anchor").expect("f")).expect("json");
         assert_eq!(sel["kind"], "select");
         assert!(sel["options"].as_array().expect("arr").len() >= 5);
+    }
+
+    #[test]
+    fn alert_screens_are_numbered_and_only_the_first_reacts_to_events() {
+        assert_eq!(alert_screen_id(1), Some("alerts"));
+        assert_eq!(alert_screen_id(6), Some("alerts6"));
+        assert_eq!(alert_screen_id(0), None);
+        assert_eq!(alert_screen_id(MAX_ALERT_SCREENS + 1), None);
+        assert_eq!(alert_screen_number("alerts12"), Some(12));
+        assert_eq!(alert_screen_number("chat"), None);
+        let one = find("alerts").expect("1").defaults();
+        let two = find("alerts2").expect("2").defaults();
+        assert_eq!((one["autoGift"].clone(), two["autoGift"].clone()), (json!(true), json!(false)));
+        assert_eq!(find("alerts3").expect("3").screen, Some(3));
+        assert_eq!(find("chat").expect("chat").screen, None);
     }
 }

@@ -312,7 +312,20 @@
     "obsVisible": "Show (unchecked = hide)",
     "obsEnabled": "Enable (unchecked = disable)",
     "obsRevert": "Revert after (ms)",
-    "obsRevertHint": "Empty = stays that way"
+    "obsRevertHint": "Empty = stays that way",
+    "screen": "Screen",
+    "screenHint": "Each screen is a separate overlay (a Browser source in OBS) with its own style and queue: alerts on different screens show at the same time.",
+    "screenOption": "Screen {{n}}",
+    "screenGone": "no longer exists: uses 1",
+    "animation": "Animation",
+    "animationDefault": "The screen's own",
+    "alertScale": "Size (%)",
+    "alertScaleHint": "Empty = the screen's.",
+    "keyMode": "Video background",
+    "keyModeHint": "For videos without transparency: removes the black or green background inside the overlay itself (works in TikTok LIVE Studio too). Videos only.",
+    "keyNone": "Leave as is",
+    "keyBlack": "Remove black background",
+    "keyGreen": "Remove green background"
   },
   "myinstants": {
     "title": "Search MyInstants",
@@ -465,7 +478,8 @@
     "wheel": "Wheel",
     "poll": "Poll",
     "nowplaying": "Now playing",
-    "jar": "Gift jar"
+    "jar": "Gift jar",
+    "alertScreen": "Alerts · Screen {{n}}"
   },
   "overlays": {
     "jarFill": "Fill",
@@ -485,7 +499,10 @@
     "copyFailed": "Could not copy to the clipboard.",
     "previewHintTest": "Preview at 1920×1080. Use «Test» to send it sample content.",
     "previewHintLive": "Preview at 1920×1080. This overlay shows real data.",
-    "testSent": "Test sent to the overlay"
+    "testSent": "Test sent to the overlay",
+    "addScreen": "+ Add screen",
+    "removeScreen": "Remove the last one",
+    "removeScreenConfirm": "Alert screen {{n}} will be removed and its style lost. Rules that use it will show their alerts on screen 1. Continue?"
   },
   "field": {
     "fontFamily": "Font",

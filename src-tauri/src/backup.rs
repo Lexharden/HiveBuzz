@@ -38,7 +38,7 @@ const MAX_MEDIA_BYTES: u64 = 60 * 1024 * 1024;
 const MAX_SETTING_BYTES: usize = 256 * 1024;
 
 /// Ajustes que viajan en el archivo. Todo lo demás (puerto, último usuario…) es de esta instalación.
-pub const SETTINGS_KEYS: [&str; 5] = ["points_config", "wheel_config", "tts_config", "obs_config", "app_prefs"];
+pub const SETTINGS_KEYS: [&str; 6] = ["points_config", "wheel_config", "tts_config", "obs_config", "app_prefs", "alert_screens"];
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

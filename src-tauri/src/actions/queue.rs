@@ -297,8 +297,8 @@ impl Shared {
         self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    fn group_of(&self, kind: &str) -> Concurrency {
-        self.registry.get(kind).map_or(Concurrency::Parallel, |e| e.concurrency())
+    fn group_of(&self, kind: &str, params: &Map<String, Value>) -> Concurrency {
+        self.registry.get(kind).map_or(Concurrency::Parallel, |e| e.concurrency_for(params))
     }
 
     /// Registra el job y deja en espera sus primeros pasos, empezando en `from`.
@@ -325,7 +325,7 @@ impl Shared {
             priority: job.priority,
             not_before_ms: now.saturating_add(i64::try_from(s.delay_ms).unwrap_or(i64::MAX)),
             expires_ms: job.expires_ms,
-            group: self.group_of(&s.action.kind),
+            group: self.group_of(&s.action.kind, &s.action.params),
         };
         st.pending.insert((Reverse(job.priority), st.seq), entry);
     }

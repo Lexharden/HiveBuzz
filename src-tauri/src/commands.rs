@@ -20,7 +20,7 @@ use crate::events::{LiveEvent, Platform};
 use crate::goals::Goal;
 use crate::leaderboard::{DonorEntry, Scope};
 use crate::media::Media;
-use crate::overlay_config::schema::{registry, OverlayDef};
+use crate::overlay_config::schema::{alert_screen_number, registry, OverlayDef};
 use crate::rules::model::Rule;
 use crate::secrets::KEY_EULER_API;
 use crate::simulator::SimKind;
@@ -482,6 +482,18 @@ pub fn list_overlays() -> Vec<OverlayDef> {
     registry()
 }
 
+/// Cuántas pantallas de alertas hay creadas.
+#[tauri::command]
+pub async fn get_alert_screens(state: State<'_, AppState>) -> Result<usize> {
+    state.overlay_cfg.screens().await
+}
+
+/// Crea o quita pantallas de alertas (de 1 a 20); las quitadas pierden su estilo.
+#[tauri::command]
+pub async fn set_alert_screens(state: State<'_, AppState>, count: usize) -> Result<usize> {
+    state.overlay_cfg.set_screens(count).await
+}
+
 #[tauri::command]
 pub async fn get_overlay_config(state: State<'_, AppState>, id: String) -> Result<Map<String, Value>> {
     state.overlay_cfg.get(&id).await
@@ -503,8 +515,8 @@ pub async fn reset_overlay_config(state: State<'_, AppState>, id: String) -> Res
 #[tauri::command]
 pub fn test_overlay(state: State<'_, AppState>, id: String) -> Result<()> {
     match id.as_str() {
-        "alerts" => state.hub.publish(
-            "alerts",
+        alert if alert_screen_number(alert).is_some() => state.hub.publish(
+            alert,
             json!({
                 "id": uuid::Uuid::new_v4().to_string(),
                 "title": "Luna",

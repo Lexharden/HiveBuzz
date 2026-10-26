@@ -39,8 +39,51 @@
   // Eventos que muestran una alerta por sí solos (sin reglas), con el interruptor que los controla.
   var AUTO = { gift: "autoGift", follow: "autoFollow", subscribe: "autoSubscribe", share: "autoShare" };
 
+  // Quita el fondo de un vídeo sin canal alfa pintándolo en un canvas y calculando la transparencia de cada
+  // píxel: «black» según el brillo (el color se «des-premultiplica» para que brillos y humo queden bien) y
+  // «green» según cuánto domina el verde (con corrección del reflejo verde en los bordes).
+  var KEY_MAX_W = 960;
+  function keyedVideo(video, mode) {
+    var canvas = HB.el("canvas", "media");
+    var ctx = canvas.getContext("2d", { willReadFrequently: true });
+    var busy = false;
+    function frame() {
+      if (!canvas.isConnected && canvas.dataset.live) return;
+      if (video.videoWidth && !busy) {
+        busy = true;
+        var k = Math.min(1, KEY_MAX_W / video.videoWidth);
+        var w = Math.round(video.videoWidth * k), h = Math.round(video.videoHeight * k);
+        if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        ctx.drawImage(video, 0, 0, w, h);
+        var img = ctx.getImageData(0, 0, w, h), d = img.data;
+        for (var i = 0; i < d.length; i += 4) {
+          var r = d[i], g = d[i + 1], b = d[i + 2];
+          if (mode === "black") {
+            var m = r > g ? (r > b ? r : b) : (g > b ? g : b);
+            var al = m < 12 ? 0 : (m > 60 ? 255 : (m - 12) * 255 / 48);
+            if (al > 0) { var f = 255 / m; d[i] = r * f; d[i + 1] = g * f; d[i + 2] = b * f; }
+            d[i + 3] = al;
+          } else {
+            var rb = r > b ? r : b, dom = g - rb;
+            d[i + 3] = dom < 25 ? 255 : (dom > 90 ? 0 : 255 - (dom - 25) * 255 / 65);
+            if (g > rb) d[i + 1] = rb;
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+        busy = false;
+      }
+      if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(frame); else requestAnimationFrame(frame);
+    }
+    canvas.dataset.live = "1";
+    video.addEventListener("playing", frame, { once: true });
+    return canvas;
+  }
+
   function build(a) {
-    var el = HB.el("div", "alert " + (cfg.animation || "pop"));
+    // La animación y la escala de la propia alerta mandan sobre las de la pantalla.
+    var anim = /^(pop|slide|fade)$/.test(a.animation) ? a.animation : (cfg.animation || "pop");
+    var el = HB.el("div", "alert " + anim);
+    if (Number(a.scale) > 0) el.style.zoom = String(HB.clamp(Number(a.scale), 40, 250) / 100);
     var m = a.media;
     if (m && HB.isLocalMedia(m.url)) {
       var src = m.url + "?token=" + encodeURIComponent(HB.token);
@@ -49,6 +92,12 @@
         node = HB.el("video", "media");
         node.src = src; node.autoplay = true; node.loop = true; node.muted = true; node.playsInline = true;
         a.videoNode = node;
+        if (a.keyMode === "black" || a.keyMode === "green") {
+          // El vídeo se reproduce fuera de la página y lo que se ve es el canvas ya sin fondo.
+          var shown = keyedVideo(node, a.keyMode);
+          node.play().catch(function () {});
+          node = shown;
+        }
       } else {
         node = HB.el("img", "media");
         node.src = src;

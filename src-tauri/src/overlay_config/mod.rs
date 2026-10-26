@@ -9,7 +9,10 @@ use serde_json::{Map, Value};
 use crate::db::Db;
 use crate::error::{AppError, Result};
 use crate::overlay::OverlayHub;
-use schema::{find, registry, OverlayDef};
+use schema::{alert_screen_id, find, registry, OverlayDef, DEFAULT_ALERT_SCREENS, MAX_ALERT_SCREENS};
+
+/// Ajuste con cuántas pantallas de alertas hay creadas.
+const SCREENS_KEY: &str = "alert_screens";
 
 /// Canal retenido con la configuración de un overlay.
 pub fn channel(id: &str) -> String {
@@ -51,6 +54,34 @@ impl OverlayConfigService {
         let merged = def.merged(&stored);
         self.publish(id, &merged);
         Ok(merged)
+    }
+
+    /// Cuántas pantallas de alertas hay creadas (de fábrica, `DEFAULT_ALERT_SCREENS`).
+    pub async fn screens(&self) -> Result<usize> {
+        let stored = self.db.get_setting(SCREENS_KEY).await?.and_then(|v| v.trim().parse::<usize>().ok());
+        Ok(stored.unwrap_or(DEFAULT_ALERT_SCREENS).clamp(1, MAX_ALERT_SCREENS))
+    }
+
+    /// Fija cuántas pantallas de alertas hay. Las que se quitan pierden su estilo: si se vuelven a
+    /// crear, empiezan de cero.
+    pub async fn set_screens(&self, n: usize) -> Result<usize> {
+        let n = n.clamp(1, MAX_ALERT_SCREENS);
+        let before = self.screens().await?;
+        for gone in (n + 1)..=before {
+            if let Some(id) = alert_screen_id(gone) {
+                self.reset(id).await?;
+            }
+        }
+        self.db.set_setting(SCREENS_KEY, &n.to_string()).await?;
+        Ok(n)
+    }
+
+    /// Pantalla de alertas que debe usarse para una petición: la pedida si existe; si no (se borró),
+    /// la 1.
+    pub async fn resolve_screen(&self, wanted: usize) -> Result<&'static str> {
+        let count = self.screens().await?;
+        let n = if (1..=count).contains(&wanted) { wanted } else { 1 };
+        Ok(alert_screen_id(n).unwrap_or("alerts"))
     }
 
     /// Vuelve a los valores por defecto.
@@ -212,5 +243,30 @@ mod tests {
         assert_eq!(channels.len(), registry().len());
         assert!(channels.contains(&"config:alerts".to_string()));
         assert_eq!(fresh_hub.retained_for("config:goals").expect("ret").data["showPercent"], json!(false));
+    }
+
+    #[tokio::test]
+    async fn alert_screens_default_to_five_and_can_grow_and_shrink() {
+        let (s, hub, _) = svc().await;
+        assert_eq!(s.screens().await.expect("n"), 5);
+        assert_eq!(s.set_screens(8).await.expect("n"), 8);
+        s.set("alerts7", &obj(json!({"fontSize": 50}))).await.expect("set");
+        assert_eq!(s.set_screens(6).await.expect("n"), 6);
+        assert_eq!(s.screens().await.expect("n"), 6);
+        // La pantalla quitada olvida su estilo.
+        assert_eq!(s.get("alerts7").await.expect("get")["fontSize"], json!(16));
+        assert_eq!(hub.retained_for("config:alerts7").expect("ret").data["fontSize"], json!(16));
+        assert_eq!(s.set_screens(0).await.expect("n"), 1, "siempre queda una");
+        assert_eq!(s.set_screens(500).await.expect("n"), MAX_ALERT_SCREENS);
+    }
+
+    #[tokio::test]
+    async fn a_removed_screen_falls_back_to_the_first() {
+        let (s, _, _) = svc().await;
+        assert_eq!(s.resolve_screen(3).await.expect("s"), "alerts3");
+        assert_eq!(s.resolve_screen(9).await.expect("s"), "alerts");
+        assert_eq!(s.resolve_screen(0).await.expect("s"), "alerts");
+        s.set_screens(2).await.expect("n");
+        assert_eq!(s.resolve_screen(3).await.expect("s"), "alerts");
     }
 }

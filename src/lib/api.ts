@@ -94,6 +94,8 @@ export const api = {
   setOverlayConfig: (id: string, patch: Partial<OverlayConfig>) => invoke<OverlayConfig>("set_overlay_config", { id, patch }),
   resetOverlayConfig: (id: string) => invoke<OverlayConfig>("reset_overlay_config", { id }),
   testOverlay: (id: string) => invoke<void>("test_overlay", { id }),
+  getAlertScreens: () => invoke<number>("get_alert_screens"),
+  setAlertScreens: (count: number) => invoke<number>("set_alert_screens", { count }),
 
   // Metas, timers, ranking y sesión
   listGoals: () => invoke<Goal[]>("list_goals"),

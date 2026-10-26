@@ -7,7 +7,9 @@ import { Preview } from "./Preview";
 import { SchemaForm } from "./SchemaForm";
 
 /** Overlays que tienen botón «probar» (los demás muestran datos reales). */
-const TESTABLE = new Set(["alerts", "chat", "feed", "gifts", "nowplaying", "jar"]);
+const TESTABLE = new Set(["chat", "feed", "gifts", "nowplaying", "jar"]);
+/** Las pantallas de alertas (`alerts`, `alerts2`…) también se pueden probar. */
+const isTestable = (d: OverlayDef) => TESTABLE.has(d.id) || d.screen !== undefined;
 /** Cuánto se espera antes de enviar un cambio (mientras se arrastra un color o se teclea). */
 const SEND_DELAY_MS = 120;
 
@@ -15,6 +17,8 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
   const { t } = useTranslation();
   const [defs, setDefs] = useState<OverlayDef[]>([]);
   const [selected, setSelected] = useState<string>("alerts");
+  /** Pantallas de alertas creadas (las demás pantallas del esquema no se muestran). */
+  const [screens, setScreens] = useState(5);
   const [config, setConfig] = useState<OverlayConfig>({});
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -25,6 +29,7 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
     alive.current = true;
     const pending = timers.current;
     void api.listOverlays().then((d) => alive.current && setDefs(d)).catch((e: unknown) => setError(errorMessage(e)));
+    void api.getAlertScreens().then((n) => alive.current && setScreens(n)).catch(() => undefined);
     return () => {
       alive.current = false;
       pending.forEach(clearTimeout);
@@ -35,7 +40,22 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
     void api.getOverlayConfig(selected).then((c) => alive.current && setConfig(c)).catch((e: unknown) => setError(errorMessage(e)));
   }, [selected]);
 
-  const def = defs.find((d) => d.id === selected);
+  const visible = defs.filter((d) => d.screen === undefined || d.screen <= screens);
+  const def = visible.find((d) => d.id === selected);
+  const nameOf = (d: OverlayDef) => t(d.name, { n: d.screen });
+
+  /** Crea (o quita) pantallas de alertas; si se quita la que se está viendo, vuelve a la primera. */
+  async function resizeScreens(count: number) {
+    try {
+      const n = await api.setAlertScreens(count);
+      setScreens(n);
+      const last = defs.find((d) => d.screen === n);
+      if (count > screens && last) setSelected(last.id);
+      else if (!defs.some((d) => d.id === selected && (d.screen === undefined || d.screen <= n))) setSelected("alerts");
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
   const url = info?.overlays.find((o) => o.id === selected)?.url;
 
   /** Aplica el cambio en pantalla al instante y lo manda al backend con un pequeño retardo. */
@@ -78,22 +98,35 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
   return (
     <div className="flex min-h-0 flex-1 gap-4">
       <nav className="w-44 shrink-0 space-y-1 overflow-y-auto">
-        {defs.map((d) => (
+        {visible.map((d) => (
           <button
             key={d.id}
             onClick={() => setSelected(d.id)}
             className={`w-full rounded-md px-3 py-2 text-left text-sm ${selected === d.id ? "bg-zinc-700 font-semibold" : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-200"}`}
           >
-            {t(d.name)}
+            {nameOf(d)}
           </button>
         ))}
+        <div className="space-y-1 border-t border-zinc-800 pt-2">
+          <Btn onClick={() => void resizeScreens(screens + 1)} disabled={defs.every((d) => d.screen === undefined || d.screen <= screens)}>
+            {t("overlays.addScreen")}
+          </Btn>
+          <Btn
+            onClick={() => {
+              if (window.confirm(t("overlays.removeScreenConfirm", { n: screens }))) void resizeScreens(screens - 1);
+            }}
+            disabled={screens <= 1}
+          >
+            {t("overlays.removeScreen")}
+          </Btn>
+        </div>
       </nav>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
         {def && (
           <>
             <Card
-              title={t(def.name)}
+              title={nameOf(def)}
               hint={t("overlays.urlHint")}
               actions={
                 <div className="flex gap-2">
@@ -101,7 +134,7 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
                   <Btn onClick={() => void copyUrl(url?.replace("//127.0.0.1:", "//localhost:"))} disabled={!url} title={t("overlays.copyLocalhostHint")}>
                     {t("overlays.copyLocalhost")}
                   </Btn>
-                  {TESTABLE.has(def.id) && <Btn onClick={() => api.testOverlay(def.id).then(() => toast(t("overlays.testSent"))).catch((e: unknown) => setError(errorMessage(e)))}>▶ {t("overlays.test")}</Btn>}
+                  {isTestable(def) && <Btn onClick={() => api.testOverlay(def.id).then(() => toast(t("overlays.testSent"))).catch((e: unknown) => setError(errorMessage(e)))}>▶ {t("overlays.test")}</Btn>}
                   <Btn
                     onClick={() => {
                       if (window.confirm(t("overlays.confirmReset"))) void api.resetOverlayConfig(def.id).then(setConfig).catch((e: unknown) => setError(errorMessage(e)));
@@ -113,7 +146,7 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
               }
             >
               {url ? <Preview url={url} /> : <p className="text-sm text-zinc-500">{t("overlays.noServer")}</p>}
-              <p className="mt-2 text-xs text-zinc-500">{TESTABLE.has(def.id) ? t("overlays.previewHintTest") : t("overlays.previewHintLive")}</p>
+              <p className="mt-2 text-xs text-zinc-500">{isTestable(def) ? t("overlays.previewHintTest") : t("overlays.previewHintLive")}</p>
             </Card>
 
             {def.id === "jar" && (

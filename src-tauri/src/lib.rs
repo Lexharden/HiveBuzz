@@ -178,6 +178,8 @@ pub fn run() {
             commands::get_mic_status,
             commands::mic_preview,
             commands::list_overlays,
+            commands::get_alert_screens,
+            commands::set_alert_screens,
             commands::get_overlay_config,
             commands::set_overlay_config,
             commands::reset_overlay_config,

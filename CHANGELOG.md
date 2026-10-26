@@ -4,6 +4,9 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Pantallas de alertas**: hay 5 de fábrica y puedes crear hasta 20 (*Overlays → + Añadir pantalla*). Cada pantalla es un overlay aparte con su propia URL, estilo y cola, así que alertas de pantallas distintas se ven a la vez, cada una en su sitio de OBS. La acción *Alerta en overlay* tiene un selector de **Pantalla** y permite cambiar la animación y el tamaño de esa alerta concreta. Además, la alerta puede **quitar el fondo negro o verde de un vídeo** sin transparencia (*Fondo del vídeo*), dentro del propio overlay, así que funciona también en TikTok LIVE Studio. La pantalla 1 es la de siempre (conserva tu estilo y es la única que muestra sola regalos, follows y suscripciones); si quitas una pantalla, las reglas que la usaban pasan a la 1. El número de pantallas viaja en las copias de seguridad.
+
 ## [0.4.1] - 2026-10-25
 
 ### Mejorado

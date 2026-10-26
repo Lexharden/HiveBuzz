@@ -4,6 +4,8 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+use crate::overlay_config::schema::{alert_screen_id, MAX_ALERT_SCREENS};
+
 const COMMON_CSS: &str = include_str!("../../../overlays/common.css");
 const COMMON_JS: &str = include_str!("../../../overlays/common.js");
 const MARKER: &str = "<!--HB_COMMON-->";
@@ -26,8 +28,19 @@ const SOURCES: &[(&str, &str)] = &[
 
 static RENDERED: LazyLock<HashMap<&'static str, String>> = LazyLock::new(|| {
     let common = format!("<style>{COMMON_CSS}</style><script>{COMMON_JS}</script>");
-    SOURCES.iter().map(|(id, html)| (*id, html.replacen(MARKER, &common, 1))).collect()
+    let mut pages: HashMap<&'static str, String> = SOURCES.iter().map(|(id, html)| (*id, html.replacen(MARKER, &common, 1))).collect();
+    // Las pantallas de alertas 2.. son la misma página con otro id y otro canal (cada una con su estilo y su cola).
+    let alerts = pages["alerts"].clone();
+    for id in (2..=MAX_ALERT_SCREENS).filter_map(alert_screen_id) {
+        let page = alerts.replace(ALERT_ID, &format!("id: \"{id}\"")).replace(ALERT_CHANNEL, &format!("channel !== \"{id}\""));
+        pages.insert(id, page);
+    }
+    pages
 });
+
+/// Textos de la página de alertas que identifican su pantalla.
+const ALERT_ID: &str = "id: \"alerts\"";
+const ALERT_CHANNEL: &str = "channel !== \"alerts\"";
 
 /// HTML listo de un overlay, o `None` si no existe.
 pub fn render(name: &str) -> Option<&'static str> {
@@ -36,7 +49,7 @@ pub fn render(name: &str) -> Option<&'static str> {
 
 #[cfg(test)]
 pub fn ids() -> impl Iterator<Item = &'static str> {
-    SOURCES.iter().map(|(id, _)| *id)
+    SOURCES.iter().map(|(id, _)| *id).chain((2..=MAX_ALERT_SCREENS).filter_map(alert_screen_id))
 }
 
 #[cfg(test)]
@@ -81,6 +94,17 @@ mod tests {
                 assert!(!html.contains(banned), "{id} usa {banned}");
             }
         }
+    }
+
+    #[test]
+    fn every_alert_screen_listens_only_to_its_own_channel() {
+        assert!(render("alerts").expect("1").contains(ALERT_CHANNEL));
+        for id in (2..=MAX_ALERT_SCREENS).filter_map(alert_screen_id) {
+            let html = render(id).expect(id);
+            assert!(html.contains(&format!("channel !== \"{id}\"")), "{id}");
+            assert!(!html.contains(ALERT_ID) && !html.contains(ALERT_CHANNEL), "{id}: quedó el id de la pantalla 1");
+        }
+        assert!(render("alerts21").is_none());
     }
 
     #[test]
