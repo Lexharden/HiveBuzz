@@ -1,0 +1,31 @@
+# Avisa a hive-web de que cambió la lista de releases para que se reconstruya.
+# - `workflow_run`: el flujo `release` publica el release con GITHUB_TOKEN, y eso no dispara el evento `release`; se avisa
+#   cuando ese flujo termina bien (el release ya está publicado y con todos sus archivos).
+# - `release`: ediciones o borrados hechos a mano desde GitHub.
+name: Avisar a la web
+
+on:
+  release:
+    types: [published, edited, deleted, unpublished]
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+
+jobs:
+  notify:
+    if: github.event_name == 'release' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pedir un nuevo build de hive-web
+        env:
+          GH_TOKEN: ${{ secrets.WEB_DISPATCH_TOKEN }}
+          REPO: ${{ github.repository }}
+          ACTION: ${{ github.event.action || 'published' }}
+          # En un push de etiqueta, `head_branch` del flujo es la propia etiqueta.
+          TAG: ${{ github.event.release.tag_name || github.event.workflow_run.head_branch }}
+        run: |
+          gh api repos/Lexharden/hive-web/dispatches \
+            -f event_type=release-changed \
+            -f "client_payload[repo]=$REPO" \
+            -f "client_payload[action]=$ACTION" \
+            -f "client_payload[tag]=$TAG"
