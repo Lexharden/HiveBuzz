@@ -16,6 +16,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ### Mejorado
 - **Ayudas en un icono ⓘ**: los textos de ayuda largos ya no ocupan sitio ni se desbordan; salen en una burbuja al pulsar o pasar el ratón por el icono ⓘ (en tarjetas, campos de formulario, Ajustes, Overlays, timers y reglas). El texto de la URL de los overlays ahora explica el HTTPS para TikTok LIVE Studio.
+- **MyInstants más compacto**: la búsqueda muestra solo los 3 primeros resultados, con un botón para ver el resto (y otro para volver a contraerlos).
 - **Robustez**: el código de producción ya no admite `unwrap`/`expect`/`panic!` (lo exige el CI) y un fallo inesperado queda registrado en `hivebuzz.log`. El CI avisa de dependencias con vulnerabilidades conocidas.
 
 ### Eliminado

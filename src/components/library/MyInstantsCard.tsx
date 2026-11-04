@@ -4,6 +4,9 @@ import { api, errorMessage } from "../../lib/api";
 import type { Instant } from "../../lib/types";
 import { Btn, Card, ErrorText, TextInput } from "../ui";
 
+/** Cuántos resultados se ven antes de expandir. */
+const PREVIEW_COUNT = 3;
+
 /** Buscador de MyInstants: se escucha sin guardar y «Descargar» lo añade a la biblioteca. */
 export function MyInstantsCard({ savedNames, onDownloaded }: { savedNames: string[]; onDownloaded: () => Promise<void> }) {
   const { t } = useTranslation();
@@ -12,6 +15,7 @@ export function MyInstantsCard({ savedNames, onDownloaded }: { savedNames: strin
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<Instant[]>([]);
   const [more, setMore] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Set<string>>(new Set());
@@ -40,9 +44,12 @@ export function MyInstantsCard({ savedNames, onDownloaded }: { savedNames: strin
   }, [load]);
 
   const search = () => {
+    setExpanded(false);
     setTerm(query.trim());
     void load(query.trim(), 1);
   };
+  const visible = expanded ? items : items.slice(0, PREVIEW_COUNT);
+  const hidden = items.length - visible.length;
   const guard = (fn: () => Promise<unknown>) => void fn().catch((e: unknown) => setError(errorMessage(e)));
 
   return (
@@ -62,7 +69,7 @@ export function MyInstantsCard({ savedNames, onDownloaded }: { savedNames: strin
       <p className="mb-2 text-xs text-zinc-500">{term ? t("myinstants.resultsFor", { term }) : t("myinstants.trending")}</p>
       {!busy && items.length === 0 && !error && <p className="py-4 text-center text-sm text-zinc-500">{t("myinstants.none")}</p>}
       <ul className="space-y-2">
-        {items.map((i) => {
+        {visible.map((i) => {
           const isSaved = saved.has(i.slug) || savedNames.includes(i.name);
           return (
             <li key={i.slug} className="flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-2">
@@ -90,13 +97,15 @@ export function MyInstantsCard({ savedNames, onDownloaded }: { savedNames: strin
           );
         })}
       </ul>
-      {more && (
-        <div className="mt-3 text-center">
+      <div className="mt-3 flex flex-wrap justify-center gap-2">
+        {hidden > 0 && <Btn onClick={() => setExpanded(true)}>▼ {t("myinstants.showMore", { n: hidden })}</Btn>}
+        {expanded && more && (
           <Btn disabled={busy} onClick={() => load(term, page + 1)}>
             {busy ? t("myinstants.loading") : t("myinstants.more")}
           </Btn>
-        </div>
-      )}
+        )}
+        {expanded && items.length > PREVIEW_COUNT && <Btn onClick={() => setExpanded(false)}>▲ {t("myinstants.showLess")}</Btn>}
+      </div>
       <ErrorText error={error} />
     </Card>
   );

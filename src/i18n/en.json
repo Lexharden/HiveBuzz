@@ -376,6 +376,8 @@
     "downloading": "Downloading…",
     "saved": "In your library",
     "more": "Load more",
+    "showMore": "Show {{n}} more",
+    "showLess": "Show less",
     "loading": "Loading…"
   },
   "library": {
