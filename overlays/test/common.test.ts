@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chat, config, eventMsg, FakeSocket, historyMsg, load } from "./harness";
+import { chat, config, eventMsg, FakeSocket, historyMsg, load, overlayMsg } from "./harness";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -133,5 +133,48 @@ describe("seguridad de las utilidades", () => {
     p.root.appendChild(img as HTMLImageElement);
     (img as HTMLImageElement).onerror?.(new p.win.Event("error"));
     expect(p.root.querySelector("img")).toBeNull();
+  });
+});
+
+describe("fuentes de la biblioteca", () => {
+  const face = (family: string, file: string, weight = 400) => ({ family, weight, file });
+  const css = (p: ReturnType<typeof load>) => p.doc.getElementById("hb-fonts")?.textContent ?? "";
+
+  it("declara un @font-face por cada fuente publicada, con el token en la URL", () => {
+    const p = load("feed");
+    p.send(overlayMsg("fonts", { faces: [face("Press Start 2P", "press-start-2p-400.woff2"), face("Press Start 2P", "press-start-2p-700.woff2", 700)] }));
+    expect(css(p)).toContain('font-family:"Press Start 2P";font-weight:400');
+    expect(css(p)).toContain('font-weight:700');
+    expect(css(p)).toContain('url("/fonts/press-start-2p-400.woff2?token=tok")');
+    p.win.close();
+  });
+
+  it("ignora nombres o archivos que puedan colar CSS", () => {
+    const p = load("feed");
+    p.send(
+      overlayMsg("fonts", {
+        faces: [
+          face('X"}body{display:none}', "a.woff2"),
+          face("Mala;background:url(x)", "a.woff2"),
+          face("Buena", "../secreto.woff2"),
+          face("Buena", 'a.woff2");}body{x:y'),
+          face("Valida", "valida-400.woff2"),
+        ],
+      }),
+    );
+    expect(css(p)).not.toContain("display:none");
+    expect(css(p)).not.toContain("background:url");
+    expect(css(p)).not.toContain("secreto");
+    expect(css(p)).toContain("Valida");
+    expect(css(p).match(/@font-face/g)?.length).toBe(1);
+    p.win.close();
+  });
+
+  it("una nueva lista sustituye a la anterior (al borrar una fuente deja de declararse)", () => {
+    const p = load("feed");
+    p.send(overlayMsg("fonts", { faces: [face("Alpha", "alpha-400.woff2")] }));
+    p.send(overlayMsg("fonts", { faces: [] }));
+    expect(css(p)).toBe("");
+    p.win.close();
   });
 });

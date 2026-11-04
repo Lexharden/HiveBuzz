@@ -8,12 +8,14 @@ pub mod api;
 mod auth;
 pub mod oauth;
 mod pages;
+pub mod tls;
 
 pub use auth::constant_time_eq;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, State};
@@ -35,8 +37,8 @@ use crate::overlay::{OverlayHub, OverlayMessage, RecentEvents};
 /// Política de contenido de las páginas: scripts/estilos en línea (los nuestros), imágenes y
 /// video por HTTPS o del propio servidor, y conexión WS al propio servidor.
 const CSP: &str = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; \
-                   img-src 'self' https: data:; media-src 'self'; \
-                   connect-src 'self' ws://127.0.0.1:* ws://localhost:*";
+                   img-src 'self' https: data:; media-src 'self'; font-src 'self'; \
+                   connect-src 'self' ws://127.0.0.1:* ws://localhost:* wss://127.0.0.1:* wss://localhost:*";
 
 /// Todo lo que el servidor necesita para arrancar.
 #[derive(Clone)]
@@ -47,6 +49,8 @@ pub struct ServerDeps {
     pub recent: RecentEvents,
     /// Carpeta de la biblioteca de medios, servida en `/media`.
     pub media_dir: PathBuf,
+    /// Carpeta de la biblioteca de fuentes, servida en `/fonts`.
+    pub fonts_dir: PathBuf,
     pub token: String,
     /// API local para disparar reglas. Sin ella, los endpoints `/api/*` responden 503.
     pub api: Option<api::SharedApi>,
@@ -91,6 +95,7 @@ pub fn router(deps: &ServerDeps) -> Router {
         .merge(api::routes())
         .merge(oauth::routes())
         .nest_service("/media", ServeDir::new(&deps.media_dir))
+        .nest_service("/fonts", ServeDir::new(&deps.fonts_dir))
         .layer(middleware::from_fn_with_state(state.clone(), auth::guard))
         .with_state(state)
 }
@@ -237,6 +242,36 @@ pub async fn start(deps: &ServerDeps, port: u16) -> Result<ServerHandle> {
         addr,
         shutdown: Some(tx),
     })
+}
+
+/// Arranca el servidor HTTPS en `127.0.0.1:port` con el certificado local de [`tls`]. Sirve exactamente lo mismo
+/// que el HTTP (mismo `router`, mismo token, mismas comprobaciones de `Host` y `Origin`).
+pub async fn start_https(deps: &ServerDeps, port: u16, tls: &tls::LocalTls) -> Result<ServerHandle> {
+    // rustls necesita un proveedor criptográfico; si ya hay uno instalado no es un error.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let config = axum_server::tls_rustls::RustlsConfig::from_pem(tls.cert_pem.clone().into_bytes(), tls.key_pem.clone().into_bytes())
+        .await
+        .map_err(|e| AppError::Server(format!("certificado HTTPS no válido: {e}")))?;
+    let listener = std::net::TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)))
+        .map_err(|e| AppError::Server(format!("no se pudo abrir 127.0.0.1:{port} (HTTPS): {e}")))?;
+    listener.set_nonblocking(true)?;
+    let addr = listener.local_addr()?;
+    let server = axum_server::from_tcp_rustls(listener, config)?;
+    let app = router(deps);
+    let handle = axum_server::Handle::new();
+    let (tx, rx) = oneshot::channel::<()>();
+    let stopper = handle.clone();
+    tokio::spawn(async move {
+        let _ = rx.await;
+        stopper.graceful_shutdown(Some(Duration::from_secs(2)));
+    });
+    tokio::spawn(async move {
+        if let Err(e) = server.handle(handle).serve(app.into_make_service()).await {
+            tracing::error!(error = %e, "el servidor HTTPS terminó con error");
+        }
+    });
+    tracing::info!(%addr, "servidor HTTPS local en marcha");
+    Ok(ServerHandle { addr, shutdown: Some(tx) })
 }
 
 #[cfg(test)]

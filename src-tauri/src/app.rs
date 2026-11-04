@@ -33,6 +33,7 @@ use crate::goals::service::{GoalService, GoalTiming};
 use crate::jar::JarService;
 use crate::viewer_groups::ViewerGroups;
 use crate::leaderboard::{LeaderboardService, LeaderboardTiming};
+use crate::fonts::FontLibrary;
 use crate::media::MediaLibrary;
 use crate::overlay::{OverlayHub, RecentEvents};
 use crate::overlay_config::OverlayConfigService;
@@ -51,6 +52,7 @@ use crate::spotify::auth::SpotifyAuth;
 use crate::spotify::service::SongService;
 use crate::stats::StatsService;
 use crate::secrets::{self, KeyringStore, SecretStore};
+use crate::server::tls::LocalTls;
 use crate::server::{self, ServerHandle};
 use crate::session::SessionService;
 use crate::simulator::Simulator;
@@ -97,6 +99,7 @@ pub struct AppState {
     pub audio: Arc<dyn AudioBackend>,
     pub sounds: Arc<SoundLibrary>,
     pub media: Arc<MediaLibrary>,
+    pub fonts: Arc<FontLibrary>,
     pub tts: Arc<TtsService>,
     /// Micrófono que pausa el TTS mientras el streamer habla.
     pub mic: Arc<MicMonitor>,
@@ -130,7 +133,14 @@ pub struct AppState {
     pub server_port: u16,
     /// Si el servidor no pudo arrancar (p. ej. puerto ocupado), el motivo.
     pub server_error: Option<String>,
+    /// Puerto del servidor HTTPS (el del HTTP + 1), si pudo arrancar.
+    pub https_port: Option<u16>,
+    /// Si el HTTPS no pudo arrancar, el motivo (la app funciona igual por HTTP).
+    pub https_error: Option<String>,
+    /// Certificados del HTTPS local (la CA que el usuario puede instalar).
+    pub local_tls: Option<LocalTls>,
     _server: Mutex<Option<ServerHandle>>,
+    _https_server: Mutex<Option<ServerHandle>>,
 }
 
 impl AppState {
@@ -152,7 +162,7 @@ impl AppState {
         };
         let secrets: Arc<dyn SecretStore> = Arc::new(KeyringStore);
         // El bot de chat de TikTok ya no existe: se borra lo que dejó (las cookies de la sesión de TikTok y su configuración).
-        if let Err(e) = secrets::clear_legacy_tiktok_session(secrets.as_ref()) {
+        if let Err(e) = secrets::clear_legacy_secrets(secrets.as_ref()) {
             tracing::warn!(error = %e, "no se pudo borrar la sesión de TikTok guardada por versiones anteriores");
         }
         if let Err(e) = db.delete_setting("bot_config").await {
@@ -201,6 +211,7 @@ impl AppState {
         };
         let sounds = Arc::new(SoundLibrary::new(db.clone(), data_dir.join("sounds"), Arc::clone(&clock))?);
         let media = Arc::new(MediaLibrary::new(db.clone(), data_dir.join("media"), Arc::clone(&clock))?);
+        let fonts = Arc::new(FontLibrary::new(data_dir.join("fonts"), hub.clone())?);
 
         let tts_dir = data_dir.join("tts");
         let default_piper = PiperPaths { exe: piper_exe_path(&tts_dir), voices_dir: tts_dir.join("voices") };
@@ -375,6 +386,7 @@ impl AppState {
             hub: hub.clone(),
             recent,
             media_dir: media.dir().to_path_buf(),
+            fonts_dir: fonts.dir().to_path_buf(),
             token: overlay_token.clone(),
             api: Some(Arc::clone(&rules) as server::api::SharedApi),
             oauth: Some(Arc::clone(&spotify_auth) as server::oauth::SharedOAuth),
@@ -385,6 +397,27 @@ impl AppState {
                 tracing::error!(error = %e, "el servidor local no arrancó");
                 (None, Some(e.to_string()))
             }
+        };
+
+        // HTTPS local (TikTok LIVE Studio no acepta URLs http). Un fallo aquí tampoco impide usar la app.
+        let https_port = server_port.checked_add(1);
+        let local_tls = match LocalTls::load_or_create(data_dir) {
+            Ok(t) => Some(t),
+            Err(e) => {
+                tracing::warn!(error = %e, "no se pudo preparar el certificado HTTPS");
+                None
+            }
+        };
+        let (https_server, https_error) = match (&local_tls, https_port) {
+            (Some(tls), Some(port)) => match server::start_https(&server_deps, port, tls).await {
+                Ok(h) => (Some(h), None),
+                Err(e) => {
+                    tracing::warn!(error = %e, "el servidor HTTPS no arrancó");
+                    (None, Some(e.to_string()))
+                }
+            },
+            (None, _) => (None, Some("no se pudo crear el certificado HTTPS".to_string())),
+            (_, None) => (None, Some("el puerto HTTP es el último posible; no queda puerto para HTTPS".to_string())),
         };
 
         spawn_ui_forwarders(app, &connections, &bus, &rules);
@@ -403,6 +436,7 @@ impl AppState {
             audio,
             sounds,
             media,
+            fonts,
             tts,
             mic,
             tts_dir,
@@ -432,7 +466,11 @@ impl AppState {
             overlay_token,
             server_port,
             server_error,
+            https_port: https_server.as_ref().and(https_port),
+            https_error,
+            local_tls,
             _server: Mutex::new(server),
+            _https_server: Mutex::new(https_server),
         })
     }
 

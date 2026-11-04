@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::sync::broadcast::error::RecvError;
 
-use super::{extension_seconds, Status, TimerConfig, TimerState};
+use super::{extension_seconds, Status, TimerConfig, TimerMode, TimerState};
 use crate::actions::clock::Clock;
 use crate::bus::EventBus;
 use crate::db::Db;
@@ -61,6 +61,11 @@ impl Default for TimerTiming {
     }
 }
 
+/// Un cronómetro con tope termina al alcanzarlo; una cuenta atrás termina sola en cero.
+fn limit_of(config: &TimerConfig) -> Option<i64> {
+    (config.mode == TimerMode::Stopwatch).then(|| config.max_ms()).flatten()
+}
+
 pub struct TimerService {
     timers: Mutex<Vec<StoredTimer>>,
     publish_dirty: AtomicBool,
@@ -101,7 +106,7 @@ impl TimerService {
         let mut timers = self.db.list_timers().await?;
         let now = self.clock.now_ms();
         for t in &mut timers {
-            t.state.tick(now);
+            t.state.tick_limit(now, limit_of(&t.config));
         }
         let n = timers.len();
         *self.lock() = timers;
@@ -124,14 +129,17 @@ impl TimerService {
             let mut timers = self.lock();
             match timers.iter_mut().find(|t| t.config.id == config.id) {
                 Some(t) => {
-                    if t.state.status == Status::Idle {
+                    if t.config.mode != config.mode {
+                        // Cambiar entre cuenta atrás y cronómetro reinicia el timer: sus valores no son comparables.
+                        t.state = TimerState::with_mode(config.mode, config.start_ms());
+                    } else if t.state.status == Status::Idle {
                         t.state.remaining_ms = config.start_ms();
                     }
                     t.config = config;
                     t.clone()
                 }
                 None => {
-                    let t = StoredTimer { state: TimerState::idle(config.start_ms()), config };
+                    let t = StoredTimer { state: TimerState::with_mode(config.mode, config.start_ms()), config };
                     timers.push(t.clone());
                     t
                 }
@@ -181,9 +189,8 @@ impl TimerService {
         let mut changed = false;
         for t in self.lock().iter_mut().filter(|t| matches!(t.state.status, Status::Running | Status::Paused)) {
             let secs = extension_seconds(&t.config, &mut t.state.leftovers, ev);
-            if secs > 0 {
-                let delta = i64::try_from(secs).unwrap_or(i64::MAX / 1000).saturating_mul(1000);
-                changed |= t.state.add(now, delta, t.config.max_ms());
+            if secs != 0 {
+                changed |= t.state.add(now, secs.saturating_mul(1000), t.config.max_ms());
             }
         }
         if changed {
@@ -199,7 +206,7 @@ impl TimerService {
         let ended: Vec<String> = self
             .lock()
             .iter_mut()
-            .filter_map(|t| t.state.tick(now).then(|| t.config.id.clone()))
+            .filter_map(|t| t.state.tick_limit(now, limit_of(&t.config)).then(|| t.config.id.clone()))
             .collect();
         if !ended.is_empty() {
             self.publish_dirty.store(true, Ordering::Relaxed);
@@ -219,6 +226,7 @@ impl TimerService {
                 json!({
                     "id": t.config.id,
                     "name": t.config.name,
+                    "mode": t.config.mode,
                     "status": t.state.status,
                     "remainingMs": t.state.remaining(now),
                     "endsAtMs": if t.state.status == Status::Running { t.state.ends_at_ms } else { 0 },

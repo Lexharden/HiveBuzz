@@ -57,10 +57,10 @@ async fn rig() -> Rig {
 }
 
 fn cfg(id: &str, start: u64, exts: Vec<Extension>) -> TimerConfig {
-    TimerConfig { id: id.into(), name: format!("Timer {id}"), start_seconds: start, max_seconds: None, extensions: exts }
+    TimerConfig { id: id.into(), name: format!("Timer {id}"), start_seconds: start, max_seconds: None, mode: Default::default(), extensions: exts }
 }
 
-fn ext(source: ExtensionSource, seconds: u64) -> Extension {
+fn ext(source: ExtensionSource, seconds: i64) -> Extension {
     Extension { source, seconds }
 }
 

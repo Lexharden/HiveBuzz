@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, errorMessage } from "../lib/api";
-import type { AppInfo } from "../lib/types";
+import type { AppInfo, HttpsStatus } from "../lib/types";
 
 function CopyButton({ text }: { text: string }) {
   const { t } = useTranslation();
@@ -22,9 +22,77 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** HTTPS local: TikTok LIVE Studio no acepta URLs `http://`. Requiere instalar el certificado de HiveBuzz una vez. */
+function HttpsSection({ info }: { info: AppInfo }) {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<HttpsStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function refresh() {
+    try {
+      setStatus(await api.httpsStatus());
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  }
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  async function install() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.installLocalCa();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-brand-700/70 bg-brand-900 p-4">
+      <h2 className="text-sm font-semibold text-zinc-300">{t("settings.https")}</h2>
+      <p className="mt-1 text-xs text-zinc-500">{t("settings.httpsHint")}</p>
+      {info.httpsError ? (
+        <p className="mt-2 text-xs text-rose-300">{t("settings.httpsError")}: {info.httpsError}</p>
+      ) : (
+        <>
+          <p className="mt-2 text-xs text-zinc-400">
+            {status?.installed === true && <span className="text-emerald-400">{t("settings.httpsInstalled")}</span>}
+            {status?.installed === false && <span className="text-amber-300">{t("settings.httpsNotInstalled")}</span>}
+            {status?.installed === null && <span>{t("settings.httpsManual", { path: status.caPath ?? "" })}</span>}
+          </p>
+          {status?.installed === false && (
+            <div className="mt-2">
+              <button disabled={busy} onClick={() => void install()} className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 disabled:opacity-50">
+                {t("settings.httpsInstall")}
+              </button>
+              <p className="mt-1 text-xs text-zinc-500">{t("settings.httpsInstallHint")}</p>
+            </div>
+          )}
+          <ul className="mt-3 space-y-2">
+            {info.overlays.filter((o) => o.httpsUrl).map((o) => (
+              <li key={o.id} className="flex items-center gap-2">
+                <span className="w-40 shrink-0 text-sm">{t(o.name)}</span>
+                <input readOnly value={o.httpsUrl ?? ""} onFocus={(e) => e.currentTarget.select()}
+                  className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-xs" />
+                <CopyButton text={o.httpsUrl ?? ""} />
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+    </section>
+  );
+}
+
 export function SettingsPanel({ info, onChanged }: { info: AppInfo; onChanged: () => Promise<void> }) {
   const { t } = useTranslation();
-  const [eulerKey, setEulerKey] = useState("");
   const [port, setPort] = useState(String(info.serverPort));
   const [error, setError] = useState<string | null>(null);
 
@@ -61,33 +129,7 @@ export function SettingsPanel({ info, onChanged }: { info: AppInfo; onChanged: (
         </ul>
       </section>
 
-      <section className="rounded-xl border border-brand-700/70 bg-brand-900 p-4">
-        <h2 className="text-sm font-semibold text-zinc-300">{t("settings.euler")}</h2>
-        <p className="mt-1 text-xs text-zinc-500">{t("settings.eulerHint")}</p>
-        {info.hasEulerApiKey && <p className="mt-2 text-xs text-emerald-400">{t("settings.eulerSaved")}</p>}
-        <div className="mt-3 flex gap-2">
-          <input
-            type="password"
-            value={eulerKey}
-            onChange={(e) => setEulerKey(e.target.value)}
-            placeholder={t("settings.eulerPlaceholder")}
-            autoComplete="off"
-            className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm"
-          />
-          <button
-            disabled={eulerKey.trim() === ""}
-            onClick={() => run(async () => { await api.setEulerApiKey(eulerKey); setEulerKey(""); })}
-            className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 disabled:opacity-50"
-          >
-            {t("settings.save")}
-          </button>
-          {info.hasEulerApiKey && (
-            <button onClick={() => void run(() => api.setEulerApiKey(null))} className="rounded-md bg-zinc-800 px-3 py-1.5 text-xs hover:bg-zinc-700">
-              {t("settings.remove")}
-            </button>
-          )}
-        </div>
-      </section>
+      <HttpsSection info={info} />
 
       <section className="rounded-xl border border-brand-700/70 bg-brand-900 p-4">
         <h2 className="text-sm font-semibold text-zinc-300">{t("settings.port")}</h2>

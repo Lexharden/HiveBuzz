@@ -170,7 +170,7 @@ mod tests {
 
     async fn timers() -> Arc<TimerService> {
         let svc = TimerService::new(Db::open_memory().await.expect("db"), OverlayHub::new(8), Arc::new(AppClock::new()));
-        svc.upsert(TimerConfig { id: "t".into(), name: "T".into(), start_seconds: 600, max_seconds: None, extensions: vec![] })
+        svc.upsert(TimerConfig { id: "t".into(), name: "T".into(), start_seconds: 600, max_seconds: None, mode: Default::default(), extensions: vec![] })
             .await
             .expect("upsert");
         svc

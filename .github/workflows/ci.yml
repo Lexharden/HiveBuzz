@@ -1,5 +1,4 @@
 # Comprueba en Windows, macOS y Linux que todo compila y pasa las pruebas (en cada push y pull request).
-# NOTA: este flujo no se ha ejecutado todavía; revísalo la primera vez.
 name: ci
 
 on:
@@ -41,3 +40,18 @@ jobs:
       - run: cargo clippy --all-targets --manifest-path src-tauri/Cargo.toml -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: bun scripts/set-version.mjs --show # las tres versiones deben coincidir
+
+  # Avisa de dependencias con vulnerabilidades conocidas. No bloquea el CI (un aviso nuevo en una
+  # dependencia indirecta no debe impedir un merge), pero queda a la vista en cada ejecución.
+  audit:
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: cargo audit --file src-tauri/Cargo.lock
+      - run: bun audit
+      - run: cd sidecar && bun audit

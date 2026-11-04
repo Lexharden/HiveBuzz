@@ -47,13 +47,13 @@ impl ConnectionService {
         self.viewers.subscribe()
     }
 
-    pub async fn connect(&self, raw_username: &str, euler_api_key: Option<String>) -> Result<()> {
+    pub async fn connect(&self, raw_username: &str) -> Result<()> {
         let unique_id = match self.platform {
             Platform::Tiktok => normalize_username(raw_username)?,
             Platform::Twitch => crate::twitch::normalize_channel(raw_username)?,
         };
         self.source
-            .connect(ConnectTarget { unique_id, euler_api_key })
+            .connect(ConnectTarget::new(unique_id))
             .await
     }
 
@@ -150,7 +150,7 @@ mod tests {
             self.calls
                 .lock()
                 .expect("lock")
-                .push(format!("connect {} key={}", t.unique_id, t.euler_api_key.is_some()));
+                .push(format!("connect {}", t.unique_id));
             Ok(())
         }
         async fn disconnect(&self) -> Result<()> {
@@ -163,12 +163,12 @@ mod tests {
     async fn connect_validates_then_delegates() {
         let src = Arc::new(FakeSource::default());
         let svc = ConnectionService::new(src.clone());
-        assert!(svc.connect("no valido!", None).await.is_err());
-        svc.connect("@ana", Some("k".into())).await.expect("connect");
+        assert!(svc.connect("no valido!").await.is_err());
+        svc.connect("@ana").await.expect("connect");
         svc.disconnect().await.expect("disconnect");
         assert_eq!(
             *src.calls.lock().expect("lock"),
-            ["connect ana key=true", "disconnect"]
+            ["connect ana", "disconnect"]
         );
     }
 

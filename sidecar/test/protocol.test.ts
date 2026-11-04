@@ -7,16 +7,9 @@ describe("protocol", () => {
     expect(line).toBe('{"kind":"status","state":"connected"}\n');
   });
 
-  it("parseCommand acepta connect con y sin API key", () => {
-    expect(parseCommand('{"cmd":"connect","uniqueId":"ana"}')).toEqual({
-      cmd: "connect",
-      uniqueId: "ana",
-    });
-    expect(parseCommand('{"cmd":"connect","uniqueId":"ana","eulerApiKey":"k"}')).toEqual({
-      cmd: "connect",
-      uniqueId: "ana",
-      eulerApiKey: "k",
-    });
+  it("parseCommand acepta connect e ignora una API key de versiones antiguas", () => {
+    expect(parseCommand('{"cmd":"connect","uniqueId":"ana"}')).toEqual({ cmd: "connect", uniqueId: "ana" });
+    expect(parseCommand('{"cmd":"connect","uniqueId":"ana","eulerApiKey":"k"}')).toEqual({ cmd: "connect", uniqueId: "ana" });
   });
 
   it("parseCommand ignora una sesión de TikTok y rechaza el sendChat de versiones antiguas", () => {

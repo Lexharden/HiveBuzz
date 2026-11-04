@@ -56,33 +56,16 @@ pub enum SidecarMessage {
     },
 }
 
-/// Rust → sidecar (stdin). `Debug` es manual: oculta la API key de Euler.
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+/// Rust → sidecar (stdin).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "cmd", rename_all = "camelCase")]
 pub enum SidecarCommand {
     #[serde(rename_all = "camelCase")]
     Connect {
         unique_id: String,
-        /// API key propia de Euler Stream (opcional; viene del keyring).
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        euler_api_key: Option<String>,
     },
     Disconnect,
     Shutdown,
-}
-
-impl std::fmt::Debug for SidecarCommand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Connect { unique_id, euler_api_key } => f
-                .debug_struct("Connect")
-                .field("unique_id", unique_id)
-                .field("euler_api_key", &euler_api_key.as_ref().map(|_| "***"))
-                .finish(),
-            Self::Disconnect => f.write_str("Disconnect"),
-            Self::Shutdown => f.write_str("Shutdown"),
-        }
-    }
 }
 
 impl SidecarCommand {
@@ -148,19 +131,8 @@ mod tests {
     }
 
     #[test]
-    fn connect_never_prints_the_euler_key() {
-        let cmd = SidecarCommand::Connect { unique_id: "ana".into(), euler_api_key: Some("clave-euler".into()) };
-        let shown = format!("{cmd:?}");
-        assert!(!shown.contains("clave-euler"), "Debug no debe filtrar secretos: {shown}");
-        assert!(shown.contains("ana"));
-    }
-
-    #[test]
     fn command_serializes_as_single_line() {
-        let line = SidecarCommand::Connect {
-            unique_id: "ana".into(),
-            euler_api_key: None,
-        }
+        let line = SidecarCommand::Connect { unique_id: "ana".into() }
         .to_line()
         .expect("serializa");
         assert_eq!(line, "{\"cmd\":\"connect\",\"uniqueId\":\"ana\"}\n");

@@ -1,4 +1,4 @@
-//! Secretos (API key de Euler, token de los overlays y Spotify)
+//! Secretos (token de los overlays, Twitch, Spotify y OBS)
 //! en el llavero del sistema operativo. Nunca en SQLite.
 
 use std::collections::HashMap;
@@ -6,7 +6,6 @@ use std::sync::Mutex;
 
 use crate::error::Result;
 
-pub const KEY_EULER_API: &str = "euler_api_key";
 pub const KEY_OVERLAY_TOKEN: &str = "overlay_token";
 
 const SERVICE: &str = "com.yafel.hivebuzz";
@@ -72,12 +71,12 @@ impl SecretStore for MemoryStore {
 }
 
 /// Claves de la sesión de TikTok que guardaban versiones anteriores (el bot de chat ya no existe).
-const LEGACY_TIKTOK_SESSION_KEYS: [&str; 2] = ["tiktok_session_id", "tiktok_tt_target_idc"];
+const LEGACY_KEYS: [&str; 3] = ["tiktok_session_id", "tiktok_tt_target_idc", "euler_api_key"];
 
 /// Borra del llavero las cookies de TikTok que dejó el bot de chat: ya no se usan y no deben quedarse guardadas.
 /// Es idempotente (borrar lo que no existe no falla).
-pub fn clear_legacy_tiktok_session(store: &dyn SecretStore) -> Result<()> {
-    for key in LEGACY_TIKTOK_SESSION_KEYS {
+pub fn clear_legacy_secrets(store: &dyn SecretStore) -> Result<()> {
+    for key in LEGACY_KEYS {
         store.delete(key)?;
     }
     Ok(())
@@ -182,12 +181,14 @@ mod tests {
         let s = MemoryStore::default();
         s.set("tiktok_session_id", "abc123").expect("set");
         s.set("tiktok_tt_target_idc", "useast1a").expect("set");
-        s.set(KEY_EULER_API, "clave").expect("set");
-        clear_legacy_tiktok_session(&s).expect("clear");
+        s.set(KEY_OVERLAY_TOKEN, "clave").expect("set");
+        s.set("euler_api_key", "clave").expect("set");
+        clear_legacy_secrets(&s).expect("clear");
         assert_eq!(s.get("tiktok_session_id").expect("get"), None);
         assert_eq!(s.get("tiktok_tt_target_idc").expect("get"), None);
-        assert_eq!(s.get(KEY_EULER_API).expect("get"), Some("clave".into()));
-        clear_legacy_tiktok_session(&s).expect("idempotente");
+        assert_eq!(s.get("euler_api_key").expect("get"), None);
+        assert_eq!(s.get(KEY_OVERLAY_TOKEN).expect("get"), Some("clave".into()));
+        clear_legacy_secrets(&s).expect("idempotente");
     }
 
     #[test]

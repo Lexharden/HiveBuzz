@@ -1,14 +1,12 @@
 // Adaptador de `tiktok-live-connector` (v2) a la interfaz `LiveClient`.
-// Es la única pieza que conoce la librería: cambiarla o cambiar el proveedor de firma
-// (hoy Euler Stream) solo toca este archivo.
+// Es la única pieza que conoce la librería: cambiarla o cambiar el proveedor de firma solo toca este archivo.
 
 import { ControlAction, ControlEvent, TikTokLiveConnection, WebcastEvent } from "tiktok-live-connector";
 import type { ClientCallbacks, ClientFactory, ConnectTarget, LiveClient } from "./connector";
 
 export const createTikTokClient: ClientFactory = (target: ConnectTarget, cb: ClientCallbacks): LiveClient => {
-  // Solo lectura: no hace falta sesión de TikTok. Firma: tier gratuito de Euler Stream; la API key propia es opcional.
+  // Solo lectura: no hace falta sesión de TikTok. La firma usa el nivel gratuito de Euler Stream, sin API key.
   const connection = new TikTokLiveConnection(target.uniqueId, {
-    ...(target.eulerApiKey ? { signApiKey: target.eulerApiKey } : {}),
     processInitialData: true,
     // Ya comprobamos `isLive()` nosotros; si el LIVE cae justo al conectar, la librería lanza
     // UserOfflineError y el supervisor vuelve a esperar.

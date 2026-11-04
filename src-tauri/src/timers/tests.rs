@@ -3,10 +3,10 @@ use crate::events::testing::sample_event;
 use crate::events::{Gift, Like};
 
 fn cfg(exts: Vec<Extension>) -> TimerConfig {
-    TimerConfig { id: "t".into(), name: "Subathon".into(), start_seconds: 600, max_seconds: None, extensions: exts }
+    TimerConfig { id: "t".into(), name: "Subathon".into(), start_seconds: 600, max_seconds: None, mode: Default::default(), extensions: exts }
 }
 
-fn ext(source: ExtensionSource, seconds: u64) -> Extension {
+fn ext(source: ExtensionSource, seconds: i64) -> Extension {
     Extension { source, seconds }
 }
 
@@ -227,9 +227,9 @@ fn leftovers_resize_when_the_config_changes() {
 
 #[test]
 fn huge_values_saturate_instead_of_overflowing() {
-    let c = cfg(vec![ext(ExtensionSource::Coins { per_coins: 1 }, u64::MAX)]);
+    let c = cfg(vec![ext(ExtensionSource::Coins { per_coins: 1 }, i64::MAX)]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, u64::MAX, 1)), u64::MAX);
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, u64::MAX, 1)), i64::MAX);
 }
 
 // ---- Validación y serialización ----
@@ -272,4 +272,85 @@ fn json_shape_roundtrips() {
 fn state_json_roundtrips_and_tolerates_missing_leftovers() {
     let s: TimerState = serde_json::from_str(r#"{"status":"paused","remainingMs":5000,"endsAtMs":0}"#).expect("parsea");
     assert_eq!((s.status, s.remaining_ms, s.leftovers.len()), (Status::Paused, 5000, 0));
+}
+
+// ---- Cronómetro y extensiones que restan ----
+
+fn stopwatch_cfg(max: Option<u64>) -> TimerConfig {
+    TimerConfig { id: "s".into(), name: "Directo".into(), mode: TimerMode::Stopwatch, start_seconds: 0, max_seconds: max, extensions: vec![] }
+}
+
+#[test]
+fn a_stopwatch_counts_up_pauses_and_resumes() {
+    let mut s = TimerState::with_mode(TimerMode::Stopwatch, 0);
+    assert_eq!(s.remaining(5_000), 0, "parado marca cero");
+    s.start(1_000, 0);
+    assert_eq!(s.remaining(1_000), 0);
+    assert_eq!(s.remaining(31_000), 30_000);
+    s.pause(31_000);
+    assert_eq!((s.status, s.remaining(900_000)), (Status::Paused, 30_000), "en pausa no avanza");
+    s.resume(100_000);
+    assert_eq!(s.remaining(110_000), 40_000, "sigue desde donde se quedó");
+    s.reset(0);
+    assert_eq!((s.status, s.mode, s.remaining(0)), (Status::Idle, TimerMode::Stopwatch, 0), "reiniciar conserva el tipo");
+}
+
+#[test]
+fn a_stopwatch_ends_only_when_it_reaches_its_limit() {
+    let mut s = TimerState::with_mode(TimerMode::Stopwatch, 0);
+    s.start(0, 0);
+    assert!(!s.tick_limit(1_000_000, None), "sin tope no termina nunca");
+    assert!(!s.tick_limit(59_999, Some(60_000)));
+    assert!(s.tick_limit(60_000, Some(60_000)));
+    assert_eq!((s.status, s.remaining(999_999)), (Status::Ended, 60_000), "se queda en el tope");
+    assert!(!s.tick_limit(70_000, Some(60_000)), "no vuelve a avisar");
+}
+
+#[test]
+fn a_stopwatch_ignores_extensions_and_manual_additions() {
+    let c = TimerConfig { extensions: vec![ext(ExtensionSource::Follow, 30)], ..stopwatch_cfg(None) };
+    let mut left = Vec::new();
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Follow)), 0);
+    let mut s = TimerState::with_mode(TimerMode::Stopwatch, 0);
+    s.start(0, 0);
+    assert!(!s.add(10_000, 5_000, None));
+    assert_eq!(s.remaining(10_000), 10_000);
+}
+
+#[test]
+fn a_negative_extension_subtracts_and_never_goes_below_zero() {
+    let c = cfg(vec![ext(ExtensionSource::Coins { per_coins: 100 }, -60)]);
+    let mut left = Vec::new();
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 250, 1)), -120, "250 monedas = 2 pasos de −60 s");
+    let mut s = running(0, 100_000);
+    assert!(s.add(0, -120_000, None));
+    assert_eq!(s.remaining(0), 0, "no baja de cero");
+    assert!(s.tick(0), "y termina en el siguiente tick");
+}
+
+#[test]
+fn positive_and_negative_extensions_can_be_mixed() {
+    let c = cfg(vec![ext(ExtensionSource::Follow, 30), ext(ExtensionSource::Share, -10)]);
+    let mut left = Vec::new();
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Follow)), 30);
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Share)), -10);
+}
+
+#[test]
+fn validation_accepts_a_stopwatch_without_start_and_negative_extensions_but_not_zero() {
+    assert!(stopwatch_cfg(None).validate().is_ok());
+    assert!(cfg(vec![ext(ExtensionSource::Follow, -30)]).validate().is_ok());
+    assert!(cfg(vec![ext(ExtensionSource::Follow, 0)]).validate().is_err());
+    let mut bad = cfg(vec![]);
+    bad.start_seconds = 0;
+    assert!(bad.validate().is_err(), "una cuenta atrás sí necesita duración inicial");
+}
+
+#[test]
+fn old_stored_timers_without_a_mode_load_as_countdown() {
+    let old = r#"{"id":"t","name":"X","startSeconds":60,"extensions":[{"source":{"type":"follow"},"seconds":30}]}"#;
+    let c: TimerConfig = serde_json::from_str(old).expect("config antigua");
+    assert_eq!(c.mode, TimerMode::Countdown);
+    let st: TimerState = serde_json::from_str(r#"{"status":"paused","remainingMs":5000,"endsAtMs":0}"#).expect("estado antiguo");
+    assert_eq!(st.mode, TimerMode::Countdown);
 }

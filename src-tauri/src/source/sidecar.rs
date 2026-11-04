@@ -283,10 +283,7 @@ impl<S: Spawner> Supervisor<S> {
         if let Some(t) = &self.desired {
             send_cmd(
                 stdin,
-                &SidecarCommand::Connect {
-                    unique_id: t.unique_id.clone(),
-                    euler_api_key: t.euler_api_key.clone(),
-                },
+                &SidecarCommand::Connect { unique_id: t.unique_id.clone() },
             )
             .await;
         }

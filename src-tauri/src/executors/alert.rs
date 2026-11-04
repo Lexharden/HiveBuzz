@@ -18,6 +18,11 @@
 //! Fondo del vídeo (`keyMode`): `black` quita el fondo negro y `green` el verde, para vídeos sin canal alfa.
 //! Ajustes de esta alerta sobre el estilo de su pantalla: `animation` (`pop`/`slide`/`fade`) y `scale` (40–250 %).
 //!
+//! Capas (`layers`, hasta 8): textos e imágenes colocados donde quieras sobre la pantalla, además del contenido
+//! normal de la alerta. Cada capa lleva `type` (`text` o `image`), `x` e `y` (0–100 %, el centro de la capa dentro
+//! de la pantalla). Texto: `text` (admite variables), `size` (8–300 px), `color` (`#RRGGBB`), `fontFamily` (una
+//! fuente de la biblioteca o del sistema) y `bold`. Imagen: `mediaId` o `imageUrl` (HTTPS) y `width` (2–100 % del ancho).
+//!
 //! Dentro de una pantalla las alertas se muestran de una en una: el overlay no las superpone.
 
 use std::sync::Arc;
@@ -38,6 +43,8 @@ use crate::overlay_config::OverlayConfigService;
 use crate::sounds::SoundLibrary;
 
 const DEFAULT_DURATION_MS: f64 = 5000.0;
+const MAX_LAYERS: usize = 8;
+const MAX_LAYER_TEXT_CHARS: usize = 200;
 /// Cuánto se espera el aviso del overlay antes de reproducir el sonido igualmente.
 const ACK_TIMEOUT: Duration = Duration::from_secs(15);
 
@@ -50,6 +57,51 @@ pub struct OverlayAlertExecutor {
 }
 
 impl OverlayAlertExecutor {
+    /// Capas listas para el overlay: textos con las variables ya aplicadas e imágenes de la biblioteca resueltas.
+    /// Una capa que queda vacía (texto sin contenido, imagen que ya no existe) se omite sin impedir la alerta.
+    async fn render_layers(&self, ctx: &ActionContext, params: &Map<String, Value>) -> Result<Vec<Value>> {
+        let mut out = Vec::new();
+        for l in layer_list(params)? {
+            let x = opt_number(l, "x", 0.0, 100.0)?.unwrap_or(50.0);
+            let y = opt_number(l, "y", 0.0, 100.0)?.unwrap_or(50.0);
+            if l.get("type").and_then(Value::as_str) == Some("text") {
+                let text = ctx.render(text_param(l, "text").unwrap_or_default());
+                if text.trim().is_empty() {
+                    continue;
+                }
+                out.push(json!({
+                    "type": "text",
+                    "text": text.chars().take(MAX_LAYER_TEXT_CHARS).collect::<String>(),
+                    "x": x,
+                    "y": y,
+                    "size": opt_number(l, "size", 8.0, 300.0)?.unwrap_or(40.0),
+                    "color": text_param(l, "color").unwrap_or("#ffffff").to_ascii_lowercase(),
+                    "fontFamily": text_param(l, "fontFamily"),
+                    "bold": opt_bool(l, "bold", false)?,
+                }));
+            } else {
+                let media = match text_param(l, "mediaId") {
+                    Some(id) => self.media.get(id).await?.map(|m| json!({ "kind": m.kind, "url": m.url_path() })),
+                    None => None,
+                };
+                let image_url = text_param(l, "imageUrl").map(|u| ctx.render(u)).filter(|u| !u.is_empty());
+                if media.is_none() && image_url.is_none() {
+                    tracing::warn!("una capa de imagen de la alerta ya no tiene su medio");
+                    continue;
+                }
+                out.push(json!({
+                    "type": "image",
+                    "media": media,
+                    "imageUrl": image_url,
+                    "x": x,
+                    "y": y,
+                    "width": opt_number(l, "width", 2.0, 100.0)?.unwrap_or(20.0),
+                }));
+            }
+        }
+        Ok(out)
+    }
+
     pub fn new(media: Arc<MediaLibrary>, hub: OverlayHub, sounds: Arc<SoundLibrary>, audio: Arc<dyn AudioBackend>, screens: OverlayConfigService) -> Self {
         Self { media, hub, sounds, audio, screens }
     }
@@ -63,6 +115,50 @@ fn wanted_screen(params: &Map<String, Value>) -> usize {
 
 fn text_param<'a>(params: &'a Map<String, Value>, key: &str) -> Option<&'a str> {
     params.get(key).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty())
+}
+
+/// Las capas de la acción, ya comprobadas (vacío si no hay).
+fn layer_list(params: &Map<String, Value>) -> Result<Vec<&Map<String, Value>>> {
+    let invalid = |why: &str| AppError::Invalid(format!("capas: {why}"));
+    let Some(raw) = params.get("layers").filter(|v| !v.is_null()) else { return Ok(Vec::new()) };
+    let list = raw.as_array().ok_or_else(|| invalid("debe ser una lista"))?;
+    if list.len() > MAX_LAYERS {
+        return Err(invalid(&format!("máximo {MAX_LAYERS}")));
+    }
+    let mut out = Vec::new();
+    for (i, l) in list.iter().enumerate() {
+        let l = l.as_object().ok_or_else(|| invalid(&format!("la {} no es válida", i + 1)))?;
+        opt_number(l, "x", 0.0, 100.0)?;
+        opt_number(l, "y", 0.0, 100.0)?;
+        match l.get("type").and_then(Value::as_str) {
+            Some("text") => {
+                opt_number(l, "size", 8.0, 300.0)?;
+                opt_bool(l, "bold", false)?;
+                if text_param(l, "text").is_none_or(|t| t.chars().count() > MAX_LAYER_TEXT_CHARS) {
+                    return Err(invalid(&format!("la capa {} necesita un texto de hasta {MAX_LAYER_TEXT_CHARS} caracteres", i + 1)));
+                }
+                if let Some(c) = text_param(l, "color") {
+                    if !(c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|h| h.is_ascii_hexdigit())) {
+                        return Err(invalid(&format!("el color de la capa {} debe ser #RRGGBB", i + 1)));
+                    }
+                }
+                if let Some(f) = text_param(l, "fontFamily") {
+                    if !crate::fonts::is_font_name(f) {
+                        return Err(invalid(&format!("la fuente de la capa {} no es válida", i + 1)));
+                    }
+                }
+            }
+            Some("image") => {
+                opt_number(l, "width", 2.0, 100.0)?;
+                if text_param(l, "mediaId").is_none() && text_param(l, "imageUrl").is_none() {
+                    return Err(invalid(&format!("la capa {} necesita una imagen", i + 1)));
+                }
+            }
+            _ => return Err(invalid(&format!("la capa {} debe ser «text» o «image»", i + 1))),
+        }
+        out.push(l);
+    }
+    Ok(out)
 }
 
 #[async_trait]
@@ -81,7 +177,8 @@ impl ActionExecutor for OverlayAlertExecutor {
     }
 
     fn validate(&self, params: &Map<String, Value>) -> Result<()> {
-        let has_content = ["title", "text", "mediaId", "imageUrl"].iter().any(|k| text_param(params, k).is_some()) || !sound_ids(params).is_empty();
+        let layers = layer_list(params)?;
+        let has_content = ["title", "text", "mediaId", "imageUrl"].iter().any(|k| text_param(params, k).is_some()) || !sound_ids(params).is_empty() || !layers.is_empty();
         if !has_content {
             return Err(AppError::Invalid("la alerta necesita título, texto o un medio".into()));
         }
@@ -141,6 +238,7 @@ impl ActionExecutor for OverlayAlertExecutor {
             }
         };
 
+        let layers = self.render_layers(ctx, params).await?;
         let channel = self.screens.resolve_screen(wanted_screen(params)).await?;
         let id = uuid::Uuid::new_v4().to_string();
         // Se pide el aviso antes de publicar: así no puede llegar antes de que alguien lo espere.
@@ -159,6 +257,7 @@ impl ActionExecutor for OverlayAlertExecutor {
             "keyMode": text_param(params, "keyMode"),
             "videoVolume": opt_number(params, "videoVolume", 0.0, 100.0)?.unwrap_or(100.0),
             "scale": opt_number(params, "scale", 40.0, 250.0)?,
+            "layers": layers,
         });
         self.hub.publish(channel, payload);
 
@@ -409,5 +508,59 @@ mod tests {
         assert!(v(json!({"text": "x", "keyMode": "black"})).is_ok());
         assert!(v(json!({"text": "x", "keyMode": ""})).is_ok());
         assert!(v(json!({"text": "x", "screen": 20, "scale": 250, "animation": "fade"})).is_ok());
+    }
+
+    #[tokio::test]
+    async fn layers_are_rendered_validated_and_clamped_by_the_executor() {
+        let r = rig().await;
+        let mut rx = r.hub.subscribe();
+        let p = params(json!({
+            "wait": false,
+            "layers": [
+                { "type": "text", "text": "¡Gracias {nickname}!", "x": 50, "y": 10, "size": 64, "color": "#FFAA00", "fontFamily": "Press Start 2P", "bold": true },
+                { "type": "image", "imageUrl": "{giftimage}", "x": 80, "y": 80, "width": 15 },
+                { "type": "text", "text": "{vacio}" }
+            ]
+        }));
+        r.exec.validate(&p).expect("válida solo con capas");
+        let mut c = ctx();
+        c.vars.insert("vacio".into(), String::new());
+        r.exec.execute(&c, &p).await.expect("exec");
+        let m = rx.recv().await.expect("msg");
+        let layers = m.data["layers"].as_array().expect("capas");
+        assert_eq!(layers.len(), 2, "la capa cuyo texto queda vacío se omite");
+        assert_eq!(layers[0]["text"], "¡Gracias Ana!");
+        assert_eq!(layers[0]["color"], "#ffaa00");
+        assert_eq!(layers[0]["fontFamily"], "Press Start 2P");
+        assert_eq!(layers[0]["bold"], true);
+        assert_eq!(layers[1]["imageUrl"], "https://x/rose.png");
+        assert_eq!(layers[1]["width"], 15.0);
+    }
+
+    #[tokio::test]
+    async fn bad_layers_are_rejected() {
+        let r = rig().await;
+        let bad = |layers: Value| r.exec.validate(&params(json!({ "title": "x", "layers": layers }))).is_err();
+        assert!(bad(json!("no es una lista")));
+        assert!(bad(json!([{ "type": "video" }])));
+        assert!(bad(json!([{ "type": "text" }])), "texto obligatorio");
+        assert!(bad(json!([{ "type": "text", "text": "a", "x": 101 }])));
+        assert!(bad(json!([{ "type": "text", "text": "a", "size": 2 }])));
+        assert!(bad(json!([{ "type": "text", "text": "a", "color": "rojo" }])));
+        assert!(bad(json!([{ "type": "text", "text": "a", "fontFamily": "x;y{}" }])), "la fuente no puede llevar CSS");
+        assert!(bad(json!([{ "type": "image" }])), "una imagen necesita origen");
+        assert!(bad(json!([{ "type": "image", "imageUrl": "https://x/a.png", "width": 500 }])));
+        assert!(bad(Value::Array((0..9).map(|_| json!({ "type": "text", "text": "a" })).collect())), "máximo 8");
+        assert!(!bad(json!([])), "sin capas es válido");
+    }
+
+    #[tokio::test]
+    async fn a_layer_image_whose_media_was_deleted_is_skipped() {
+        let r = rig().await;
+        let mut rx = r.hub.subscribe();
+        let p = params(json!({ "title": "hola", "wait": false, "layers": [{ "type": "image", "mediaId": "ya-no-existe" }] }));
+        r.exec.execute(&ctx(), &p).await.expect("exec");
+        let m = rx.recv().await.expect("msg");
+        assert_eq!(m.data["layers"], json!([]));
     }
 }

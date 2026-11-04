@@ -45,7 +45,6 @@ export interface LiveClient {
 
 export interface ConnectTarget {
   uniqueId: string;
-  eulerApiKey?: string;
 }
 
 export type ClientFactory = (target: ConnectTarget, cb: ClientCallbacks) => LiveClient;

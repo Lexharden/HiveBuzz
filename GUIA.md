@@ -51,7 +51,6 @@ Cada pantalla trae una frase que explica para qué sirve.
    Para ver también **seguidores nuevos**, saber si estás en directo y cuántos te ven, pulsa **Entrar con Twitch**: se abre twitch.tv/activate, escribes el código que ves en
    pantalla, aceptas y HiveBuzz lo detecta solo. (HiveBuzz no escribe en el chat de Twitch.)
 5. **Primeros pasos:** en Inicio hay una lista que se va marcando sola (conectar, poner un overlay en OBS, probar una alerta, crear una regla).
-6. (Opcional) **Ajustes → API key de Euler Stream**: da más margen de firmas al conectar. Sin ella funciona el nivel gratuito.
 
 ---
 
@@ -62,8 +61,10 @@ Cada pantalla trae una frase que explica para qué sirve.
 2. Cambia colores, fuente, posición, tamaño… la **vista previa** se actualiza al instante. Botón ▶ *Probar* manda ejemplos.
    **Alertas** funciona sin reglas: regalos, follows y suscripciones salen solos (ajústalo en *Comportamiento*).
 3. En **Ajustes → Overlays** copia la URL del overlay.
-4. En OBS: *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080. TikTok LIVE Studio puede decir
-   «enlace no válido» con estas direcciones locales: prueba el botón *Copiar (localhost)* o usa la cámara virtual de OBS.
+4. En OBS: *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080. TikTok LIVE Studio no acepta
+   direcciones `http://` («enlace no válido»): en *Ajustes → HTTPS* pulsa **Instalar certificado** (una sola vez; Windows
+   pedirá confirmación) y usa el botón *Copiar (HTTPS)* o las URL de esa sección. El certificado es propio de tu equipo y
+   solo vale para `localhost` y `127.0.0.1`.
 5. ⚠️ La URL lleva tu token: **no la compartas**.
 6. **Pantallas de alertas**: hay 5 de fábrica (*Alertas · Pantalla 1…5*) y puedes crear hasta 20 con *+ Añadir pantalla* (o quitar la última). Cada una es un overlay distinto con su propia URL, su estilo (posición, tamaño, fuente, animación…) y su propia cola: añade varias como *Navegador* en OBS, colócalas en sitios distintos y las alertas de pantallas diferentes se ven a la vez. En la acción *Alerta en overlay* eliges la **Pantalla** donde sale y, si quieres, cambias la animación o el tamaño de esa alerta. Solo la pantalla 1 muestra sola regalos, follows y suscripciones. Si quitas una pantalla, las reglas que la usaban pasan a la 1. Los vídeos con audio suenan en el overlay (*Volumen del vídeo* en la acción; en OBS, activa «Controlar audio mediante OBS» en la fuente Navegador para llevarlo a su propio canal). Para vídeos sin transparencia, la acción tiene *Fondo del vídeo*: quita el fondo negro o el verde sin filtros de OBS.
 7. **Jarrón de regalos**: lleva su propia cuenta de monedas (no necesita meta). En Overlays → Jarrón de regalos fija el *objetivo*, suma, llena o vacía a mano, y personaliza forma, colores, olas, burbujas, textos y efecto al llenarse. Con «Una meta de monedas» como origen sigue una meta de «Metas y timers».
@@ -211,14 +212,14 @@ Los usuarios se reconocen por su @ (sin importar mayúsculas ni el `@`), y puede
 
 ## 12. Seguridad en una línea
 
-El servidor solo escucha en tu PC (`127.0.0.1`), los overlays/API piden token, y los secretos (Euler, sesión de
-TikTok, contraseña de OBS, Spotify) van al **llavero del sistema**, nunca a la base de datos.
+El servidor solo escucha en tu PC (`127.0.0.1`), los overlays/API piden token, y los secretos (Twitch,
+contraseña de OBS, Spotify) van al **llavero del sistema**, nunca a la base de datos.
 
 ## 13. Si algo no funciona
 
 | Síntoma | Qué mirar |
 |---|---|
-| No conecta | Estado en el Panel; *Ajustes → Registro*; prueba la API key de Euler |
+| No conecta | Estado en el Panel; *Ajustes → Registro* |
 | Overlay vacío en OBS | URL completa con token; servidor local sin error en Ajustes; puerto libre |
 | Spotify no encola | Premium, dispositivo activo, Redirect URI exacta, "Conectado" en verde |
 | Spotify: 403 Forbidden | Añade tu cuenta en *Settings → User Management* de tu app de Spotify y reconecta |

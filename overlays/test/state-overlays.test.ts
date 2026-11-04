@@ -131,6 +131,22 @@ describe("timer", () => {
     p.win.close();
   });
 
+  it("el cronómetro cuenta hacia arriba desde el origen, sin textos de fin ni aviso de poco tiempo", async () => {
+    const p = load("timer");
+    p.send(config("timer", cfg));
+    p.send(overlayMsg("timer", { timers: [{ id: "t", name: "Directo", mode: "stopwatch", status: "running", remainingMs: 0, endsAtMs: Date.now() - 125_000 }] }));
+    expect(digits(p.root)).toMatch(/^02:0[4-6]$/);
+    expect(p.root.querySelector(".timer")?.classList.contains("low")).toBe(false);
+    const before = digits(p.root);
+    await sleep(1_300);
+    expect(digits(p.root)).not.toBe(before);
+    p.send(overlayMsg("timer", { timers: [{ id: "t", name: "Directo", mode: "stopwatch", status: "paused", remainingMs: 3_725_000, endsAtMs: 0 }] }));
+    expect(digits(p.root)).toBe("01:02:05");
+    p.send(overlayMsg("timer", { timers: [{ id: "t", name: "Directo", mode: "stopwatch", status: "ended", remainingMs: 60_000, endsAtMs: 0 }] }));
+    expect(digits(p.root)).toBe("01:00");
+    p.win.close();
+  });
+
   it("formato de horas y formato forzado minutos:segundos", () => {
     const p = load("timer");
     p.send(config("timer", cfg));

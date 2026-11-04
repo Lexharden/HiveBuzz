@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, errorMessage, pickFile } from "../../lib/api";
 import type { AppInfo, Media, Sound } from "../../lib/types";
 import { Btn, Card, ErrorText } from "../ui";
+import { FontsCard } from "./FontsCard";
 import { MyInstantsCard } from "./MyInstantsCard";
 
 const AUDIO_EXT = ["mp3", "wav", "ogg", "flac"];
@@ -103,6 +104,8 @@ export function LibraryPage({ info }: { info: AppInfo | null }) {
           ))}
         </ul>
       </Card>
+
+      <FontsCard />
       <ErrorText error={error} />
     </div>
   );

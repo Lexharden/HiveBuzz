@@ -41,10 +41,7 @@ rl.on("line", (line) => {
   }
   switch (cmd.cmd) {
     case "connect":
-      void connector.connect({
-        uniqueId: cmd.uniqueId,
-        ...(cmd.eulerApiKey ? { eulerApiKey: cmd.eulerApiKey } : {}),
-      });
+      void connector.connect({ uniqueId: cmd.uniqueId });
       break;
     case "disconnect":
       void connector.disconnect();

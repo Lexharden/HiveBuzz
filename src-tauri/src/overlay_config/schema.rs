@@ -25,6 +25,9 @@ pub enum FieldKind {
     Select { default: &'static str, options: Vec<(&'static str, &'static str)> },
     Bool { default: bool },
     Text { default: &'static str, max_len: usize },
+    /// Familia tipográfica: una del sistema o una de la biblioteca de fuentes. El nombre solo admite letras, números,
+    /// espacios y guiones (nunca CSS); si la fuente no existe en el equipo, el overlay usa la del sistema.
+    Font { default: &'static str },
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -53,7 +56,7 @@ pub struct OverlayDef {
 impl FieldDef {
     pub fn default_value(&self) -> Value {
         match &self.kind {
-            FieldKind::Color { default } | FieldKind::Select { default, .. } | FieldKind::Text { default, .. } => json!(default),
+            FieldKind::Color { default } | FieldKind::Select { default, .. } | FieldKind::Text { default, .. } | FieldKind::Font { default } => json!(default),
             FieldKind::Number { default, min, max, step } => number_value(*default, *min, *max, *step),
             FieldKind::Bool { default } => json!(default),
         }
@@ -74,6 +77,10 @@ impl FieldDef {
             FieldKind::Select { options, .. } => match v.as_str() {
                 Some(s) if options.iter().any(|(val, _)| *val == s) => Ok(json!(s)),
                 _ => bad("valor no permitido"),
+            },
+            FieldKind::Font { .. } => match v.as_str() {
+                Some(s) if crate::fonts::is_font_name(s) => Ok(json!(s.trim())),
+                _ => bad("nombre de fuente no válido"),
             },
             FieldKind::Bool { .. } => v.as_bool().map(|b| json!(b)).map_or_else(|| bad("debe ser verdadero o falso"), Ok),
             FieldKind::Text { max_len, .. } => match v.as_str() {
@@ -158,16 +165,9 @@ const fn text(key: &'static str, label: &'static str, group: Group, default: &'s
     FieldDef { key, label, group, kind: FieldKind::Text { default, max_len } }
 }
 
-const FONTS: &[(&str, &str)] = &[
-    ("Segoe UI", "font.segoe"),
-    ("Arial", "font.arial"),
-    ("Verdana", "font.verdana"),
-    ("Georgia", "font.georgia"),
-    ("Impact", "font.impact"),
-    ("Trebuchet MS", "font.trebuchet"),
-    ("Comic Sans MS", "font.comic"),
-    ("Courier New", "font.courier"),
-];
+fn font(key: &'static str, label: &'static str, group: Group, default: &'static str) -> FieldDef {
+    FieldDef { key, label, group, kind: FieldKind::Font { default } }
+}
 
 const ANCHORS: &[(&str, &str)] = &[
     ("top-left", "anchor.topLeft"),
@@ -181,7 +181,7 @@ const ANCHORS: &[(&str, &str)] = &[
 fn common_style(anchor: &'static str, with_background: bool) -> Vec<FieldDef> {
     use Group::Style;
     let mut f = vec![
-        select("fontFamily", "field.fontFamily", Style, "Segoe UI", FONTS),
+        font("fontFamily", "field.fontFamily", Style, "Segoe UI"),
         num("fontSize", "field.fontSize", Style, 16.0, 8.0, 120.0, 1.0),
         color("textColor", "field.textColor", Style, "#ffffff"),
         color("accentColor", "field.accentColor", Style, "#ffc113"),
@@ -547,6 +547,18 @@ mod tests {
         assert!(d.validate_patch(json!({"anchor": "center"}).as_object().expect("obj")).is_ok());
         assert!(d.validate_patch(json!({"anchor": "diagonal"}).as_object().expect("obj")).is_err());
         assert!(d.validate_patch(json!({"fontFamily": "Papyrus; background:url(x)"}).as_object().expect("obj")).is_err());
+    }
+
+    #[test]
+    fn font_family_accepts_library_fonts_but_never_css() {
+        let d = find("chat").expect("chat");
+        for ok in ["Segoe UI", "Press Start 2P", "Open Sans", "Anton-Regular"] {
+            assert!(d.validate_patch(json!({"fontFamily": ok}).as_object().expect("obj")).is_ok(), "{ok}");
+        }
+        for bad in ["", "a\"b", "a'b", "x}body{display:none", "url(http://x)", "a;b"] {
+            assert!(d.validate_patch(json!({"fontFamily": bad}).as_object().expect("obj")).is_err(), "{bad}");
+        }
+        assert!(d.validate_patch(json!({"fontFamily": 5}).as_object().expect("obj")).is_err(), "un número no es una fuente");
     }
 
     #[test]

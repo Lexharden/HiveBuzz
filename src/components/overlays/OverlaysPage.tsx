@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, errorMessage } from "../../lib/api";
+import { save } from "@tauri-apps/plugin-dialog";
+import { api, errorMessage, pickFile } from "../../lib/api";
 import type { AppInfo, OverlayConfig, OverlayDef } from "../../lib/types";
 import { Btn, Card, ErrorText, toast } from "../ui";
 import { Preview } from "./Preview";
@@ -57,6 +58,7 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
     }
   }
   const url = info?.overlays.find((o) => o.id === selected)?.url;
+  const httpsUrl = info?.overlays.find((o) => o.id === selected)?.httpsUrl ?? undefined;
 
   /** Aplica el cambio en pantalla al instante y lo manda al backend con un pequeño retardo. */
   const change = useCallback(
@@ -134,6 +136,9 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
                   <Btn onClick={() => void copyUrl(url?.replace("//127.0.0.1:", "//localhost:"))} disabled={!url} title={t("overlays.copyLocalhostHint")}>
                     {t("overlays.copyLocalhost")}
                   </Btn>
+                  <Btn onClick={() => void copyUrl(httpsUrl)} disabled={!httpsUrl} title={t("overlays.copyHttpsHint")}>
+                    {t("overlays.copyHttps")}
+                  </Btn>
                   {isTestable(def) && <Btn onClick={() => api.testOverlay(def.id).then(() => toast(t("overlays.testSent"))).catch((e: unknown) => setError(errorMessage(e)))}>▶ {t("overlays.test")}</Btn>}
                   <Btn
                     onClick={() => {
@@ -141,6 +146,44 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
                     }}
                   >
                     {t("overlays.reset")}
+                  </Btn>
+                  <Btn
+                    title={t("overlays.themeExportHint")}
+                    onClick={() =>
+                      void (async () => {
+                        setError(null);
+                        try {
+                          const path = await save({ defaultPath: `tema-${def.id}.json`, filters: [{ name: t("overlays.themeFiles"), extensions: ["json"] }] });
+                          if (path) {
+                            await api.exportOverlayTheme(def.id, path, nameOf(def));
+                            toast(t("overlays.themeExported"));
+                          }
+                        } catch (e) {
+                          setError(errorMessage(e));
+                        }
+                      })()
+                    }
+                  >
+                    {t("overlays.themeExport")}
+                  </Btn>
+                  <Btn
+                    title={t("overlays.themeImportHint")}
+                    onClick={() =>
+                      void (async () => {
+                        setError(null);
+                        try {
+                          const path = await pickFile(t("overlays.themeFiles"), ["json"]);
+                          if (!path) return;
+                          const res = await api.importOverlayTheme(def.id, path);
+                          if (alive.current) setConfig(res.config);
+                          toast(res.skipped > 0 ? t("overlays.themeImportedSkipped", { n: res.skipped }) : t("overlays.themeImported"));
+                        } catch (e) {
+                          setError(errorMessage(e));
+                        }
+                      })()
+                    }
+                  >
+                    {t("overlays.themeImport")}
                   </Btn>
                 </div>
               }

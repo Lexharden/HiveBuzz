@@ -31,8 +31,9 @@
 
   function pad(n) { return (n < 10 ? "0" : "") + n; }
 
-  function format(ms) {
-    var total = Math.max(0, Math.ceil(ms / 1000));
+  // La cuenta atrás redondea hacia arriba (00:01 hasta llegar a cero); el cronómetro, hacia abajo.
+  function format(ms, stopwatch) {
+    var total = Math.max(0, stopwatch ? Math.floor(ms / 1000) : Math.ceil(ms / 1000));
     var h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), s = total % 60;
     if (cfg.format === "ms") return pad(Math.floor(total / 60)) + ":" + pad(s);
     if (cfg.format === "hms" || h > 0) return pad(h) + ":" + pad(m) + ":" + pad(s);
@@ -49,14 +50,17 @@
     var t = current();
     card.style.display = t ? "" : "none";
     if (!t) return;
-    var ms = t.status === "running" ? Math.max(0, t.endsAtMs - Date.now()) : t.remainingMs;
-    var ended = t.status === "ended" || (t.status === "running" && ms <= 0);
+    var stopwatch = t.mode === "stopwatch";
+    var running = t.status === "running";
+    // Cuenta atrás: endsAtMs es el fin. Cronómetro: endsAtMs es el origen y remainingMs, el tiempo transcurrido en pausa.
+    var ms = running ? Math.max(0, stopwatch ? Date.now() - t.endsAtMs : t.endsAtMs - Date.now()) : t.remainingMs;
+    var ended = t.status === "ended" || (!stopwatch && running && ms <= 0);
     label.style.display = cfg.showLabel ? "" : "none";
     label.textContent = t.name;
     digits.style.fontSize = cfg.digitSize + "px";
     card.style.setProperty("--hb-low", cfg.lowColor);
-    digits.textContent = ended ? cfg.endText : format(ms);
-    card.classList.toggle("low", t.status === "running" && !ended && ms <= cfg.lowSeconds * 1000);
+    digits.textContent = ended && !stopwatch ? cfg.endText : format(ms, stopwatch);
+    card.classList.toggle("low", running && !ended && !stopwatch && ms <= cfg.lowSeconds * 1000);
     card.classList.toggle("paused", t.status === "paused");
   }
 

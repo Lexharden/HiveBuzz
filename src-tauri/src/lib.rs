@@ -1,5 +1,8 @@
 // El enlazador de MSVC informa «Creando biblioteca…» al generar la cdylib; es solo informativo.
 #![allow(linker_messages)]
+// El código de producción no debe poder entrar en pánico: con `panic = "abort"` un pánico cierra la app en pleno directo.
+// Los errores se propagan con `Result`; los tests pueden usar `unwrap`/`expect`.
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 pub mod actions;
 pub mod app;
@@ -19,6 +22,7 @@ pub mod db;
 pub mod error;
 pub mod events;
 pub mod executors;
+pub mod fonts;
 pub mod goals;
 pub mod jar;
 pub mod interact;
@@ -68,9 +72,19 @@ fn init_tracing() {
         .try_init();
 }
 
+/// Con `panic = "abort"` la app muere sin más: antes se deja constancia del motivo en el registro (y en `hivebuzz.log`).
+fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        tracing::error!(panic = %info, "HiveBuzz ha fallado de forma inesperada");
+        previous(info);
+    }));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     init_tracing();
+    install_panic_hook();
 
     let builder = tauri::Builder::default();
     // Debe ir primero: una segunda instancia abriría la misma base de datos, otro sidecar y otra
@@ -132,8 +146,13 @@ pub fn run() {
             commands::disconnect,
             commands::get_statuses,
             commands::get_app_info,
-            commands::set_euler_api_key,
             commands::set_server_port,
+            commands::https_status,
+            commands::list_fonts,
+            commands::import_font,
+            commands::download_google_font,
+            commands::delete_font,
+            commands::install_local_ca,
             commands::simulate_event,
             commands::simulate_burst,
             commands::recent_events,
@@ -183,6 +202,8 @@ pub fn run() {
             commands::get_overlay_config,
             commands::set_overlay_config,
             commands::reset_overlay_config,
+            commands_app::export_overlay_theme,
+            commands_app::import_overlay_theme,
             commands::test_overlay,
             commands::list_goals,
             commands::save_goal,

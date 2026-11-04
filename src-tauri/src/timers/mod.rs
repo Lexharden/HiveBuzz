@@ -1,5 +1,5 @@
-//! Timers / subathon: cuenta regresiva que los regalos (y follows, shares, suscripciones, likes)
-//! pueden extender. La lógica de estados es pura (el reloj entra por parámetro); el servicio
+//! Timers / subathon: cuenta regresiva (o cronómetro hacia arriba) que los regalos (y follows, shares,
+//! suscripciones, likes) pueden extender o recortar. La lógica de estados es pura (el reloj entra por parámetro); el servicio
 //! (`service`) la conecta al bus, a los overlays y a las reglas.
 
 pub mod service;
@@ -11,6 +11,17 @@ use crate::events::{EventType, LiveEvent};
 
 const MAX_START_SECONDS: u64 = 7 * 24 * 3600;
 const MAX_EXTENSIONS: usize = 20;
+
+/// Cómo cuenta el timer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TimerMode {
+    /// Cuenta hacia atrás desde la duración inicial y termina en cero.
+    #[default]
+    Countdown,
+    /// Cronómetro: cuenta hacia arriba desde cero. Con tope, termina al alcanzarlo. No admite extensiones.
+    Stopwatch,
+}
 
 /// Qué extiende el timer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,8 +50,8 @@ pub enum ExtensionSource {
 #[serde(rename_all = "camelCase")]
 pub struct Extension {
     pub source: ExtensionSource,
-    /// Segundos que suma cada vez.
-    pub seconds: u64,
+    /// Segundos que suma cada vez; si es negativo, los resta.
+    pub seconds: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,9 +59,13 @@ pub struct Extension {
 pub struct TimerConfig {
     pub id: String,
     pub name: String,
-    /// Duración inicial.
+    /// Cómo cuenta (por defecto, cuenta atrás).
+    #[serde(default)]
+    pub mode: TimerMode,
+    /// Duración inicial (solo cuenta atrás).
     pub start_seconds: u64,
-    /// Tope del tiempo restante (la extensión nunca lo supera). `None` = sin tope.
+    /// Cuenta atrás: tope del tiempo restante (la extensión nunca lo supera). Cronómetro: al llegar aquí termina.
+    /// `None` = sin tope.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_seconds: Option<u64>,
     #[serde(default)]
@@ -65,7 +80,7 @@ impl TimerConfig {
         if self.name.trim().is_empty() || self.name.chars().count() > 80 {
             return Err(AppError::Invalid("el nombre del timer debe tener entre 1 y 80 caracteres".into()));
         }
-        if self.start_seconds == 0 || self.start_seconds > MAX_START_SECONDS {
+        if self.mode == TimerMode::Countdown && (self.start_seconds == 0 || self.start_seconds > MAX_START_SECONDS) {
             return Err(AppError::Invalid("la duración inicial debe estar entre 1 segundo y 7 días".into()));
         }
         if self.max_seconds.is_some_and(|m| m == 0 || m > MAX_START_SECONDS) {
@@ -75,8 +90,8 @@ impl TimerConfig {
             return Err(AppError::Invalid("demasiadas extensiones (máximo 20)".into()));
         }
         for e in &self.extensions {
-            if e.seconds == 0 {
-                return Err(AppError::Invalid("cada extensión debe sumar al menos 1 segundo".into()));
+            if e.seconds == 0 || e.seconds.unsigned_abs() > MAX_START_SECONDS {
+                return Err(AppError::Invalid("cada extensión debe sumar o restar entre 1 segundo y 7 días".into()));
             }
             match &e.source {
                 ExtensionSource::Coins { per_coins: 0 } | ExtensionSource::Likes { per_likes: 0 } => {
@@ -92,7 +107,10 @@ impl TimerConfig {
     }
 
     pub fn start_ms(&self) -> i64 {
-        secs_to_ms(self.start_seconds)
+        match self.mode {
+            TimerMode::Countdown => secs_to_ms(self.start_seconds),
+            TimerMode::Stopwatch => 0,
+        }
     }
 
     pub fn max_ms(&self) -> Option<i64> {
@@ -118,8 +136,12 @@ pub enum Status {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimerState {
+    #[serde(default)]
+    pub mode: TimerMode,
     pub status: Status,
+    /// Cuenta atrás: tiempo restante. Cronómetro: tiempo transcurrido.
     pub remaining_ms: i64,
+    /// Cuenta atrás: instante de fin. Cronómetro: instante de origen (ahora − transcurrido).
     pub ends_at_ms: i64,
     /// Sobrantes de las extensiones «cada N» (monedas o likes que aún no completan un paso),
     /// una entrada por extensión.
@@ -129,12 +151,18 @@ pub struct TimerState {
 
 impl TimerState {
     pub fn idle(initial_ms: i64) -> Self {
-        Self { status: Status::Idle, remaining_ms: initial_ms, ends_at_ms: 0, leftovers: Vec::new() }
+        Self::with_mode(TimerMode::Countdown, initial_ms)
     }
 
+    pub fn with_mode(mode: TimerMode, initial_ms: i64) -> Self {
+        Self { mode, status: Status::Idle, remaining_ms: initial_ms, ends_at_ms: 0, leftovers: Vec::new() }
+    }
+
+    /// Valor que muestra el timer: tiempo restante (cuenta atrás) o transcurrido (cronómetro).
     pub fn remaining(&self, now_ms: i64) -> i64 {
-        match self.status {
-            Status::Running => (self.ends_at_ms - now_ms).max(0),
+        match (self.status, self.mode) {
+            (Status::Running, TimerMode::Countdown) => (self.ends_at_ms - now_ms).max(0),
+            (Status::Running, TimerMode::Stopwatch) => (now_ms - self.ends_at_ms).max(0),
             _ => self.remaining_ms.max(0),
         }
     }
@@ -146,8 +174,16 @@ impl TimerState {
             Status::Paused => self.resume(now_ms),
             Status::Idle | Status::Ended => {
                 self.status = Status::Running;
-                self.remaining_ms = initial_ms;
-                self.ends_at_ms = now_ms.saturating_add(initial_ms);
+                match self.mode {
+                    TimerMode::Countdown => {
+                        self.remaining_ms = initial_ms;
+                        self.ends_at_ms = now_ms.saturating_add(initial_ms);
+                    }
+                    TimerMode::Stopwatch => {
+                        self.remaining_ms = 0;
+                        self.ends_at_ms = now_ms;
+                    }
+                }
             }
         }
     }
@@ -161,19 +197,22 @@ impl TimerState {
 
     pub fn resume(&mut self, now_ms: i64) {
         if self.status == Status::Paused {
-            self.ends_at_ms = now_ms.saturating_add(self.remaining_ms);
+            self.ends_at_ms = match self.mode {
+                TimerMode::Countdown => now_ms.saturating_add(self.remaining_ms),
+                TimerMode::Stopwatch => now_ms.saturating_sub(self.remaining_ms),
+            };
             self.status = Status::Running;
         }
     }
 
     pub fn reset(&mut self, initial_ms: i64) {
-        *self = Self::idle(initial_ms);
+        *self = Self::with_mode(self.mode, initial_ms);
     }
 
     /// Suma (o resta) tiempo, respetando el tope. Solo afecta a un timer en marcha o en pausa:
     /// uno parado o terminado no se «revive» con regalos. Devuelve si cambió algo.
     pub fn add(&mut self, now_ms: i64, delta_ms: i64, cap_ms: Option<i64>) -> bool {
-        if !matches!(self.status, Status::Running | Status::Paused) || delta_ms == 0 {
+        if self.mode == TimerMode::Stopwatch || !matches!(self.status, Status::Running | Status::Paused) || delta_ms == 0 {
             return false;
         }
         let before = self.remaining(now_ms);
@@ -194,21 +233,41 @@ impl TimerState {
 
     /// Pasa a `Ended` si el tiempo se agotó. Devuelve `true` solo en el instante en que termina.
     pub fn tick(&mut self, now_ms: i64) -> bool {
-        if self.status == Status::Running && self.remaining(now_ms) == 0 {
-            self.status = Status::Ended;
-            self.remaining_ms = 0;
-            return true;
+        self.tick_limit(now_ms, None)
+    }
+
+    /// Como [`tick`](Self::tick), pero un cronómetro con `limit_ms` termina al alcanzarlo.
+    pub fn tick_limit(&mut self, now_ms: i64, limit_ms: Option<i64>) -> bool {
+        if self.status != Status::Running {
+            return false;
         }
-        false
+        let value = self.remaining(now_ms);
+        match self.mode {
+            TimerMode::Countdown if value == 0 => {
+                self.status = Status::Ended;
+                self.remaining_ms = 0;
+                true
+            }
+            TimerMode::Stopwatch if limit_ms.is_some_and(|l| value >= l) => {
+                self.status = Status::Ended;
+                self.remaining_ms = limit_ms.unwrap_or(value);
+                true
+            }
+            _ => false,
+        }
     }
 }
 
 /// Segundos que un evento suma a un timer. Actualiza los sobrantes de las extensiones «cada N».
-pub fn extension_seconds(cfg: &TimerConfig, leftovers: &mut Vec<u64>, ev: &LiveEvent) -> u64 {
+/// Positivo suma, negativo resta. Un cronómetro no tiene extensiones.
+pub fn extension_seconds(cfg: &TimerConfig, leftovers: &mut Vec<u64>, ev: &LiveEvent) -> i64 {
+    if cfg.mode == TimerMode::Stopwatch {
+        return 0;
+    }
     if leftovers.len() != cfg.extensions.len() {
         leftovers.resize(cfg.extensions.len(), 0);
     }
-    let mut total: u64 = 0;
+    let mut total: i64 = 0;
     for (i, ext) in cfg.extensions.iter().enumerate() {
         let steps = match (&ext.source, ev.kind) {
             (ExtensionSource::Follow, EventType::Follow) | (ExtensionSource::Share, EventType::Share) | (ExtensionSource::Subscribe, EventType::Subscribe) => 1,
@@ -229,7 +288,7 @@ pub fn extension_seconds(cfg: &TimerConfig, leftovers: &mut Vec<u64>, ev: &LiveE
             }),
             _ => 0,
         };
-        total = total.saturating_add(steps.saturating_mul(ext.seconds));
+        total = total.saturating_add(i64::try_from(steps).unwrap_or(i64::MAX).saturating_mul(ext.seconds));
     }
     total
 }

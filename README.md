@@ -169,8 +169,14 @@ el cambio se aplica al reiniciar). En *Ajustes → Overlays* están las URLs lis
 http://127.0.0.1:17890/overlay/feed?token=<TOKEN>
 ```
 
-Pégalas como **Browser Source** en OBS. TikTok LIVE Studio puede rechazarlas («enlace no válido»): prueba el botón
-*Copiar (localhost)* o envía OBS a LIVE Studio con su cámara virtual.
+Pégalas como **Browser Source** en OBS. TikTok LIVE Studio solo acepta `https://`: usa *Copiar (HTTPS)* tras instalar el
+certificado en *Ajustes → HTTPS*. El servidor HTTPS escucha en el puerto HTTP + 1, solo en loopback, con una CA propia
+restringida (name constraints) a `localhost` y `127.0.0.1`; su clave privada se descarta tras firmar y nunca se guarda.
+
+**Fuentes, capas y temas.** *Biblioteca → Fuentes* descarga fuentes de Google Fonts (o sube las tuyas) a disco; los overlays las sirven
+desde `/fonts` con el mismo token, así que no dependen de Internet en directo. La acción `overlayAlert` acepta `layers`
+(hasta 8 capas `text`/`image` con `x`, `y` en %), y *Overlays → Exportar/Importar tema* comparte el estilo como `.json`
+(formato `hivebuzzTheme: 1`; solo opciones de estilo, validadas contra el esquema del overlay de destino).
 
 Seguridad del servidor local:
 
@@ -393,7 +399,7 @@ Requisitos de Spotify: la cuenta dueña de una app en modo desarrollo necesita *
 
 ## Secretos y datos
 
-- La API key de Euler Stream (opcional; sin ella se usa el tier gratuito), el token de overlays, la contraseña de OBS y el refresh token de Spotify se
+- El token de overlays, la contraseña de OBS y el refresh token de Spotify se
   guardan en el **llavero del sistema** (Credential Manager / Keychain / Secret Service), nunca en SQLite.
 - Base de datos: `hivebuzz.db` en el directorio de datos de la app (`%APPDATA%\com.yafel.hivebuzz`
   en Windows). Contiene ajustes y el log de eventos, que se rota a 7 días.
@@ -403,7 +409,7 @@ Requisitos de Spotify: la cuenta dueña de una app en modo desarrollo necesita *
 Una línea JSON por mensaje. `stdout` es exclusivo del protocolo; los logs van a `stderr`.
 
 - Sidecar → Rust: `ready`, `event`, `status`, `log`
-- Rust → sidecar: `connect {uniqueId, eulerApiKey?}`, `disconnect`, `shutdown`
+- Rust → sidecar: `connect {uniqueId}`, `disconnect`, `shutdown`
 
 Tipos espejo en `sidecar/src/{types,protocol}.ts` y `src-tauri/src/{events.rs,source/protocol.rs}`.
 

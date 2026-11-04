@@ -3,6 +3,7 @@
 //! apliquen al instante.
 
 pub mod schema;
+pub mod theme;
 
 use serde_json::{Map, Value};
 

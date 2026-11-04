@@ -187,6 +187,45 @@ pub async fn install_update(app: AppHandle, state: State<'_, AppState>) -> Resul
     updater::install(&app, &state.pending_update, state.persist()).await
 }
 
+// ---- Temas de overlay ----
+
+use crate::overlay_config::{schema, theme};
+
+/// Guarda el estilo de un overlay como tema `.json` para compartirlo.
+#[tauri::command]
+pub async fn export_overlay_theme(state: State<'_, AppState>, id: String, path: String, name: String) -> Result<()> {
+    let def = schema::find(&id).ok_or_else(|| AppError::Invalid(format!("overlay desconocido: «{id}»")))?;
+    let dest = checked_path(&path, &["json"])?;
+    let config = state.overlay_cfg.get(&id).await?;
+    let text = serde_json::to_string_pretty(&theme::export(&def, &config, &name))?;
+    tokio::fs::write(dest, text).await?;
+    Ok(())
+}
+
+/// Resultado de importar un tema.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThemeImported {
+    pub config: serde_json::Map<String, serde_json::Value>,
+    /// Valores del archivo que no se aplicaron (no existen en este overlay o no eran válidos).
+    pub skipped: usize,
+}
+
+/// Aplica un tema `.json` al estilo de un overlay. Solo se toman las opciones de estilo válidas.
+#[tauri::command]
+pub async fn import_overlay_theme(state: State<'_, AppState>, id: String, path: String) -> Result<ThemeImported> {
+    let def = schema::find(&id).ok_or_else(|| AppError::Invalid(format!("overlay desconocido: «{id}»")))?;
+    let src = checked_path(&path, &["json"])?;
+    let size = tokio::fs::metadata(&src).await?.len();
+    if size > theme::MAX_BYTES {
+        return Err(AppError::Invalid("el archivo del tema es demasiado grande".into()));
+    }
+    let text = tokio::fs::read_to_string(&src).await.map_err(|_| AppError::Invalid("no se pudo leer el tema como texto".into()))?;
+    let imported = theme::import(&def, &text)?;
+    let config = state.overlay_cfg.set(&id, &imported.patch).await?;
+    Ok(ThemeImported { config, skipped: imported.skipped })
+}
+
 #[cfg(test)]
 mod tests {
     use super::checked_path;

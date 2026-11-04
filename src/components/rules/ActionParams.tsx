@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ActionSpec, Goal, Media, Sound, TimerView, VoiceInfo } from "../../lib/types";
+import type { ActionSpec, AlertLayer, FontFamily, Goal, Media, Sound, TimerView, VoiceInfo } from "../../lib/types";
 import { api } from "../../lib/api";
 import { voiceLabel } from "../../lib/voices";
 import { Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
@@ -208,6 +208,7 @@ function AlertParams({ action, onChange, media, sounds }: Pick<Props, "action" |
           options={[{ value: "", label: t("action.keyNone") }, { value: "black", label: t("action.keyBlack") }, { value: "green", label: t("action.keyGreen") }]}
         />
       </Field>
+      <AlertLayers action={action} onChange={onChange} media={media} />
       <div className="grid grid-cols-2 gap-2">
         <Field label={t("action.alertSound")} hint={t("action.alertSoundHint")}>
           <Select
@@ -230,6 +231,105 @@ function AlertParams({ action, onChange, media, sounds }: Pick<Props, "action" |
         <div className="flex items-end pb-1.5">
           <Checkbox checked={bool(action, "wait", true)} onChange={(v) => onChange(set(action, "wait", v))} label={t("action.wait")} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+const MAX_LAYERS = 8;
+
+/** Capas libres de la alerta: textos e imágenes colocados donde quieras (en % de la pantalla). */
+function AlertLayers({ action, onChange, media }: Pick<Props, "action" | "onChange" | "media">) {
+  const { t } = useTranslation();
+  const [fonts, setFonts] = useState<FontFamily[]>([]);
+  useEffect(() => {
+    void api.listFonts().then(setFonts).catch(() => undefined);
+  }, []);
+  const layers = (Array.isArray(action.layers) ? action.layers : []) as AlertLayer[];
+  const save = (next: AlertLayer[]) => onChange(set(action, "layers", next.length ? next : null));
+  const patch = (i: number, p: Partial<AlertLayer>) => save(layers.map((l, j) => (j === i ? ({ ...l, ...p } as AlertLayer) : l)));
+  const images = media.filter((m) => m.kind === "image");
+
+  return (
+    <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold text-zinc-400">{t("action.layers")}</h4>
+        <div className="flex gap-1">
+          <button
+            disabled={layers.length >= MAX_LAYERS}
+            onClick={() => save([...layers, { type: "text", text: "{nickname}", x: 50, y: 15, size: 48, color: "#ffffff" }])}
+            className="rounded-md bg-zinc-800 px-2 py-1 text-xs hover:bg-zinc-700 disabled:opacity-40"
+          >
+            + {t("action.layerText")}
+          </button>
+          <button
+            disabled={layers.length >= MAX_LAYERS}
+            onClick={() => save([...layers, { type: "image", mediaId: images[0]?.id, x: 50, y: 50, width: 25 }])}
+            className="rounded-md bg-zinc-800 px-2 py-1 text-xs hover:bg-zinc-700 disabled:opacity-40"
+          >
+            + {t("action.layerImage")}
+          </button>
+        </div>
+      </div>
+      <p className="mt-1 text-xs text-zinc-500">{t("action.layersHint")}</p>
+      <div className="mt-2 space-y-2">
+        {layers.map((l, i) => (
+          <div key={i} className="rounded-md border border-zinc-800 p-2">
+            <div className="grid grid-cols-6 gap-2">
+              {l.type === "text" ? (
+                <>
+                  <Field label={t("action.layerTextLabel")} className="col-span-3">
+                    <TextInput value={l.text} onChange={(v) => patch(i, { text: v })} placeholder="¡Gracias {nickname}!" />
+                  </Field>
+                  <Field label={t("action.layerSize")}>
+                    <NumberInput value={l.size ?? 40} min={8} max={300} onChange={(v) => patch(i, { size: v ?? 40 })} />
+                  </Field>
+                  <Field label={t("action.layerColor")}>
+                    <input type="color" value={l.color ?? "#ffffff"} onChange={(e) => patch(i, { color: e.target.value })} className="h-8 w-full rounded border border-zinc-700 bg-zinc-950" />
+                  </Field>
+                  <div className="flex items-end pb-1.5">
+                    <Checkbox checked={l.bold ?? false} onChange={(v) => patch(i, { bold: v })} label={t("action.layerBold")} />
+                  </div>
+                  <Field label={t("action.layerFont")} className="col-span-3">
+                    <Select
+                      value={l.fontFamily ?? ""}
+                      onChange={(v) => patch(i, { fontFamily: v || undefined })}
+                      options={[{ value: "", label: t("action.layerFontDefault") }, ...fonts.map((f) => ({ value: f.family, label: f.family }))]}
+                    />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label={t("action.media")} className="col-span-2">
+                    <Select
+                      value={l.mediaId ?? ""}
+                      onChange={(v) => patch(i, { mediaId: v || undefined })}
+                      options={[{ value: "", label: t("action.noMedia") }, ...media.map((m) => ({ value: m.id, label: `${m.kind === "video" ? "🎬" : "🖼️"} ${m.name}` }))]}
+                    />
+                  </Field>
+                  <Field label={t("action.imageUrl")} className="col-span-2">
+                    <TextInput value={l.imageUrl ?? ""} onChange={(v) => patch(i, { imageUrl: v || undefined })} placeholder="{giftimage}" />
+                  </Field>
+                  <Field label={t("action.layerWidth")}>
+                    <NumberInput value={l.width ?? 20} min={2} max={100} onChange={(v) => patch(i, { width: v ?? 20 })} />
+                  </Field>
+                  <div />
+                </>
+              )}
+              <Field label="X %">
+                <NumberInput value={l.x} min={0} max={100} onChange={(v) => patch(i, { x: v ?? 50 })} />
+              </Field>
+              <Field label="Y %">
+                <NumberInput value={l.y} min={0} max={100} onChange={(v) => patch(i, { y: v ?? 50 })} />
+              </Field>
+              <div className="col-span-4 flex items-end justify-end pb-1.5">
+                <button onClick={() => save(layers.filter((_, j) => j !== i))} className="rounded-md bg-zinc-800 px-2 py-1 text-xs text-rose-300 hover:bg-zinc-700">
+                  ✕ {t("action.layerRemove")}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

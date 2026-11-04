@@ -23,21 +23,36 @@ export interface PlatformStatus extends StatusUpdate {
 
 export const PLATFORMS: Platform[] = ["tiktok", "twitch"];
 
+/** Familia de la biblioteca de fuentes de los overlays. */
+export interface FontFamily {
+  family: string;
+  weights: number[];
+}
+
 export interface OverlayInfo {
   id: string;
   name: string;
   url: string;
+  /** La misma dirección por HTTPS (con `localhost`), o `null` si el HTTPS no arrancó. */
+  httpsUrl: string | null;
+}
+
+/** Estado del certificado del HTTPS local. `installed: null` = este sistema no permite comprobarlo. */
+export interface HttpsStatus {
+  installed: boolean | null;
+  caPath: string | null;
 }
 
 export interface AppInfo {
   serverPort: number;
   serverError: string | null;
+  httpsPort: number | null;
+  httpsError: string | null;
   overlays: OverlayInfo[];
   mediaBase: string;
   overlayToken: string;
   lastUsername: string | null;
   lastTwitchChannel: string | null;
-  hasEulerApiKey: boolean;
 }
 
 export type SimKind =
@@ -92,6 +107,11 @@ export interface Conditions {
 }
 
 /** Acción abierta: `type` + parámetros propios de cada ejecutor. */
+/** Capa libre de una alerta: texto o imagen colocados por porcentajes (x, y = centro). */
+export type AlertLayer =
+  | { type: "text"; text: string; x: number; y: number; size?: number; color?: string; fontFamily?: string; bold?: boolean }
+  | { type: "image"; mediaId?: string; imageUrl?: string; x: number; y: number; width?: number };
+
 export interface ActionSpec {
   type: string;
   [param: string]: unknown;
@@ -281,7 +301,8 @@ export type FieldDef =
   | (FieldBase & { kind: "number"; default: number; min: number; max: number; step: number })
   | (FieldBase & { kind: "select"; default: string; options: [string, string][] })
   | (FieldBase & { kind: "bool"; default: boolean })
-  | (FieldBase & { kind: "text"; default: string; maxLen: number });
+  | (FieldBase & { kind: "text"; default: string; maxLen: number })
+  | (FieldBase & { kind: "font"; default: string });
 
 export interface OverlayDef {
   id: string;
@@ -329,12 +350,16 @@ export type ExtensionSource =
 
 export interface Extension {
   source: ExtensionSource;
+  /** Segundos que suma cada vez; negativo = resta. */
   seconds: number;
 }
+
+export type TimerMode = "countdown" | "stopwatch";
 
 export interface TimerConfig {
   id: string;
   name: string;
+  mode: TimerMode;
   startSeconds: number;
   maxSeconds?: number;
   extensions: Extension[];

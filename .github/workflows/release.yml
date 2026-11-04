@@ -15,7 +15,6 @@
 #
 # El release se publica solo al terminar: se crea como borrador interno, los cuatro builds le suben sus archivos y, si todos
 # salen bien, el job `publish` lo publica. Si un build falla, el borrador se queda sin publicar (nadie ve un release a medias).
-# NOTA: este flujo no se ha ejecutado todavía; revísalo en el primer release.
 name: release
 
 on:

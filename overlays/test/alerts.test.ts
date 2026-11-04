@@ -180,3 +180,85 @@ describe("alertas", () => {
     p.win.close();
   });
 });
+
+describe("alertas · capas libres", () => {
+  const stage = (doc: Document) => doc.querySelector<HTMLElement>(".stage");
+  const layers = (doc: Document) => [...doc.querySelectorAll<HTMLElement>(".stage .layer")];
+
+  it("dibuja textos e imágenes colocados por porcentajes sobre toda la pantalla", () => {
+    const p = load("alerts");
+    p.send(config("alerts", cfg));
+    p.send(
+      overlayMsg(
+        "alerts",
+        alert({
+          title: "",
+          text: "",
+          layers: [
+            { type: "text", text: "¡Gracias Ana!", x: 50, y: 10, size: 64, color: "#ffaa00", fontFamily: "Press Start 2P", bold: true },
+            { type: "image", imageUrl: "https://x/rose.png", x: 80, y: 85, width: 15 },
+          ],
+        }),
+      ),
+    );
+    const [text, image] = layers(p.doc);
+    expect(text?.textContent).toBe("¡Gracias Ana!");
+    expect(text?.style.left).toBe("50%");
+    expect(text?.style.top).toBe("10%");
+    expect(text?.style.fontSize).toBe("64px");
+    expect(text?.style.color).toBe("rgb(255, 170, 0)");
+    expect(text?.style.fontFamily).toContain("Press Start 2P");
+    expect(text?.style.fontWeight).toBe("800");
+    expect(image?.querySelector("img")?.getAttribute("src")).toBe("https://x/rose.png");
+    expect(image?.style.width).toBe("15vw");
+    expect(stage(p.doc)?.classList.contains("pop")).toBe(true);
+    p.win.close();
+  });
+
+  it("las capas se retiran con la alerta y no se acumulan", async () => {
+    const p = load("alerts");
+    p.send(config("alerts", cfg));
+    p.send(overlayMsg("alerts", alert({ durationMs: 500, layers: [{ type: "text", text: "uno", x: 50, y: 50 }] })));
+    expect(layers(p.doc)).toHaveLength(1);
+    await sleep(1_100);
+    expect(stage(p.doc)).toBeNull();
+    p.win.close();
+  });
+
+  it("nunca interpreta el texto como HTML ni acepta fuentes, colores o URLs peligrosas", () => {
+    const p = load("alerts");
+    p.send(config("alerts", cfg));
+    p.send(
+      overlayMsg(
+        "alerts",
+        alert({
+          layers: [
+            { type: "text", text: "<img src=x onerror=alert(1)><b>hola</b>", x: 50, y: 50, color: "red; background:url(x)", fontFamily: 'x";}body{display:none' },
+            { type: "image", imageUrl: "javascript:alert(1)", x: 10, y: 10 },
+            { type: "image", media: { kind: "image", url: "/media/../secreto.png" }, x: 10, y: 10 },
+          ],
+        }),
+      ),
+    );
+    const found = layers(p.doc);
+    expect(found).toHaveLength(1);
+    expect(found[0]?.querySelector("img, b")).toBeNull();
+    expect(found[0]?.textContent).toContain("<img src=x");
+    expect(found[0]?.style.color).toBe("rgb(255, 255, 255)");
+    expect(found[0]?.style.fontFamily).toBe("");
+    p.win.close();
+  });
+
+  it("acota posiciones y tamaños fuera de rango y solo admite ocho capas", () => {
+    const p = load("alerts");
+    p.send(config("alerts", cfg));
+    const many = Array.from({ length: 12 }, (_, i) => ({ type: "text", text: `t${i}`, x: i === 0 ? 500 : 50, y: i === 0 ? -20 : 50, size: i === 0 ? 9999 : 40 }));
+    p.send(overlayMsg("alerts", alert({ layers: many })));
+    const found = layers(p.doc);
+    expect(found).toHaveLength(8);
+    expect(found[0]?.style.left).toBe("100%");
+    expect(found[0]?.style.top).toBe("0%");
+    expect(found[0]?.style.fontSize).toBe("300px");
+    p.win.close();
+  });
+});

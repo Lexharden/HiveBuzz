@@ -22,7 +22,6 @@ use crate::leaderboard::{DonorEntry, Scope};
 use crate::media::Media;
 use crate::overlay_config::schema::{alert_screen_number, registry, OverlayDef};
 use crate::rules::model::Rule;
-use crate::secrets::KEY_EULER_API;
 use crate::simulator::SimKind;
 use crate::sounds::Sound;
 use crate::viewer_groups::ViewerGroup;
@@ -42,6 +41,8 @@ pub struct OverlayInfo {
     /// Clave de i18n del nombre.
     pub name: &'static str,
     pub url: String,
+    /// La misma dirección por HTTPS (para programas que no aceptan `http://`).
+    pub https_url: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -49,24 +50,14 @@ pub struct OverlayInfo {
 pub struct AppInfo {
     pub server_port: u16,
     pub server_error: Option<String>,
+    pub https_port: Option<u16>,
+    pub https_error: Option<String>,
     pub overlays: Vec<OverlayInfo>,
     /// `http://127.0.0.1:<puerto>/media`: base para mostrar miniaturas de la biblioteca de medios.
     pub media_base: String,
     pub overlay_token: String,
     pub last_username: Option<String>,
     pub last_twitch_channel: Option<String>,
-    pub has_euler_api_key: bool,
-}
-
-/// Si TikTok ya está conectado (o reintentando), vuelve a conectar con la API key guardada ahora:
-/// solo se lee al conectar, así que sin esto un cambio no se aplicaría hasta reconectar a mano.
-pub async fn reconnect_tiktok_if_active(state: &AppState) -> Result<()> {
-    if state.conn.status().state == crate::source::protocol::ConnectionState::Disconnected {
-        return Ok(());
-    }
-    let Some(username) = state.db.get_setting(KEY_LAST_USERNAME).await? else { return Ok(()) };
-    let key = state.secrets.get(KEY_EULER_API)?;
-    state.conn.connect(&username, key).await
 }
 
 /// Conecta una plataforma. `name` es el @usuario de TikTok o el canal de Twitch.
@@ -74,14 +65,13 @@ pub async fn reconnect_tiktok_if_active(state: &AppState) -> Result<()> {
 pub async fn connect(state: State<'_, AppState>, platform: Platform, username: String) -> Result<()> {
     match platform {
         Platform::Tiktok => {
-            let key = state.secrets.get(KEY_EULER_API)?;
-            state.conn.connect(&username, key).await?;
+            state.conn.connect(&username).await?;
             // Solo se guarda si la validación del nombre pasó (connect devuelve error si no).
             let clean = crate::connection::normalize_username(&username)?;
             state.db.set_setting(KEY_LAST_USERNAME, &clean).await
         }
         Platform::Twitch => {
-            state.connections.service(Platform::Twitch).connect(&username, None).await?;
+            state.connections.service(Platform::Twitch).connect(&username).await?;
             let clean = crate::twitch::normalize_channel(&username)?;
             state.db.set_setting(KEY_LAST_TWITCH_CHANNEL, &clean).await
         }
@@ -110,27 +100,23 @@ pub async fn get_app_info(state: State<'_, AppState>) -> Result<AppInfo> {
     Ok(AppInfo {
         server_port: state.server_port,
         server_error: state.server_error.clone(),
+        https_port: state.https_port,
+        https_error: state.https_error.clone(),
         overlays: registry()
             .into_iter()
-            .map(|d| OverlayInfo { id: d.id, name: d.name, url: format!("{base}/overlay/{}?token={token}{lang}", d.id) })
+            .map(|d| OverlayInfo {
+                url: format!("{base}/overlay/{}?token={token}{lang}", d.id),
+                // `localhost` y no la IP: algunos programas rechazan una IP donde esperan un dominio.
+                https_url: state.https_port.map(|p| format!("https://localhost:{p}/overlay/{}?token={token}{lang}", d.id)),
+                id: d.id,
+                name: d.name,
+            })
             .collect(),
         media_base: format!("{base}/media"),
         overlay_token: token.clone(),
         last_username: state.db.get_setting(KEY_LAST_USERNAME).await?,
         last_twitch_channel: state.db.get_setting(KEY_LAST_TWITCH_CHANNEL).await?,
-        has_euler_api_key: state.secrets.get(KEY_EULER_API)?.is_some(),
     })
-}
-
-/// Guarda (o borra, si llega vacía) la API key propia de Euler Stream en el llavero.
-/// Nunca se devuelve a la UI.
-#[tauri::command]
-pub async fn set_euler_api_key(state: State<'_, AppState>, key: Option<String>) -> Result<()> {
-    match key.map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
-        Some(k) => state.secrets.set(KEY_EULER_API, &k)?,
-        None => state.secrets.delete(KEY_EULER_API)?,
-    }
-    reconnect_tiktok_if_active(&state).await
 }
 
 /// El nuevo puerto se aplica al reiniciar la app.
@@ -680,4 +666,58 @@ pub fn get_counters(state: State<'_, AppState>) -> Counters {
 #[tauri::command]
 pub fn new_session(state: State<'_, AppState>) -> u64 {
     state.session.start_new()
+}
+
+// ---- HTTPS local ----
+
+/// Estado del certificado del HTTPS local en este equipo.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpsStatus {
+    /// `None` si este sistema no permite comprobarlo desde la app.
+    pub installed: Option<bool>,
+    pub ca_path: Option<String>,
+}
+
+#[tauri::command]
+pub async fn https_status(state: State<'_, AppState>) -> Result<HttpsStatus> {
+    let Some(tls) = &state.local_tls else { return Ok(HttpsStatus { installed: None, ca_path: None }) };
+    let installed = match crate::server::tls::ca_status(&tls.ca_name).await {
+        crate::server::tls::CaStatus::Installed => Some(true),
+        crate::server::tls::CaStatus::NotInstalled => Some(false),
+        crate::server::tls::CaStatus::Unsupported => None,
+    };
+    Ok(HttpsStatus { installed, ca_path: Some(tls.ca_path.to_string_lossy().into_owned()) })
+}
+
+/// Instala la CA local como autoridad de confianza del usuario (el sistema pide confirmación).
+#[tauri::command]
+pub async fn install_local_ca(state: State<'_, AppState>) -> Result<()> {
+    let tls = state.local_tls.as_ref().ok_or_else(|| crate::error::AppError::Server("no hay certificado HTTPS".into()))?;
+    crate::server::tls::install_ca(tls).await
+}
+
+// ---- Fuentes ----
+
+use crate::fonts::FontFamily;
+
+#[tauri::command]
+pub fn list_fonts(state: State<'_, AppState>) -> Vec<FontFamily> {
+    state.fonts.list()
+}
+
+#[tauri::command]
+pub async fn import_font(state: State<'_, AppState>, path: String, name: Option<String>) -> Result<FontFamily> {
+    state.fonts.import(&PathBuf::from(path), name).await
+}
+
+/// Descarga una familia de Google Fonts a la biblioteca local (los overlays la usan sin conectarse a Google).
+#[tauri::command]
+pub async fn download_google_font(state: State<'_, AppState>, family: String) -> Result<FontFamily> {
+    state.fonts.download_google(&family).await
+}
+
+#[tauri::command]
+pub async fn delete_font(state: State<'_, AppState>, family: String) -> Result<()> {
+    state.fonts.delete(&family).await
 }

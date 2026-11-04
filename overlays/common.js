@@ -123,6 +123,24 @@ window.HB = (function () {
     if (cfg.anchor) document.body.setAttribute("data-anchor", cfg.anchor);
   }
 
+  /** Declara las fuentes de la biblioteca (canal «fonts»). Se valida cada nombre: nunca debe colarse CSS. */
+  function loadFonts(data) {
+    var style = document.getElementById("hb-fonts");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "hb-fonts";
+      document.head.appendChild(style);
+    }
+    var css = "";
+    (data && Array.isArray(data.faces) ? data.faces : []).forEach(function (f) {
+      if (!f || typeof f.family !== "string" || typeof f.file !== "string") return;
+      if (!/^[^"'\\;:{}()<>\/\r\n]{1,40}$/.test(f.family) || !/^[A-Za-z0-9._-]{1,100}$/.test(f.file)) return;
+      css += '@font-face{font-family:"' + f.family + '";font-weight:' + ((f.weight | 0) || 400) +
+        ';font-display:swap;src:url("/fonts/' + f.file + "?token=" + encodeURIComponent(token) + '");}\n';
+    });
+    style.textContent = css;
+  }
+
   /** Quita los elementos más viejos para no pasar de `max`. */
   function trim(container, max) {
     while (container.children.length > max) {
@@ -187,6 +205,8 @@ window.HB = (function () {
               applyStyle(msg.data);
               if (opts.onConfig) opts.onConfig(msg.data, firstConfig);
               firstConfig = false;
+            } else if (msg.channel === "fonts") {
+              loadFonts(msg.data);
             } else if (opts.onOverlay) {
               opts.onOverlay(msg.channel, msg.data);
             }

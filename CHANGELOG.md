@@ -4,6 +4,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Overlays por HTTPS** para TikTok LIVE Studio (que no acepta `http://`). Certificado propio, restringido a `localhost`/`127.0.0.1`, con botón *Instalar certificado* en *Ajustes → HTTPS* y *Copiar (HTTPS)* en cada overlay. Escucha en el puerto HTTP + 1.
+- **Cronómetro y restas en los timers**: además de la cuenta atrás, un timer puede ser un **cronómetro** que sube desde cero (con un tope opcional en el que se detiene y avisa). Las extensiones aceptan segundos **negativos** para restar tiempo («cada 100 monedas, −1 min»). Los timers guardados siguen funcionando igual.
+- **Fuentes para los overlays** (*Biblioteca → Fuentes*): descarga cualquier fuente de Google Fonts por su nombre o sube tus archivos `.woff2`/`.ttf`/`.otf`. Se guardan en tu equipo y los overlays las usan sin conectarse a Google mientras estás en directo. Se eligen en la opción *Fuente* de cada overlay y de las capas de las alertas.
+- **Capas libres en las alertas**: la acción *Mostrar alerta* admite hasta 8 capas de texto o imagen colocadas donde quieras (X e Y en %), con tamaño, color, negrita y fuente. Los textos admiten variables como `{nickname}`.
+- **Temas de overlay**: *Exportar tema* e *Importar tema* guardan y aplican el estilo (colores, fuente, tamaños) de un overlay en un archivo `.json` que se puede compartir. Solo se aplican opciones de estilo válidas.
+
+### Mejorado
+- **Robustez**: el código de producción ya no admite `unwrap`/`expect`/`panic!` (lo exige el CI) y un fallo inesperado queda registrado en `hivebuzz.log`. El CI avisa de dependencias con vulnerabilidades conocidas.
+
+### Eliminado
+- **API key de Euler Stream**: ya no se usa. Se quita el apartado de Ajustes y, al arrancar, se borra la clave que hubiera en el llavero del sistema. La conexión a TikTok sigue igual (nivel gratuito).
+
 ## [0.4.3] - 2026-10-26
 
 ### Añadido

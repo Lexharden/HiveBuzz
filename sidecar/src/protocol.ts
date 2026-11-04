@@ -28,7 +28,7 @@ export type SidecarMessage =
 
 /** Rust → sidecar (stdin). */
 export type SidecarCommand =
-  | { cmd: "connect"; uniqueId: string; eulerApiKey?: string }
+  | { cmd: "connect"; uniqueId: string }
   | { cmd: "disconnect" }
   | { cmd: "shutdown" };
 
@@ -49,11 +49,7 @@ export function parseCommand(line: string): SidecarCommand | null {
   switch (o.cmd) {
     case "connect":
       if (typeof o.uniqueId !== "string" || o.uniqueId.trim() === "") return null;
-      return {
-        cmd: "connect",
-        uniqueId: o.uniqueId,
-        ...(typeof o.eulerApiKey === "string" ? { eulerApiKey: o.eulerApiKey } : {}),
-      };
+      return { cmd: "connect", uniqueId: o.uniqueId };
     case "disconnect":
       return { cmd: "disconnect" };
     case "shutdown":

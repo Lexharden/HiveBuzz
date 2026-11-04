@@ -42,6 +42,7 @@ impl Rig {
             hub: self.hub.clone(),
             recent: self.recent.clone(),
             media_dir: self.media.path().to_path_buf(),
+            fonts_dir: self.media.path().join("fonts"),
             token: TOKEN.into(),
             api: None,
             oauth: None,
@@ -59,6 +60,7 @@ async fn started() -> Rig {
         hub: hub.clone(),
         recent: recent.clone(),
         media_dir: media.path().to_path_buf(),
+        fonts_dir: media.path().join("fonts"),
         token: TOKEN.into(),
         api: None,
         oauth: None,
@@ -294,6 +296,7 @@ async fn api_rig(queued: usize) -> (ServerHandle, Arc<FakeApi>, tempfile::TempDi
         hub: OverlayHub::new(16),
         recent: RecentEvents::new(10),
         media_dir: media.path().to_path_buf(),
+        fonts_dir: media.path().join("fonts"),
         token: TOKEN.into(),
         api: Some(Arc::clone(&fake) as api::SharedApi),
         oauth: None,
@@ -418,6 +421,7 @@ async fn oauth_rig() -> (ServerHandle, Arc<FakeOAuth>, tempfile::TempDir) {
         hub: OverlayHub::new(16),
         recent: RecentEvents::new(10),
         media_dir: media.path().to_path_buf(),
+        fonts_dir: media.path().join("fonts"),
         token: TOKEN.into(),
         api: None,
         oauth: Some(Arc::clone(&fake) as oauth::SharedOAuth),
@@ -466,4 +470,137 @@ fn only_a_short_well_formed_shown_message_counts_as_an_ack() {
     assert_eq!(shown_id(r#"{"type":"shown"}"#), None);
     assert_eq!(shown_id("no es json"), None);
     assert_eq!(shown_id(&format!(r#"{{"type":"shown","id":"{}"}}"#, "x".repeat(300))), None);
+}
+
+// ---- HTTPS ----
+
+use std::sync::Arc;
+
+use rustls::pki_types::pem::PemObject;
+use rustls::pki_types::{CertificateDer, ServerName};
+
+struct HttpsRig {
+    _http: Rig,
+    handle: ServerHandle,
+    tls: tls::LocalTls,
+    _dir: tempfile::TempDir,
+}
+
+async fn https_started() -> HttpsRig {
+    let http = started().await;
+    let dir = tempfile::tempdir().expect("tmp");
+    let tls = tls::LocalTls::load_or_create(dir.path()).expect("certificados");
+    let handle = start_https(&http.deps(), 0, &tls).await.expect("start https");
+    HttpsRig { _http: http, handle, tls, _dir: dir }
+}
+
+/// Cliente que solo confía en la CA generada por HiveBuzz (igual que un navegador tras instalarla).
+fn client_config(tls: &tls::LocalTls) -> Arc<rustls::ClientConfig> {
+    let mut roots = rustls::RootCertStore::empty();
+    let pem = std::fs::read(&tls.ca_path).expect("ca");
+    for cert in CertificateDer::pem_slice_iter(&pem) {
+        roots.add(cert.expect("pem")).expect("raíz");
+    }
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    Arc::new(
+        rustls::ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .expect("versiones")
+            .with_root_certificates(roots)
+            .with_no_client_auth(),
+    )
+}
+
+async fn tls_connect(r: &HttpsRig, server_name: &str) -> std::io::Result<tokio_rustls::client::TlsStream<TcpStream>> {
+    let tcp = TcpStream::connect(r.handle.addr).await?;
+    let name = ServerName::try_from(server_name.to_string()).expect("nombre");
+    tokio_rustls::TlsConnector::from(client_config(&r.tls)).connect(name, tcp).await
+}
+
+async fn https_get(r: &HttpsRig, server_name: &str, host_header: &str, path: &str) -> (u16, String) {
+    let mut s = tls_connect(r, server_name).await.expect("handshake TLS");
+    let req = format!("GET {path} HTTP/1.1\r\nHost: {host_header}\r\nConnection: close\r\n\r\n");
+    s.write_all(req.as_bytes()).await.expect("write");
+    let mut raw = Vec::new();
+    // Algunos servidores cierran sin `close_notify`: lo leído hasta ahí es la respuesta.
+    let _ = s.read_to_end(&mut raw).await;
+    let raw = String::from_utf8_lossy(&raw).into_owned();
+    let status = raw.split_whitespace().nth(1).and_then(|c| c.parse().ok()).expect("status");
+    (status, raw)
+}
+
+#[tokio::test]
+async fn https_only_binds_to_loopback() {
+    let r = https_started().await;
+    assert!(r.handle.addr.ip().is_loopback());
+}
+
+#[tokio::test]
+async fn https_serves_overlays_to_a_client_that_trusts_the_local_ca() {
+    let r = https_started().await;
+    let host = format!("localhost:{}", r.handle.addr.port());
+    let (status, raw) = https_get(&r, "localhost", &host, &format!("/overlay/alerts?token={TOKEN}")).await;
+    assert_eq!(status, 200, "{raw}");
+    assert!(raw.to_ascii_lowercase().contains("content-security-policy"));
+    // También por la IP: el certificado cubre `127.0.0.1`.
+    let host = format!("127.0.0.1:{}", r.handle.addr.port());
+    let (status, _) = https_get(&r, "127.0.0.1", &host, &format!("/overlay/alerts?token={TOKEN}")).await;
+    assert_eq!(status, 200);
+}
+
+#[tokio::test]
+async fn https_applies_the_same_token_and_host_rules() {
+    let r = https_started().await;
+    let host = format!("localhost:{}", r.handle.addr.port());
+    let (status, _) = https_get(&r, "localhost", &host, "/overlay/alerts").await;
+    assert_eq!(status, 401, "sin token");
+    let (status, _) = https_get(&r, "localhost", "evil.com", &format!("/overlay/alerts?token={TOKEN}")).await;
+    assert_eq!(status, 403, "host ajeno");
+}
+
+#[tokio::test]
+async fn https_rejects_a_client_that_does_not_trust_the_ca() {
+    let r = https_started().await;
+    let tcp = TcpStream::connect(r.handle.addr).await.expect("tcp");
+    // Otra CA distinta (otra generación): el certificado del servidor no encadena con ella.
+    let other_dir = tempfile::tempdir().expect("tmp");
+    let other = tls::LocalTls::load_or_create(other_dir.path()).expect("otra");
+    let name = ServerName::try_from("localhost".to_string()).expect("nombre");
+    let res = tokio_rustls::TlsConnector::from(client_config(&other)).connect(name, tcp).await;
+    assert!(res.is_err(), "no debe aceptar un certificado de una CA ajena");
+}
+
+#[tokio::test]
+async fn the_certificate_is_not_valid_for_other_names() {
+    let r = https_started().await;
+    assert!(tls_connect(&r, "evil.com").await.is_err(), "el certificado solo cubre localhost y 127.0.0.1");
+}
+
+#[tokio::test]
+async fn secure_websocket_streams_bus_events() {
+    let r = https_started().await;
+    let stream = tls_connect(&r, "localhost").await.expect("handshake TLS");
+    let url = format!("wss://localhost:{}/ws?token={TOKEN}", r.handle.addr.port());
+    let (mut ws, _) = tokio_tungstenite::client_async(url.into_client_request().expect("req"), stream).await.expect("wss");
+    assert_eq!(next_json(&mut ws).await["type"], "hello");
+}
+
+#[tokio::test]
+async fn fonts_are_served_with_the_token_and_cannot_escape_their_folder() {
+    let r = started().await;
+    let host = r.handle.addr.to_string();
+    let fonts = r.media.path().join("fonts");
+    std::fs::create_dir_all(&fonts).expect("dir");
+    std::fs::write(fonts.join("mi-fuente-400.woff2"), b"wOF2FUENTE").expect("write");
+    std::fs::write(r.media.path().join("secreto-fuentes.txt"), b"SECRETO").expect("write");
+
+    let (status, raw) = http_get(r.handle.addr, &format!("/fonts/mi-fuente-400.woff2?token={TOKEN}"), &host).await;
+    assert_eq!(status, 200);
+    assert!(raw.contains("FUENTE"));
+    assert!(raw.to_ascii_lowercase().contains("font/woff2"), "tipo de contenido de fuente: {raw}");
+    assert_eq!(http_get(r.handle.addr, "/fonts/mi-fuente-400.woff2", &host).await.0, 401, "sin token");
+    for evil in ["/fonts/../secreto-fuentes.txt", "/fonts/%2e%2e/secreto-fuentes.txt", "/fonts/..%2fsecreto-fuentes.txt"] {
+        let (status, raw) = http_get(r.handle.addr, &format!("{evil}?token={TOKEN}"), &host).await;
+        assert!(!raw.contains("SECRETO"), "{evil} filtró el archivo (status {status})");
+    }
 }

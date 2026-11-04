@@ -60,7 +60,7 @@ async fn populated() -> Install {
         .unwrap();
     i.db
         .save_timers(&[StoredTimer {
-            config: TimerConfig { id: "t".into(), name: "Timer".into(), start_seconds: 60, max_seconds: None, extensions: vec![] },
+            config: TimerConfig { id: "t".into(), name: "Timer".into(), start_seconds: 60, max_seconds: None, mode: Default::default(), extensions: vec![] },
             state: TimerState::idle(60_000),
         }])
         .await

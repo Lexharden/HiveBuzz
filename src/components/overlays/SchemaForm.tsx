@@ -1,6 +1,44 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { api } from "../../lib/api";
 import type { FieldDef, OverlayConfig } from "../../lib/types";
 import { Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
+
+/** Fuentes que casi todo Windows trae de serie (el segundo valor es la clave de i18n). */
+const SYSTEM_FONTS: [string, string][] = [
+  ["Segoe UI", "font.segoe"],
+  ["Arial", "font.arial"],
+  ["Verdana", "font.verdana"],
+  ["Georgia", "font.georgia"],
+  ["Impact", "font.impact"],
+  ["Trebuchet MS", "font.trebuchet"],
+  ["Comic Sans MS", "font.comic"],
+  ["Courier New", "font.courier"],
+];
+
+function FontSelect({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const { t } = useTranslation();
+  const [custom, setCustom] = useState<string[]>([]);
+  useEffect(() => {
+    let alive = true;
+    api.listFonts().then((f) => alive && setCustom(f.map((x) => x.family))).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const known = new Set([...SYSTEM_FONTS.map(([v]) => v), ...custom]);
+  const options = [
+    ...SYSTEM_FONTS.map(([v, key]) => ({ value: v, label: t(key) })),
+    ...custom.map((v) => ({ value: v, label: `★ ${v}` })),
+    // Una fuente ya elegida que se borró de la biblioteca: se muestra para poder cambiarla.
+    ...(known.has(value) ? [] : [{ value, label: `${value} (${t("fonts.missing")})` }]),
+  ];
+  return (
+    <Field label={label}>
+      <Select value={value} onChange={onChange} options={options} />
+    </Field>
+  );
+}
 
 interface Props {
   fields: FieldDef[];
@@ -80,6 +118,8 @@ function FieldInput({ field, value, onChange }: { field: FieldDef; value: string
           />
         </Field>
       );
+    case "font":
+      return <FontSelect label={label} value={typeof value === "string" ? value : field.default} onChange={onChange} />;
     case "bool":
       return (
         <div className="flex items-end pb-1.5">

@@ -228,7 +228,7 @@ describe("recuperación", () => {
 
   it("un error de firma muestra signature_error y respeta retry-after", async () => {
     w.connects = [new SignatureRateLimitError("rate limited")];
-    await w.connector.connect({ uniqueId: "ana", eulerApiKey: "k" });
+    await w.connector.connect({ uniqueId: "ana" });
     await w.clock.advance(0);
     expect(w.connector.state).toBe("signature_error");
     const retry = statusMsgs(w).find((m) => m.retryInMs !== undefined);
