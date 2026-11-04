@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.5.0] - 2026-11-04
+
 ### Añadido
 - **Overlays por HTTPS** para TikTok LIVE Studio (que no acepta `http://`). Certificado propio, restringido a `localhost`/`127.0.0.1`, con botón *Instalar certificado* en *Ajustes → HTTPS* y *Copiar (HTTPS)* en cada overlay. Escucha en el puerto HTTP + 1.
 - **Cronómetro y restas en los timers**: además de la cuenta atrás, un timer puede ser un **cronómetro** que sube desde cero (con un tope opcional en el que se detiene y avisa). Las extensiones aceptan segundos **negativos** para restar tiempo («cada 100 monedas, −1 min»). Los timers guardados siguen funcionando igual.
