@@ -81,6 +81,35 @@ export const RULE_PRESETS: RulePreset[] = [
     priority: 60,
     needsEdit: true,
   }),
+  // Alerta con capas libres: texto de agradecimiento arriba, la imagen del regalo y la cantidad abajo. Sin enlaces que completar.
+  preset(
+    "alertLayers",
+    "new",
+    { type: "gift", minCoins: 50 },
+    (t) => [
+      {
+        type: "overlayAlert",
+        title: "{nickname}",
+        durationMs: 6000,
+        wait: true,
+        layers: [
+          { type: "text", text: t("presets.alertLayers.thanks"), x: 50, y: 12, size: 56, color: "#ffd24a", bold: true },
+          { type: "image", imageUrl: "{giftimage}", x: 50, y: 80, width: 14 },
+          { type: "text", text: "x{count} {gift}", x: 50, y: 92, size: 36, color: "#ffffff" },
+        ],
+      },
+    ],
+    { conditions: { globalCooldownMs: 1_000 }, priority: 45 },
+  ),
+  // Timers: piden elegir el timer al personalizar (timerId vacío).
+  preset("timerEnded", "new", { type: "timerEnded", timerId: "" }, (t) => [alert(t("presets.timerEnded.say"))], {
+    priority: 60,
+    needsEdit: true,
+  }),
+  preset("timerFollowAdd", "new", { type: "follow" }, () => [{ type: "timerControl", timerId: "", op: "add", seconds: 30 }], {
+    conditions: { userCooldownMs: 6 * HOUR, globalCooldownMs: 1_000 },
+    needsEdit: true,
+  }),
   // Agradecimientos en voz alta.
   preset("thanksGift", "thanks", { type: "gift" }, (t) => [tts(t("presets.thanksGift.say"))]),
   preset("bigGift", "thanks", { type: "gift", minCoins: 100 }, (t) => [alert(t("presets.bigGift.say"))], { priority: 50 }),

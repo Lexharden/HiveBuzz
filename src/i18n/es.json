@@ -1447,6 +1447,30 @@
       "thanks": "Agradecimientos",
       "interaction": "Interacción"
     },
+    "suggest": {
+      "title": "Sugerencias para ti",
+      "timerEnded": "Tienes el timer «{{name}}» pero ninguna regla avisa cuando termina.",
+      "timerFollowAdd": "Suma tiempo a «{{name}}» con cada follow (puedes cambiar los segundos).",
+      "layersImages": "Tienes {{n}} imágenes en la biblioteca: pruébalas en una alerta con capas.",
+      "layersFonts": "Tienes {{n}} fuentes propias: úsalas en el texto de una alerta con capas.",
+      "layersPlain": "Tus alertas de regalo solo llevan título y texto: prueba una con capas (imagen del regalo y textos donde quieras)."
+    },
+    "alertLayers": {
+      "name": "Alerta de regalo con capas",
+      "desc": "NUEVO. Muestra un agradecimiento arriba, la imagen del regalo y la cantidad abajo, cada cosa en su sitio de la pantalla. Cambia textos, posiciones y fuente en la regla.",
+      "thanks": "¡Gracias {nickname}!"
+    },
+    "timerEnded": {
+      "name": "Aviso cuando termina un timer",
+      "desc": "NUEVO. Muestra una alerta en pantalla cuando se acaba un timer (por ejemplo el subathon). Al personalizarla eliges el timer.",
+      "say": "¡Se acabó el tiempo!",
+      "edit": "elige el timer"
+    },
+    "timerFollowAdd": {
+      "name": "Cada follow suma tiempo al timer",
+      "desc": "NUEVO. Suma 30 segundos al timer con cada follow nuevo (una vez cada 6 h por persona). Al personalizarla eliges el timer y los segundos.",
+      "edit": "elige el timer"
+    },
     "webhookGift": {
       "name": "Avisar a un servicio de los regalos grandes",
       "desc": "NUEVO. Hace una petición HTTP (POST con JSON) cada vez que llega un regalo de 100 monedas o más: sirve para luces, Home Assistant, Discord, Streamer.bot… Reintenta una vez si falla.",

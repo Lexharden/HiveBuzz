@@ -1447,6 +1447,30 @@
       "thanks": "Thank-yous",
       "interaction": "Interaction"
     },
+    "suggest": {
+      "title": "Suggestions for you",
+      "timerEnded": "You have the timer “{{name}}” but no rule announces when it ends.",
+      "timerFollowAdd": "Add time to “{{name}}” on every follow (you can change the seconds).",
+      "layersImages": "You have {{n}} images in the library: try them in an alert with layers.",
+      "layersFonts": "You have {{n}} custom fonts: use them in the text of an alert with layers.",
+      "layersPlain": "Your gift alerts only have a title and text: try one with layers (the gift image and texts wherever you want)."
+    },
+    "alertLayers": {
+      "name": "Gift alert with layers",
+      "desc": "NEW. Shows a thank-you on top, the gift image and the amount below, each in its own place on the screen. Change texts, positions and font in the rule.",
+      "thanks": "Thanks {nickname}!"
+    },
+    "timerEnded": {
+      "name": "Notice when a timer ends",
+      "desc": "NEW. Shows an on-screen alert when a timer runs out (for example the subathon). When you customize it you pick the timer.",
+      "say": "Time's up!",
+      "edit": "pick the timer"
+    },
+    "timerFollowAdd": {
+      "name": "Every follow adds time to the timer",
+      "desc": "NEW. Adds 30 seconds to the timer on every new follow (once every 6 h per person). When you customize it you pick the timer and the seconds.",
+      "edit": "pick the timer"
+    },
     "webhookGift": {
       "name": "Notify a service about big gifts",
       "desc": "NEW. Sends an HTTP request (POST with JSON) for every gift worth 100 coins or more: use it for lights, Home Assistant, Discord, Streamer.bot… Retries once on failure.",

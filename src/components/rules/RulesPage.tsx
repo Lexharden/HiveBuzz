@@ -100,6 +100,8 @@ export function RulesPage() {
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
       {(showPresets || rules.length === 0) && (
         <PresetsPanel
+          timers={timers}
+          media={media}
           rules={rules}
           onClose={() => setShowPresets(false)}
           onCustomize={(rule) => setEditing({ rule, isNew: true })}

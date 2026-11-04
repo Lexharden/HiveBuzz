@@ -1,10 +1,16 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Rule } from "../../lib/types";
+import { api } from "../../lib/api";
+import type { FontFamily, Media, Rule, TimerView } from "../../lib/types";
 import { Btn, Card } from "../ui";
+import { suggestPresets } from "./presetSuggestions";
 import { PRESET_CATEGORIES, presetRuleId, RULE_PRESETS, type RulePreset } from "./rulePresets";
 
 interface Props {
   rules: Rule[];
+  /** Lo que ya tiene el streamer: con esto se sugieren las plantillas que más le sirven. */
+  timers: TimerView[];
+  media: Media[];
   /** Guarda la regla tal cual. */
   onAdd: (rules: Rule[]) => void;
   /** Abre el editor con la regla rellenada (para las que llevan enlaces que completar). */
@@ -13,14 +19,45 @@ interface Props {
 }
 
 /** Plantillas de reglas habituales: se añaden con un clic y luego se editan como cualquier otra. */
-export function PresetsPanel({ rules, onAdd, onCustomize, onClose }: Props) {
+export function PresetsPanel({ rules, timers, media, onAdd, onCustomize, onClose }: Props) {
   const { t } = useTranslation();
+  const [fonts, setFonts] = useState<FontFamily[]>([]);
+  useEffect(() => {
+    void api.listFonts().then(setFonts).catch(() => undefined);
+  }, []);
+  const suggestions = suggestPresets({ rules, timers, media, fonts });
   const added = new Set(rules.map((r) => r.id));
   const isAdded = (p: RulePreset) => added.has(presetRuleId(p.key));
 
   return (
     <Card title={t("presets.title")} hint={t("presets.hint")} actions={<Btn onClick={onClose}>{t("presets.close")}</Btn>}>
       <div className="space-y-4">
+        {suggestions.length > 0 && (
+          <section className="rounded-lg border border-amber-400/30 bg-amber-400/5 p-3">
+            <h3 className="text-sm font-semibold text-amber-300">✨ {t("presets.suggest.title")}</h3>
+            <ul className="mt-2 space-y-2">
+              {suggestions.map((s) => {
+                const p = RULE_PRESETS.find((x) => x.key === s.key);
+                if (!p) return null;
+                return (
+                  <li key={s.key} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold">{t(`presets.${p.key}.name`)}</div>
+                      <div className="text-xs text-amber-200/80">{t(s.reason.key, s.reason.vars)}</div>
+                    </div>
+                    {p.needsEdit ? (
+                      <Btn onClick={() => onCustomize(p.build(t))}>{t("presets.customize")}</Btn>
+                    ) : (
+                      <Btn variant="primary" onClick={() => onAdd([p.build(t)])}>
+                        + {t("presets.add")}
+                      </Btn>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
         {PRESET_CATEGORIES.map((cat) => {
           const items = RULE_PRESETS.filter((p) => p.category === cat);
           const pending = items.filter((p) => !isAdded(p) && !p.needsEdit);
