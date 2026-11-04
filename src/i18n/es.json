@@ -66,6 +66,13 @@
     "giftTwitch": "Bits",
     "bigGiftTwitch": "Bits grandes"
   },
+  "whatsNew": {
+    "title": "Novedades de HiveBuzz",
+    "version": "Versión {{version}}",
+    "close": "Entendido",
+    "open": "Ver novedades",
+    "spanishOnly": "Las notas de versión están en español."
+  },
   "ui": {
     "help": "Ayuda"
   },

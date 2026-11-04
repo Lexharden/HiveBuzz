@@ -17,6 +17,9 @@ import { SystemPanel } from "./components/system/SystemPanel";
 import { InstallStatus, useInstall } from "./components/system/useInstall";
 import { Tour } from "./components/tour/Tour";
 import { TourOffer } from "./components/tour/TourOffer";
+import { WhatsNew } from "./components/WhatsNew";
+import changelogRaw from "../CHANGELOG.md?raw";
+import { getSeenVersion, hasOtherUiFlags, parseChangelog, planWhatsNew, setSeenVersion, type Release } from "./lib/changelog";
 import { TtsPage } from "./components/tts/TtsPage";
 import { Btn, ToastHost, toast } from "./components/ui";
 import i18n from "./i18n";
@@ -32,11 +35,27 @@ function App() {
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [version, setVersion] = useState<string | null>(null);
   const [touring, setTouring] = useState(false);
+  /** Novedades que se están enseñando (tras actualizar, o al pedirlas desde Ayuda). */
+  const [whatsNew, setWhatsNew] = useState<Release[] | null>(null);
   const installer = useInstall();
 
   useEffect(() => {
-    void getVersion().then(setVersion).catch(() => undefined);
+    void getVersion()
+      .then((v) => {
+        setVersion(v);
+        // Tras actualizar se enseñan las novedades una vez; en una instalación nueva solo se anota la versión.
+        const plan = planWhatsNew(parseChangelog(changelogRaw), v, getSeenVersion(), hasOtherUiFlags());
+        if (plan.show.length > 0) setWhatsNew(plan.show);
+        if (plan.show.length > 0 || plan.markSeen) setSeenVersion(v);
+      })
+      .catch(() => undefined);
   }, []);
+
+  /** Abre las novedades de la versión instalada a petición del usuario. */
+  const showCurrentNotes = () => {
+    const current = parseChangelog(changelogRaw).find((r) => version !== null && r.version === version) ?? parseChangelog(changelogRaw)[0];
+    if (current) setWhatsNew([current]);
+  };
 
   // Idioma guardado y, si está configurado, comprobación de actualizaciones al abrir.
   useEffect(() => {
@@ -95,7 +114,7 @@ function App() {
         {page === "library" && <LibraryPage info={info} />}
         {page === "tts" && <TtsPage />}
         {page === "about" && <AboutPage />}
-        {page === "help" && <HelpPage onNavigate={setPage} onStartTour={() => setTouring(true)} />}
+        {page === "help" && <HelpPage onNavigate={setPage} onStartTour={() => setTouring(true)} onShowWhatsNew={showCurrentNotes} />}
         {page === "settings" && (
           <div className="min-h-0 flex-1 overflow-y-auto">
             {info ? <SettingsPanel info={info} onChanged={refreshInfo} /> : null}
@@ -107,6 +126,7 @@ function App() {
       </main>
 
       <ToastHost />
+      {whatsNew && <WhatsNew releases={whatsNew} onClose={() => setWhatsNew(null)} />}
       {touring && <Tour page={page} setPage={setPage} onClose={() => setTouring(false)} />}
     </div>
   );

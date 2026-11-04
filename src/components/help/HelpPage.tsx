@@ -7,7 +7,7 @@ const FAQ = ["obs", "chatWrite", "spotify", "safe", "test", "update", "vip", "so
 const ITEMS = [1, 2, 3, 4] as const;
 
 /** Ayuda: el recorrido, qué hay en cada parte del menú, un glosario y respuestas rápidas. */
-export function HelpPage({ onNavigate, onStartTour }: { onNavigate: (p: Page) => void; onStartTour: () => void }) {
+export function HelpPage({ onNavigate, onStartTour, onShowWhatsNew }: { onNavigate: (p: Page) => void; onStartTour: () => void; onShowWhatsNew: () => void }) {
   const { t } = useTranslation();
   return (
     <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
@@ -17,9 +17,14 @@ export function HelpPage({ onNavigate, onStartTour }: { onNavigate: (p: Page) =>
           <h2 className="text-base font-bold text-white">{t("help.tour.title")}</h2>
           <p className="text-sm text-zinc-300">{t("help.tour.body")}</p>
         </div>
-        <Btn variant="accent" className="px-4 py-2 text-sm" onClick={onStartTour}>
-          ▶ {t("help.tour.start")}
-        </Btn>
+        <div className="flex flex-col gap-2">
+          <Btn variant="accent" className="px-4 py-2 text-sm" onClick={onStartTour}>
+            ▶ {t("help.tour.start")}
+          </Btn>
+          <Btn className="px-4 py-2 text-sm" onClick={onShowWhatsNew}>
+            ✨ {t("whatsNew.open")}
+          </Btn>
+        </div>
       </section>
 
       <Card title={t("help.menu.title")} hint={t("help.menu.hint")}>
