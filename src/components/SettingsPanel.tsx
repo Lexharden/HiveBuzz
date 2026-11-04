@@ -22,6 +22,12 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** Número de pantalla de un overlay de alertas (`alerts` = 1, `alerts2` = 2…); sin número para los demás. */
+function screenOf(id: string): number | undefined {
+  const m = /^alerts(\d*)$/.exec(id);
+  return m ? Number(m[1] || 1) : undefined;
+}
+
 /** HTTPS local: TikTok LIVE Studio no acepta URLs `http://`. Requiere instalar el certificado de HiveBuzz una vez. */
 function HttpsSection({ info }: { info: AppInfo }) {
   const { t } = useTranslation();
@@ -74,16 +80,7 @@ function HttpsSection({ info }: { info: AppInfo }) {
               <p className="mt-1 text-xs text-zinc-500">{t("settings.httpsInstallHint")}</p>
             </div>
           )}
-          <ul className="mt-3 space-y-2">
-            {info.overlays.filter((o) => o.httpsUrl).map((o) => (
-              <li key={o.id} className="flex items-center gap-2">
-                <span className="w-40 shrink-0 text-sm">{t(o.name)}</span>
-                <input readOnly value={o.httpsUrl ?? ""} onFocus={(e) => e.currentTarget.select()}
-                  className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-xs" />
-                <CopyButton text={o.httpsUrl ?? ""} />
-              </li>
-            ))}
-          </ul>
+          <p className="mt-2 text-xs text-zinc-500">{t("settings.httpsWhere")}</p>
         </>
       )}
       {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
@@ -120,7 +117,7 @@ export function SettingsPanel({ info, onChanged }: { info: AppInfo; onChanged: (
         <ul className="mt-3 space-y-2">
           {info.overlays.map((o) => (
             <li key={o.id} className="flex items-center gap-2">
-              <span className="w-40 shrink-0 text-sm">{t(o.name)}</span>
+              <span className="w-40 shrink-0 text-sm">{t(o.name, { n: screenOf(o.id) })}</span>
               <input readOnly value={o.url} onFocus={(e) => e.currentTarget.select()}
                 className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-xs" />
               <CopyButton text={o.url} />

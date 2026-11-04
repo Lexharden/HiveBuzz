@@ -83,6 +83,7 @@
     "httpsNotInstalled": "The certificate is not installed yet.",
     "httpsManual": "This system can't install it from the app. Install it manually as a trusted authority: {{path}}",
     "httpsInstall": "Install certificate",
+    "httpsWhere": "Then, on the Overlays page, use each overlay's “Copy (HTTPS)” button.",
     "httpsInstallHint": "Windows will show a security prompt: accept it. It only affects your user and the certificate is only valid for localhost and 127.0.0.1."
   },
   "role": {
