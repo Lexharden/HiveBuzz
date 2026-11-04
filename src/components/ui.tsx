@@ -1,17 +1,91 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { errorMessage } from "../lib/api";
 
 const inputCls =
   "w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-amber-400 disabled:opacity-50";
 
+/** Pistas más largas que esto se muestran tras un icono ⓘ en vez de ocupar sitio en la pantalla. */
+export const HINT_INLINE_MAX = 60;
+export const isLongHint = (hint: string) => hint.length > HINT_INLINE_MAX;
+
+/**
+ * Icono de ayuda ⓘ: al pulsarlo (o pasar el ratón / enfocarlo con el teclado) muestra el texto en una burbuja que se
+ * ajusta al ancho y no desborda. Se cierra con Escape, al pulsar fuera o al soltar el foco.
+ */
+export function InfoTip({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  const id = useId();
+
+  function show() {
+    // Si el icono está en la mitad derecha de la ventana, la burbuja se abre hacia la izquierda para no salirse.
+    const r = box.current?.getBoundingClientRect();
+    setAlignRight(r ? r.left > window.innerWidth / 2 : false);
+    setOpen(true);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <span ref={box} className={`relative inline-block align-middle ${className}`} onMouseEnter={show} onMouseLeave={() => setOpen(false)}>
+      <button
+        type="button"
+        aria-label={t("ui.help")}
+        aria-expanded={open}
+        aria-describedby={open ? id : undefined}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          open ? setOpen(false) : show();
+        }}
+        onFocus={show}
+        onBlur={() => setOpen(false)}
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-zinc-600 text-[10px] font-bold leading-none text-zinc-400 hover:border-amber-400 hover:text-amber-300 focus:border-amber-400 focus:outline-none"
+      >
+        i
+      </button>
+      {open && (
+        <span
+          id={id}
+          role="tooltip"
+          className={`absolute top-full z-50 mt-1 w-72 max-w-[min(18rem,80vw)] whitespace-normal break-words rounded-lg border border-zinc-700 bg-zinc-900 p-2 text-left text-xs font-normal normal-case leading-snug text-zinc-300 shadow-xl ${alignRight ? "right-0" : "left-0"}`}
+        >
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function Card({ title, hint, actions, children }: { title?: string; hint?: string; actions?: ReactNode; children: ReactNode }) {
+  // Con título, una pista larga va en un ⓘ junto a él; sin título (o si es corta) se queda a la vista.
+  const tip = !!hint && !!title && isLongHint(hint);
   return (
     <section className="rounded-xl border border-brand-700/70 bg-brand-900 p-4">
       {(title || actions) && (
         <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            {title && <h2 className="text-sm font-semibold text-zinc-300">{title}</h2>}
-            {hint && <p className="mt-0.5 text-xs text-zinc-500">{hint}</p>}
+          <div className="min-w-0">
+            {title && (
+              <h2 className="text-sm font-semibold text-zinc-300">
+                {title} {tip && <InfoTip>{hint}</InfoTip>}
+              </h2>
+            )}
+            {hint && !tip && <p className="mt-0.5 break-words text-xs text-zinc-500">{hint}</p>}
           </div>
           {actions}
         </div>
@@ -22,11 +96,14 @@ export function Card({ title, hint, actions, children }: { title?: string; hint?
 }
 
 export function Field({ label, hint, children, className = "" }: { label: string; hint?: string; children: ReactNode; className?: string }) {
+  const tip = !!hint && isLongHint(hint);
   return (
     <label className={`block text-xs ${className}`}>
-      <span className="mb-1 block text-zinc-400">{label}</span>
+      <span className="mb-1 block text-zinc-400">
+        {label} {tip && <InfoTip>{hint}</InfoTip>}
+      </span>
       {children}
-      {hint && <span className="mt-1 block text-zinc-500">{hint}</span>}
+      {hint && !tip && <span className="mt-1 block break-words text-zinc-500">{hint}</span>}
     </label>
   );
 }

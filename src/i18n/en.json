@@ -66,6 +66,9 @@
     "giftTwitch": "Bits",
     "bigGiftTwitch": "Big bits"
   },
+  "ui": {
+    "help": "Help"
+  },
   "settings": {
     "overlays": "Overlays",
     "overlaysHint": "Copy the URL and paste it as a Browser Source in OBS. TikTok LIVE Studio doesn't accept http:// addresses (“invalid link”): use the HTTPS URLs below (install the certificate first). It contains your token: don't share it.",
@@ -523,7 +526,7 @@
     "jarConfirmEmpty": "Empty the jar and clear the laps?",
     "groupStyle": "Style",
     "groupBehavior": "Behavior",
-    "urlHint": "Add this URL as a Browser Source in OBS. TikTok LIVE Studio may say “invalid link”: try “Copy (localhost)” or send OBS to LIVE Studio through its virtual camera. Changes show instantly, no reload.",
+    "urlHint": "Add this URL as a Browser Source in OBS. TikTok LIVE Studio only accepts HTTPS addresses: use “Copy (HTTPS)” after installing the certificate in Settings → HTTPS. Changes show instantly, no reload.",
     "copyLocalhost": "Copy (localhost)",
     "copyLocalhostHint": "Same address with “localhost” instead of 127.0.0.1, in case TikTok LIVE Studio rejects the other.",
     "copyHttps": "Copy (HTTPS)",

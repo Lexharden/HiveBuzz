@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Conditions, Goal, Media, Role, Rule, Sound, Step, TimerView, Trigger, TriggerType, VoiceInfo } from "../../lib/types";
-import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
+import { Btn, Card, Checkbox, ErrorText, Field, InfoTip, NumberInput, Select, TextInput, useAction } from "../ui";
 import { api } from "../../lib/api";
 import { GroupPicker } from "../groups/GroupPicker";
 import { useViewerGroups } from "../groups/useViewerGroups";
@@ -145,8 +145,8 @@ export function RuleEditor({ initial, isNew, actionTypes, sounds, media, voices,
               return on ? { ...rest, replacesGeneral: true } : rest;
             })}
             label={t("editor.replacesGeneral")}
-          />
-          <p className="mt-1 text-xs text-zinc-500">{t("editor.replacesGeneralHint")}</p>
+          />{" "}
+          <InfoTip>{t("editor.replacesGeneralHint")}</InfoTip>
         </div>
       </Card>
 

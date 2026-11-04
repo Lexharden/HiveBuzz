@@ -15,6 +15,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - **Plantillas nuevas y sugerencias inteligentes**: tres plantillas (*Alerta de regalo con capas*, *Aviso cuando termina un timer* y *Cada follow suma tiempo al timer*) y un bloque «Sugerencias para ti» que, según lo que ya tienes (timers, imágenes, fuentes, reglas), propone las que te sirven y aún no usas.
 
 ### Mejorado
+- **Ayudas en un icono ⓘ**: los textos de ayuda largos ya no ocupan sitio ni se desbordan; salen en una burbuja al pulsar o pasar el ratón por el icono ⓘ (en tarjetas, campos de formulario, Ajustes, Overlays, timers y reglas). El texto de la URL de los overlays ahora explica el HTTPS para TikTok LIVE Studio.
 - **Robustez**: el código de producción ya no admite `unwrap`/`expect`/`panic!` (lo exige el CI) y un fallo inesperado queda registrado en `hivebuzz.log`. El CI avisa de dependencias con vulnerabilidades conocidas.
 
 ### Eliminado

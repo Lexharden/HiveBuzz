@@ -129,7 +129,7 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
           <>
             <Card
               title={nameOf(def)}
-              hint={t("overlays.urlHint")}
+              hint={`${t("overlays.urlHint")} ${isTestable(def) ? t("overlays.previewHintTest") : t("overlays.previewHintLive")}`}
               actions={
                 <div className="flex gap-2">
                   <Btn onClick={() => void copyUrl()} disabled={!url}>{copied ? t("settings.copied") : t("settings.copy")}</Btn>
@@ -189,7 +189,6 @@ export function OverlaysPage({ info }: { info: AppInfo | null }) {
               }
             >
               {url ? <Preview url={url} /> : <p className="text-sm text-zinc-500">{t("overlays.noServer")}</p>}
-              <p className="mt-2 text-xs text-zinc-500">{isTestable(def) ? t("overlays.previewHintTest") : t("overlays.previewHintLive")}</p>
             </Card>
 
             {def.id === "jar" && (

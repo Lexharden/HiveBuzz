@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Extension, ExtensionSource, TimerConfig, TimerMode } from "../../lib/types";
-import { Btn, Card, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
+import { Btn, Card, ErrorText, Field, InfoTip, NumberInput, Select, TextInput, useAction } from "../ui";
 
 const SOURCES: ExtensionSource["type"][] = ["coins", "likes", "follow", "share", "subscribe", "gift"];
 
@@ -75,8 +75,9 @@ export function TimerEditor({ initial, isNew, onSave, onCancel }: Props) {
 
         {!stopwatch && (
         <div>
-          <h3 className="mb-1 text-xs font-semibold text-zinc-400">{t("timers.extensions")}</h3>
-          <p className="mb-2 text-xs text-zinc-500">{t("timers.extensionsHint")}</p>
+          <h3 className="mb-2 text-xs font-semibold text-zinc-400">
+            {t("timers.extensions")} <InfoTip>{t("timers.extensionsHint")}</InfoTip>
+          </h3>
           <div className="space-y-2">
             {cfg.extensions.map((e, i) => (
               <div key={i} className="flex items-end gap-2 rounded-lg border border-zinc-800 bg-zinc-950/50 p-2">

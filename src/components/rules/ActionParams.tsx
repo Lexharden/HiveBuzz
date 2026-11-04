@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { ActionSpec, AlertLayer, FontFamily, Goal, Media, Sound, TimerView, VoiceInfo } from "../../lib/types";
 import { api } from "../../lib/api";
 import { voiceLabel } from "../../lib/voices";
-import { Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
+import { Checkbox, Field, InfoTip, NumberInput, Select, TextInput } from "../ui";
 import { amountValue, bool, num, set, str, toAmount } from "./paramHelpers";
 import { ObsParams, PointsAdjustParams, PressKeysParams, StartPollParams, TcpSendParams, WebhookParams, WsSendParams } from "./IntegrationParams";
 
@@ -253,7 +253,9 @@ function AlertLayers({ action, onChange, media }: Pick<Props, "action" | "onChan
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950/40 p-2">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-semibold text-zinc-400">{t("action.layers")}</h4>
+        <h4 className="text-xs font-semibold text-zinc-400">
+          {t("action.layers")} <InfoTip>{t("action.layersHint")}</InfoTip>
+        </h4>
         <div className="flex gap-1">
           <button
             disabled={layers.length >= MAX_LAYERS}
@@ -271,7 +273,6 @@ function AlertLayers({ action, onChange, media }: Pick<Props, "action" | "onChan
           </button>
         </div>
       </div>
-      <p className="mt-1 text-xs text-zinc-500">{t("action.layersHint")}</p>
       <div className="mt-2 space-y-2">
         {layers.map((l, i) => (
           <div key={i} className="rounded-md border border-zinc-800 p-2">

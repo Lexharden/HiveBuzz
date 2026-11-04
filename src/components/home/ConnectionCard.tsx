@@ -4,6 +4,7 @@ import { api, errorMessage } from "../../lib/api";
 import { isActive, statusKey } from "../../lib/connectionText";
 import type { Platform, StatusUpdate } from "../../lib/types";
 import { PlatformBadge } from "../PlatformBadge";
+import { InfoTip } from "../ui";
 
 const DOT: Record<StatusUpdate["state"], string> = {
   disconnected: "bg-zinc-500",
@@ -72,7 +73,7 @@ export function ConnectionCard({ platform, status, lastName, children, onChanged
 
       <form onSubmit={submit} className="mt-3">
         <label htmlFor={inputId} className="mb-1 block text-xs text-zinc-400">
-          {t(`conn.${platform}.label`)}
+          {t(`conn.${platform}.label`)} <InfoTip>{t(`conn.${platform}.help`)}</InfoTip>
         </label>
         <div className="flex gap-2">
           <input
@@ -93,7 +94,6 @@ export function ConnectionCard({ platform, status, lastName, children, onChanged
             {busy ? t("connect.busy") : active ? t("connect.disconnect") : t("connect.connect")}
           </button>
         </div>
-        <p className="mt-1 text-xs text-zinc-500">{t(`conn.${platform}.help`)}</p>
       </form>
 
       {error && (

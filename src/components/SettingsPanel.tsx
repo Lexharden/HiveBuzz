@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, errorMessage } from "../lib/api";
+import { InfoTip } from "./ui";
 import type { AppInfo, HttpsStatus } from "../lib/types";
 
 function CopyButton({ text }: { text: string }) {
@@ -61,8 +62,9 @@ function HttpsSection({ info }: { info: AppInfo }) {
 
   return (
     <section className="rounded-xl border border-brand-700/70 bg-brand-900 p-4">
-      <h2 className="text-sm font-semibold text-zinc-300">{t("settings.https")}</h2>
-      <p className="mt-1 text-xs text-zinc-500">{t("settings.httpsHint")}</p>
+      <h2 className="text-sm font-semibold text-zinc-300">
+        {t("settings.https")} <InfoTip>{t("settings.httpsHint")} {t("settings.httpsWhere")}</InfoTip>
+      </h2>
       {info.httpsError ? (
         <p className="mt-2 text-xs text-rose-300">{t("settings.httpsError")}: {info.httpsError}</p>
       ) : (
@@ -76,11 +78,10 @@ function HttpsSection({ info }: { info: AppInfo }) {
             <div className="mt-2">
               <button disabled={busy} onClick={() => void install()} className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 disabled:opacity-50">
                 {t("settings.httpsInstall")}
-              </button>
-              <p className="mt-1 text-xs text-zinc-500">{t("settings.httpsInstallHint")}</p>
+              </button>{" "}
+              <InfoTip>{t("settings.httpsInstallHint")}</InfoTip>
             </div>
           )}
-          <p className="mt-2 text-xs text-zinc-500">{t("settings.httpsWhere")}</p>
         </>
       )}
       {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
@@ -112,8 +113,9 @@ export function SettingsPanel({ info, onChanged }: { info: AppInfo; onChanged: (
       )}
 
       <section className="rounded-xl border border-brand-700/70 bg-brand-900 p-4">
-        <h2 className="text-sm font-semibold text-zinc-300">{t("settings.overlays")}</h2>
-        <p className="mt-1 text-xs text-zinc-500">{t("settings.overlaysHint")}</p>
+        <h2 className="text-sm font-semibold text-zinc-300">
+          {t("settings.overlays")} <InfoTip>{t("settings.overlaysHint")}</InfoTip>
+        </h2>
         <ul className="mt-3 space-y-2">
           {info.overlays.map((o) => (
             <li key={o.id} className="flex items-center gap-2">
@@ -129,8 +131,9 @@ export function SettingsPanel({ info, onChanged }: { info: AppInfo; onChanged: (
       <HttpsSection info={info} />
 
       <section className="rounded-xl border border-brand-700/70 bg-brand-900 p-4">
-        <h2 className="text-sm font-semibold text-zinc-300">{t("settings.port")}</h2>
-        <p className="mt-1 text-xs text-zinc-500">{t("settings.portHint")}</p>
+        <h2 className="text-sm font-semibold text-zinc-300">
+          {t("settings.port")} <InfoTip>{t("settings.portHint")}</InfoTip>
+        </h2>
         <div className="mt-3 flex gap-2">
           <input
             type="number"

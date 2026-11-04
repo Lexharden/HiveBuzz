@@ -66,6 +66,9 @@
     "giftTwitch": "Bits",
     "bigGiftTwitch": "Bits grandes"
   },
+  "ui": {
+    "help": "Ayuda"
+  },
   "settings": {
     "overlays": "Overlays",
     "overlaysHint": "Copia la URL y pégala como Browser Source en OBS. TikTok LIVE Studio no acepta direcciones http:// («enlace no válido»): usa las URL HTTPS de abajo (instala antes el certificado). Contiene tu token: no la compartas.",
@@ -523,7 +526,7 @@
     "jarConfirmEmpty": "¿Vaciar el jarrón y borrar las vueltas?",
     "groupStyle": "Estilo",
     "groupBehavior": "Comportamiento",
-    "urlHint": "Añade esta URL como Browser Source en OBS. En TikTok LIVE Studio puede dar «enlace no válido»: prueba «Copiar (localhost)» o envía OBS a LIVE Studio con su cámara virtual. Los cambios se ven al instante, sin recargar.",
+    "urlHint": "Añade esta URL como Browser Source en OBS. TikTok LIVE Studio solo acepta direcciones HTTPS: usa «Copiar (HTTPS)» tras instalar el certificado en Ajustes → HTTPS. Los cambios se ven al instante, sin recargar.",
     "copyLocalhost": "Copiar (localhost)",
     "copyLocalhostHint": "Misma dirección con «localhost» en vez de 127.0.0.1, por si TikTok LIVE Studio rechaza la otra.",
     "copyHttps": "Copiar (HTTPS)",
