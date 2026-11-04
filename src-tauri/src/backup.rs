@@ -1,4 +1,4 @@
-//! Exportar e importar la configuración completa en un único archivo `.zip` (con sus sonidos e
+//! Exportar e importar la configuración completa en un único archivo `.zip` (con sus sonidos, fuentes e
 //! imágenes). Nunca incluye secretos (llavero) ni datos de la comunidad (espectadores, puntos,
 //! donaciones, log de eventos).
 //!
@@ -16,6 +16,7 @@ use serde_json::{Map, Value};
 
 use crate::db::Db;
 use crate::error::{AppError, Result};
+use crate::fonts::{self, FontFace, FONT_EXT, MAX_FONT_BYTES};
 use crate::goals::Goal;
 use crate::media::{Media, MediaKind, IMAGE_EXT, VIDEO_EXT};
 use crate::overlay_config::schema::find as find_overlay;
@@ -30,6 +31,9 @@ const APP: &str = "hivebuzz";
 const CONFIG_ENTRY: &str = "hivebuzz-config.json";
 const SOUNDS_DIR: &str = "sounds";
 const MEDIA_DIR: &str = "media";
+const FONTS_DIR: &str = "fonts";
+/// Tope de archivos de fuente en un paquete (60 familias × negrita/normal con holgura).
+const MAX_FONT_FACES: usize = 240;
 pub const PENDING_FILE: &str = "pending-import.zip";
 const MAX_ENTRIES: usize = 5_000;
 const MAX_CONFIG_BYTES: u64 = 32 * 1024 * 1024;
@@ -71,6 +75,9 @@ pub struct Bundle {
     pub sounds: Vec<Sound>,
     #[serde(default)]
     pub media: Vec<Media>,
+    /// Fuentes de la biblioteca de fuentes (los archivos van en `fonts/`). Los paquetes anteriores no las traen.
+    #[serde(default)]
+    pub fonts: Vec<FontFace>,
     #[serde(default)]
     pub profiles: Vec<ProfileBundle>,
 }
@@ -85,6 +92,7 @@ pub struct Summary {
     pub overlays: usize,
     pub sounds: usize,
     pub media: usize,
+    pub fonts: usize,
     pub profiles: usize,
     /// Cosas del archivo que se descartaron y por qué.
     pub skipped: Vec<String>,
@@ -117,6 +125,7 @@ impl Summary {
             overlays: b.overlays.len(),
             sounds: b.sounds.len(),
             media: b.media.len(),
+            fonts: b.fonts.len(),
             profiles: b.profiles.len(),
             skipped,
             risky: risky_actions(b),
@@ -147,7 +156,7 @@ fn short_text(s: &str, max: usize) -> bool {
 // ---------------------------------------------------------------- exportar
 
 pub async fn export(db: &Db, data_dir: &Path, dest: &Path, version: &str, now_ms: i64) -> Result<Summary> {
-    let (sounds_dir, media_dir) = (data_dir.join(SOUNDS_DIR), data_dir.join(MEDIA_DIR));
+    let (sounds_dir, media_dir, fonts_dir) = (data_dir.join(SOUNDS_DIR), data_dir.join(MEDIA_DIR), data_dir.join(FONTS_DIR));
     let mut settings = BTreeMap::new();
     for key in SETTINGS_KEYS {
         if let Some(v) = db.get_setting(key).await? {
@@ -188,6 +197,17 @@ pub async fn export(db: &Db, data_dir: &Path, dest: &Path, version: &str, now_ms
             ok
         })
         .collect();
+    // Solo viajan las fuentes cuyo archivo existe y cabe en el límite; `read_index` ya descarta las que no.
+    let fonts: Vec<FontFace> = fonts::read_index(&fonts_dir)
+        .into_iter()
+        .filter(|f| {
+            let ok = std::fs::metadata(fonts_dir.join(&f.file)).is_ok_and(|m| m.len() <= MAX_FONT_BYTES);
+            if !ok {
+                skipped.push(format!("fuente «{}»: archivo no válido", f.family));
+            }
+            ok
+        })
+        .collect();
     let profiles = db
         .list_profiles()
         .await?
@@ -206,17 +226,18 @@ pub async fn export(db: &Db, data_dir: &Path, dest: &Path, version: &str, now_ms
         overlays,
         sounds,
         media,
+        fonts,
         profiles,
     };
     let summary = Summary::of(&bundle, skipped);
     let dest = dest.to_path_buf();
-    tokio::task::spawn_blocking(move || write_zip(&bundle, &sounds_dir, &media_dir, &dest))
+    tokio::task::spawn_blocking(move || write_zip(&bundle, &sounds_dir, &media_dir, &fonts_dir, &dest))
         .await
         .map_err(|e| bad(format!("la exportación falló: {e}")))??;
     Ok(summary)
 }
 
-fn write_zip(bundle: &Bundle, sounds_dir: &Path, media_dir: &Path, dest: &Path) -> Result<()> {
+fn write_zip(bundle: &Bundle, sounds_dir: &Path, media_dir: &Path, fonts_dir: &Path, dest: &Path) -> Result<()> {
     // Se escribe a un temporal y se renombra: un fallo a medias no deja un archivo roto con el nombre bueno.
     let mut tmp = dest.as_os_str().to_owned();
     tmp.push(".part");
@@ -236,6 +257,10 @@ fn write_zip(bundle: &Bundle, sounds_dir: &Path, media_dir: &Path, dest: &Path) 
         for m in &bundle.media {
             zip.start_file(format!("{MEDIA_DIR}/{}", m.file), stored).map_err(bad)?;
             zip.write_all(&std::fs::read(media_dir.join(&m.file))?)?;
+        }
+        for f in &bundle.fonts {
+            zip.start_file(format!("{FONTS_DIR}/{}", f.file), stored).map_err(bad)?;
+            zip.write_all(&std::fs::read(fonts_dir.join(&f.file))?)?;
         }
         zip.finish().map_err(bad)?;
         Ok(())
@@ -410,7 +435,45 @@ fn sanitize(b: &mut Bundle, archive: &mut zip::ZipArchive<File>, skipped: &mut V
         }
         why.is_none()
     });
+
+    // Fuentes: nombre de familia sin CSS, archivo simple con extensión de fuente, sin repetidos, con cabecera de
+    // fuente de verdad (no se fía de la extensión) y dentro del paquete.
+    let mut seen_faces = HashSet::new();
+    let mut count = 0;
+    b.fonts.retain(|f| {
+        count += 1;
+        let why = if count > MAX_FONT_FACES {
+            Some("demasiadas fuentes")
+        } else if !fonts::is_font_name(&f.family) || !(1..=1000).contains(&f.weight) || !seen_faces.insert((f.family.clone(), f.weight)) {
+            Some("nombre, peso o repetición no válidos")
+        } else if !safe_file_name(&f.file) || !FONT_EXT.contains(&ext_of(&f.file).as_str()) {
+            Some("nombre de archivo no permitido")
+        } else {
+            check_font_entry(archive, &format!("{FONTS_DIR}/{}", f.file))
+        };
+        if let Some(why) = why {
+            skipped.push(format!("fuente «{}» descartada: {why}", f.family));
+        }
+        why.is_none()
+    });
     Ok(())
+}
+
+/// `None` si la entrada existe, cabe en el límite y empieza como una fuente (`wOF2`, `wOFF`, TrueType u OpenType).
+fn check_font_entry(archive: &mut zip::ZipArchive<File>, name: &str) -> Option<&'static str> {
+    match archive.by_name(name) {
+        Ok(e) if e.is_file() && e.size() <= MAX_FONT_BYTES => {
+            let mut head = [0u8; 4];
+            let ok = e.take(4).read_exact(&mut head).is_ok() && fonts::font_ext_from_magic(&head).is_some();
+            if ok {
+                None
+            } else {
+                Some("no es un archivo de fuente")
+            }
+        }
+        Ok(_) => Some("archivo demasiado grande"),
+        Err(_) => Some("falta el archivo en el paquete"),
+    }
 }
 
 fn check_unique<'a>(what: &str, ids: impl Iterator<Item = &'a str>) -> Result<()> {
@@ -481,10 +544,10 @@ pub async fn apply_pending(db: &Db, data_dir: &Path, now_ms: i64) -> Result<Opti
 async fn apply_file(db: &Db, data_dir: &Path, path: &Path, now_ms: i64) -> Result<Summary> {
     let path_owned = path.to_path_buf();
     let data_dir = data_dir.to_path_buf();
-    let dirs = (data_dir.join(SOUNDS_DIR), data_dir.join(MEDIA_DIR));
+    let dirs = (data_dir.join(SOUNDS_DIR), data_dir.join(MEDIA_DIR), data_dir.join(FONTS_DIR));
     let (bundle, skipped) = tokio::task::spawn_blocking(move || -> Result<(Bundle, Vec<String>)> {
         let (bundle, skipped) = inspect(&path_owned)?;
-        extract_files(&path_owned, &bundle, &dirs.0, &dirs.1)?;
+        extract_files(&path_owned, &bundle, &dirs.0, &dirs.1, &dirs.2)?;
         Ok((bundle, skipped))
     })
     .await
@@ -493,15 +556,17 @@ async fn apply_file(db: &Db, data_dir: &Path, path: &Path, now_ms: i64) -> Resul
     Ok(Summary::of(&bundle, skipped))
 }
 
-fn extract_files(path: &Path, b: &Bundle, sounds_dir: &Path, media_dir: &Path) -> Result<()> {
+fn extract_files(path: &Path, b: &Bundle, sounds_dir: &Path, media_dir: &Path, fonts_dir: &Path) -> Result<()> {
     std::fs::create_dir_all(sounds_dir)?;
     std::fs::create_dir_all(media_dir)?;
+    std::fs::create_dir_all(fonts_dir)?;
     let mut archive = zip::ZipArchive::new(File::open(path)?).map_err(bad)?;
     let items = b
         .sounds
         .iter()
         .map(|s| (format!("{SOUNDS_DIR}/{}", s.file), sounds_dir.join(&s.file), MAX_SOUND_BYTES))
-        .chain(b.media.iter().map(|m| (format!("{MEDIA_DIR}/{}", m.file), media_dir.join(&m.file), MAX_MEDIA_BYTES)));
+        .chain(b.media.iter().map(|m| (format!("{MEDIA_DIR}/{}", m.file), media_dir.join(&m.file), MAX_MEDIA_BYTES)))
+        .chain(b.fonts.iter().map(|f| (format!("{FONTS_DIR}/{}", f.file), fonts_dir.join(&f.file), MAX_FONT_BYTES)));
     for (entry_name, target, max) in items {
         let entry = archive.by_name(&entry_name).map_err(|e| bad(format!("{entry_name}: {e}")))?;
         let mut tmp = target.as_os_str().to_owned();
@@ -518,6 +583,8 @@ fn extract_files(path: &Path, b: &Bundle, sounds_dir: &Path, media_dir: &Path) -
         }
         std::fs::rename(&tmp, &target)?;
     }
+    // Las fuentes importadas se suman a las que ya hay (mandan las del paquete si coinciden familia y peso).
+    fonts::merge_into_index(fonts_dir, &b.fonts)?;
     Ok(())
 }
 

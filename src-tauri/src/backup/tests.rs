@@ -304,6 +304,7 @@ fn risky_actions_are_counted_across_rules_and_profiles() {
         overlays: Map::new(),
         sounds: vec![],
         media: vec![],
+        fonts: vec![],
         profiles: vec![],
     };
     assert!(risky_actions(&bundle).is_empty(), "noop no es una acción de riesgo");
@@ -320,4 +321,113 @@ fn risky_actions_are_counted_across_rules_and_profiles() {
         data: ProfileData { rules: vec![with("webhook"), with("pressKeys")], overlays: Map::new() },
     }];
     assert_eq!(risky_actions(&bundle), vec!["pressKeys × 1", "tcpSend × 1", "webhook × 3"]);
+}
+
+// ---- Fuentes ----
+
+fn woff2(tag: u8) -> Vec<u8> {
+    let mut b = b"wOF2".to_vec();
+    b.extend_from_slice(&[tag; 32]);
+    b
+}
+
+/// Deja una fuente instalada (archivo + índice) en una instalación.
+fn install_font(i: &Install, family: &str, weight: u16, file: &str, bytes: &[u8]) {
+    let dir = i.path("fonts");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(file), bytes).unwrap();
+    let mut faces = fonts::read_index(&dir);
+    faces.push(FontFace { family: family.into(), weight, file: file.into() });
+    std::fs::write(dir.join(fonts::INDEX_FILE), serde_json::to_string(&faces).unwrap()).unwrap();
+}
+
+#[tokio::test]
+async fn fonts_travel_in_the_backup_and_are_merged_on_import() {
+    let src = populated().await;
+    install_font(&src, "Press Start 2P", 400, "press-start-2p-400.woff2", &woff2(1));
+    install_font(&src, "Anton", 400, "anton-400.woff2", &woff2(2));
+    let file = src.path("backup.zip");
+    let summary = export(&src.db, src.dir.path(), &file, "0.5.0", 1).await.unwrap();
+    assert_eq!(summary.fonts, 2);
+    assert!(summary.skipped.is_empty(), "{:?}", summary.skipped);
+
+    // El destino ya tiene una fuente propia (se conserva) y una versión distinta de «Anton» (manda la del paquete).
+    let dst = Install::new().await;
+    install_font(&dst, "Mi fuente", 400, "mi-fuente-400.woff2", &woff2(9));
+    install_font(&dst, "Anton", 400, "anton-400.woff2", &woff2(7));
+    stage_import(&file, dst.dir.path()).unwrap();
+    let applied = apply_pending(&dst.db, dst.dir.path(), 5).await.unwrap().unwrap();
+    assert_eq!(applied.fonts, 2);
+
+    let mut got: Vec<_> = fonts::read_index(&dst.path("fonts")).into_iter().map(|f| f.family).collect();
+    got.sort();
+    assert_eq!(got, ["Anton", "Mi fuente", "Press Start 2P"]);
+    assert_eq!(std::fs::read(dst.path("fonts/anton-400.woff2")).unwrap(), woff2(2));
+    assert_eq!(std::fs::read(dst.path("fonts/press-start-2p-400.woff2")).unwrap(), woff2(1));
+    assert_eq!(std::fs::read(dst.path("fonts/mi-fuente-400.woff2")).unwrap(), woff2(9), "no se borra lo que ya había");
+}
+
+#[tokio::test]
+async fn an_export_without_fonts_and_old_packages_still_work() {
+    let src = populated().await;
+    let file = src.path("backup.zip");
+    let summary = export(&src.db, src.dir.path(), &file, "0.5.0", 1).await.unwrap();
+    assert_eq!(summary.fonts, 0);
+    // Un paquete de una versión anterior no trae el campo `fonts`.
+    let old = src.path("old.zip");
+    zip_with(&old, &config(json!({})), &[]);
+    let (bundle, skipped) = inspect(&old).unwrap();
+    assert!(bundle.fonts.is_empty() && skipped.is_empty());
+    // Y al importarlo no se tocan las fuentes del destino.
+    let dst = Install::new().await;
+    install_font(&dst, "Mi fuente", 400, "mi-fuente-400.woff2", &woff2(9));
+    stage_import(&old, dst.dir.path()).unwrap();
+    apply_pending(&dst.db, dst.dir.path(), 5).await.unwrap();
+    assert_eq!(fonts::read_index(&dst.path("fonts")).len(), 1);
+}
+
+#[test]
+fn hostile_fonts_in_a_package_are_dropped_not_extracted() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("evil.zip");
+    let face = |family: &str, weight: u16, file: &str| json!({ "family": family, "weight": weight, "file": file });
+    let cfg = config(json!({ "fonts": [
+        face("Buena", 400, "buena-400.woff2"),
+        face("x;y{}", 400, "css.woff2"),
+        face("Traversal", 400, "../escape.woff2"),
+        face("Ruta", 400, "sub/dir.woff2"),
+        face("Exe", 400, "virus.exe"),
+        face("Falsa", 400, "falsa.woff2"),
+        face("Peso", 0, "peso.woff2"),
+        face("Buena", 400, "duplicada.woff2"),
+        face("Ausente", 400, "ausente.woff2"),
+    ] }));
+    zip_with(
+        &path,
+        &cfg,
+        &[
+            ("fonts/buena-400.woff2", &woff2(1)),
+            ("fonts/css.woff2", &woff2(1)),
+            ("fonts/virus.exe", &woff2(1)),
+            ("fonts/falsa.woff2", b"MZ\x90\x00 no soy una fuente"),
+            ("fonts/peso.woff2", &woff2(1)),
+            ("fonts/duplicada.woff2", &woff2(1)),
+        ],
+    );
+    let (bundle, skipped) = inspect(&path).unwrap();
+    assert_eq!(bundle.fonts.iter().map(|f| f.family.as_str()).collect::<Vec<_>>(), ["Buena"]);
+    assert_eq!(skipped.len(), 8, "{skipped:?}");
+}
+
+#[tokio::test]
+async fn a_package_cannot_write_fonts_outside_the_fonts_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("evil.zip");
+    let cfg = config(json!({ "fonts": [{ "family": "Traversal", "weight": 400, "file": "../../escape.woff2" }] }));
+    zip_with(&path, &cfg, &[("fonts/../../escape.woff2", &woff2(1))]);
+    let dst = Install::new().await;
+    stage_import(&path, dst.dir.path()).unwrap();
+    apply_pending(&dst.db, dst.dir.path(), 5).await.unwrap();
+    assert!(!dst.dir.path().parent().unwrap().join("escape.woff2").exists());
+    assert!(fonts::read_index(&dst.path("fonts")).is_empty());
 }

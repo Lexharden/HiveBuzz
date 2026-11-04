@@ -1,6 +1,8 @@
 //! Registro en memoria para la pestaña de logs de la UI: un `Layer` de `tracing` que guarda las
-//! últimas entradas en un anillo. Los secretos no se registran en ningún sitio de la app, y aun así
-//! cada mensaje se acota a una longitud razonable.
+//! últimas entradas en un anillo. Los secretos no se registran en ningún sitio de la app; como red de seguridad,
+//! cada mensaje pasa por [`redact`] (tokens, contraseñas, `Bearer…`) antes de guardarse, de modo que ni la pantalla,
+//! ni `hivebuzz.log`, ni el archivo que se exporta para soporte pueden llevarlos. Además cada mensaje se acota a una
+//! longitud razonable.
 
 use std::collections::VecDeque;
 use std::fmt::Write as _;
@@ -176,13 +178,87 @@ impl<S: Subscriber> Layer<S> for BufferLayer {
         }
         let mut v = MessageVisitor::default();
         event.record(&mut v);
-        let mut message = format!("{}{}", v.message, v.fields);
+        let mut message = redact(&format!("{}{}", v.message, v.fields));
         if message.chars().count() > MAX_MESSAGE_CHARS {
             message = message.chars().take(MAX_MESSAGE_CHARS).collect::<String>() + "…";
         }
         let ts_ms = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| i64::try_from(d.as_millis()).unwrap_or(i64::MAX));
         self.0.push(LogEntry { ts_ms, level: meta.level().to_string(), target: meta.target().to_string(), message });
     }
+}
+
+/// Texto que sustituye a un secreto.
+const MASK: &str = "***";
+/// Un valor más corto que esto no se enmascara: no puede ser un token (evita tapar `token=5`).
+const MIN_SECRET_CHARS: usize = 6;
+/// Nombres de parámetro cuyo valor es secreto. Se busca como sufijo, así que `access_token=`, `overlay_token=` y
+/// `client_secret=` entran sin listarlos uno a uno; `tokens=` no (después del nombre debe venir `=` o `:`).
+const SECRET_KEYS: [&str; 6] = ["token", "secret", "password", "apikey", "api_key", "sessionid"];
+
+/// Fin de un valor que empieza en `start`: hasta un separador habitual de URL, JSON, cabeceras o texto.
+fn value_end(s: &str, start: usize) -> usize {
+    s[start..]
+        .char_indices()
+        .find(|(_, c)| c.is_whitespace() || matches!(c, '&' | '"' | '\'' | ',' | ';' | ')' | ']' | '}' | '<' | '>' | '\\'))
+        .map_or(s.len(), |(i, _)| start + i)
+}
+
+/// Enmascara los secretos de un texto de registro: `token=…`, `"access_token":"…"`, `password: …`, `Bearer …` y
+/// `oauth:…`. Es una defensa en profundidad: la app no debería registrar nunca un secreto, pero un olvido no debe
+/// acabar en un archivo que el usuario envía a soporte.
+pub fn redact(input: &str) -> String {
+    let lower = input.to_ascii_lowercase();
+    let bytes = input.as_bytes();
+    let mut spans: Vec<(usize, usize)> = Vec::new();
+
+    for key in SECRET_KEYS {
+        for (pos, _) in lower.match_indices(key) {
+            let mut i = pos + key.len();
+            if matches!(bytes.get(i), Some(b'"' | b'\'')) {
+                i += 1;
+            }
+            if !matches!(bytes.get(i), Some(b'=' | b':')) {
+                continue;
+            }
+            i += 1;
+            while matches!(bytes.get(i), Some(b' ')) {
+                i += 1;
+            }
+            if matches!(bytes.get(i), Some(b'"' | b'\'')) {
+                i += 1;
+            }
+            let end = value_end(input, i);
+            if input[i..end].chars().count() >= MIN_SECRET_CHARS {
+                spans.push((i, end));
+            }
+        }
+    }
+    for prefix in ["bearer ", "oauth:"] {
+        for (pos, _) in lower.match_indices(prefix) {
+            let start = pos + prefix.len();
+            let end = value_end(input, start);
+            if input[start..end].chars().count() >= MIN_SECRET_CHARS {
+                spans.push((start, end));
+            }
+        }
+    }
+    if spans.is_empty() {
+        return input.to_string();
+    }
+
+    spans.sort_unstable();
+    let mut out = String::with_capacity(input.len());
+    let mut at = 0;
+    for (start, end) in spans {
+        if end <= at {
+            continue;
+        }
+        out.push_str(&input[at..start.max(at)]);
+        out.push_str(MASK);
+        at = end;
+    }
+    out.push_str(&input[at..]);
+    out
 }
 
 #[cfg(test)]
@@ -262,5 +338,65 @@ mod tests {
         let fresh = std::fs::read_to_string(&path).unwrap();
         assert!(fresh.contains("nuevo") && !fresh.contains("hola"), "{fresh}");
         assert!(dir.path().join("hivebuzz.log.1").is_file());
+    }
+
+    #[test]
+    fn redact_hides_secrets_in_urls_headers_and_json() {
+        let hex = "0123456789abcdef0123456789abcdef";
+        for (input, secret) in [
+            (format!("GET /overlay/chat?token={hex}&lang=en"), hex),
+            (format!("falló https://x.com/api?access_token={hex}"), hex),
+            (format!("overlay_token={hex}"), hex),
+            ("Authorization: Bearer abcdef123456".to_string(), "abcdef123456"),
+            ("PASS oauth:abcdef1234567890".to_string(), "abcdef1234567890"),
+            (r#"{"refresh_token":"abcdef123456","x":1}"#.to_string(), "abcdef123456"),
+            (r#"{"client_secret": "abcdef123456"}"#.to_string(), "abcdef123456"),
+            ("password: hunter22hunter".to_string(), "hunter22hunter"),
+            ("api_key=SECRETVALUE99".to_string(), "SECRETVALUE99"),
+        ] {
+            let out = redact(&input);
+            assert!(!out.contains(secret), "{input} → {out}");
+            assert!(out.contains(MASK), "{input} → {out}");
+        }
+    }
+
+    #[test]
+    fn redact_keeps_the_rest_of_the_message_readable() {
+        assert_eq!(redact("GET /overlay/chat?token=0123456789abcdef&lang=en ok"), "GET /overlay/chat?token=***&lang=en ok");
+        assert_eq!(redact(r#"{"access_token":"abcdef123456","expires_in":3600}"#), r#"{"access_token":"***","expires_in":3600}"#);
+        assert_eq!(redact("Authorization: Bearer abcdef123456 (reintento 2)"), "Authorization: Bearer *** (reintento 2)");
+    }
+
+    #[test]
+    fn redact_does_not_touch_ordinary_messages() {
+        for msg in [
+            "conectado a @ana",
+            "tokens=5 usados",
+            "token=5",
+            "el token es válido",
+            "status code=404 en /api",
+            "secret sauce",
+            "Twitch: reconectando canal=ana motivo=timeout intento=3",
+        ] {
+            assert_eq!(redact(msg), msg);
+        }
+    }
+
+    #[test]
+    fn redact_handles_repeats_overlaps_and_non_ascii() {
+        let out = redact("a token=abcdef123456 b token=ghijkl654321 c Bearer token=zzzzzz999999 ñ ✓");
+        assert!(!out.contains("abcdef") && !out.contains("ghijkl") && !out.contains("zzzzzz"), "{out}");
+        assert!(out.ends_with("ñ ✓"), "{out}");
+        assert_eq!(redact(""), "");
+        assert_eq!(redact("token=abcdef123456"), "token=***");
+    }
+
+    #[test]
+    fn secrets_never_reach_the_buffer_or_the_exported_text() {
+        let logs = capture(|| {
+            tracing::warn!(url = "http://127.0.0.1:17890/overlay/chat?token=0123456789abcdef", "petición rara");
+        });
+        assert!(!logs[0].message.contains("0123456789abcdef"), "{}", logs[0].message);
+        assert!(logs[0].message.contains("token=***"), "{}", logs[0].message);
     }
 }

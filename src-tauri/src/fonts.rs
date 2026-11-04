@@ -17,11 +17,11 @@ use crate::overlay::OverlayHub;
 
 /// Canal del overlay con la lista de fuentes instaladas.
 pub const CHANNEL: &str = "fonts";
-const INDEX_FILE: &str = "fonts.json";
-const MAX_FONT_BYTES: u64 = 5 * 1024 * 1024;
+pub(crate) const INDEX_FILE: &str = "fonts.json";
+pub(crate) const MAX_FONT_BYTES: u64 = 5 * 1024 * 1024;
 const MAX_FAMILIES: usize = 60;
 const MAX_NAME_CHARS: usize = 40;
-const FONT_EXT: &[&str] = &["woff2", "woff", "ttf", "otf"];
+pub(crate) const FONT_EXT: &[&str] = &["woff2", "woff", "ttf", "otf"];
 /// Pesos que se piden a Google Fonts (normal y negrita).
 const GOOGLE_WEIGHTS: &str = "400;700";
 const GOOGLE_CSS_HOST: &str = "https://fonts.googleapis.com/css2";
@@ -60,7 +60,7 @@ fn slug(family: &str) -> String {
 }
 
 /// Reconoce los formatos de fuente por su cabecera (no se fía de la extensión).
-fn font_ext_from_magic(bytes: &[u8]) -> Option<&'static str> {
+pub(crate) fn font_ext_from_magic(bytes: &[u8]) -> Option<&'static str> {
     match bytes.get(..4)? {
         b"wOF2" => Some("woff2"),
         b"wOFF" => Some("woff"),
@@ -80,14 +80,7 @@ impl FontLibrary {
     /// Abre (y crea si falta) la carpeta y carga el índice. Un índice ilegible se ignora, no impide arrancar.
     pub fn new(dir: PathBuf, hub: OverlayHub) -> Result<Self> {
         std::fs::create_dir_all(&dir)?;
-        let faces = std::fs::read_to_string(dir.join(INDEX_FILE))
-            .ok()
-            .and_then(|s| serde_json::from_str::<Vec<FontFace>>(&s).ok())
-            .unwrap_or_default()
-            .into_iter()
-            // Solo lo que sigue siendo seguro y existe: un índice editado a mano no puede apuntar fuera de la carpeta.
-            .filter(|f| is_font_name(&f.family) && is_plain_file_name(&f.file) && dir.join(&f.file).is_file())
-            .collect();
+        let faces = read_index(&dir);
         let lib = Self { dir, faces: Mutex::new(faces), hub };
         lib.publish();
         Ok(lib)
@@ -235,7 +228,34 @@ impl FontLibrary {
     }
 }
 
-fn is_plain_file_name(name: &str) -> bool {
+/// Fuentes anotadas en el índice de `dir` que siguen siendo válidas: nombre sin CSS, archivo simple y existente.
+/// Un índice ilegible o editado a mano no puede apuntar fuera de la carpeta ni romper nada: se ignora lo dudoso.
+pub fn read_index(dir: &Path) -> Vec<FontFace> {
+    std::fs::read_to_string(dir.join(INDEX_FILE))
+        .ok()
+        .and_then(|s| serde_json::from_str::<Vec<FontFace>>(&s).ok())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|f| is_font_name(&f.family) && is_plain_file_name(&f.file) && dir.join(&f.file).is_file())
+        .collect()
+}
+
+/// Añade `faces` al índice de `dir` (cuyos archivos ya están copiados). Si una familia y peso ya existían, mandan las
+/// nuevas; el resto de fuentes del equipo se conserva. Escritura atómica (temporal + renombrado).
+pub fn merge_into_index(dir: &Path, faces: &[FontFace]) -> Result<()> {
+    let mut all: Vec<FontFace> = read_index(dir)
+        .into_iter()
+        .filter(|old| !faces.iter().any(|n| n.family == old.family && n.weight == old.weight))
+        .collect();
+    all.extend(faces.iter().filter(|f| dir.join(&f.file).is_file()).cloned());
+    std::fs::create_dir_all(dir)?;
+    let tmp = dir.join(format!("{INDEX_FILE}.tmp"));
+    std::fs::write(&tmp, serde_json::to_string_pretty(&all)?)?;
+    std::fs::rename(&tmp, dir.join(INDEX_FILE))?;
+    Ok(())
+}
+
+pub(crate) fn is_plain_file_name(name: &str) -> bool {
     !name.is_empty() && name.len() <= 100 && name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.')) && !name.starts_with('.')
 }
 

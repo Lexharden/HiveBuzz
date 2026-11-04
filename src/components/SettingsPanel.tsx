@@ -47,11 +47,12 @@ function HttpsSection({ info }: { info: AppInfo }) {
     void refresh();
   }, []);
 
-  async function install() {
+  async function install(remove = false) {
     setBusy(true);
     setError(null);
     try {
-      await api.installLocalCa();
+      if (remove) await api.uninstallLocalCa();
+      else await api.installLocalCa();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -74,9 +75,21 @@ function HttpsSection({ info }: { info: AppInfo }) {
             {status?.installed === false && <span className="text-amber-300">{t("settings.httpsNotInstalled")}</span>}
             {status?.installed === null && <span>{t("settings.httpsManual", { path: status.caPath ?? "" })}</span>}
           </p>
+          {status?.installed === true && (
+            <div className="mt-2">
+              <button
+                disabled={busy}
+                onClick={() => window.confirm(t("settings.httpsUninstallConfirm")) && void install(true)}
+                className="rounded-md bg-zinc-800 px-3 py-1.5 text-xs hover:bg-zinc-700 disabled:opacity-50"
+              >
+                {t("settings.httpsUninstall")}
+              </button>{" "}
+              <InfoTip>{t("settings.httpsUninstallHint")}</InfoTip>
+            </div>
+          )}
           {status?.installed === false && (
             <div className="mt-2">
-              <button disabled={busy} onClick={() => void install()} className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 disabled:opacity-50">
+              <button disabled={busy} onClick={() => void install(false)} className="rounded-md bg-amber-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 disabled:opacity-50">
                 {t("settings.httpsInstall")}
               </button>{" "}
               <InfoTip>{t("settings.httpsInstallHint")}</InfoTip>

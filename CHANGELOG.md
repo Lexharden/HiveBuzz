@@ -12,12 +12,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - **Fuentes para los overlays** (*Biblioteca → Fuentes*): descarga cualquier fuente de Google Fonts por su nombre o sube tus archivos `.woff2`/`.ttf`/`.otf`. Se guardan en tu equipo y los overlays las usan sin conectarse a Google mientras estás en directo. Se eligen en la opción *Fuente* de cada overlay y de las capas de las alertas.
 - **Capas libres en las alertas**: la acción *Mostrar alerta* admite hasta 8 capas de texto o imagen colocadas donde quieras (X e Y en %), con tamaño, color, negrita y fuente. Los textos admiten variables como `{nickname}`.
 - **Temas de overlay**: *Exportar tema* e *Importar tema* guardan y aplican el estilo (colores, fuente, tamaños) de un overlay en un archivo `.json` que se puede compartir. Solo se aplican opciones de estilo válidas.
+- **Quitar el certificado HTTPS** desde *Ajustes → HTTPS* (botón *Quitar certificado*), con confirmación; la instalación ahora comprueba que el certificado quedó de verdad en el almacén de confianza.
+- **Las fuentes viajan en la copia de seguridad**: *Exportar/Importar configuración* incluye las fuentes de la biblioteca (se suman a las del equipo de destino, sin borrar las que ya tenías).
 - **Ventana de novedades**: al abrir HiveBuzz tras actualizar se muestra qué hay de nuevo (las notas de este changelog; si te saltaste varias versiones, las últimas tres). Se puede volver a ver desde *Ayuda → Ver novedades*.
 - **Plantillas nuevas y sugerencias inteligentes**: tres plantillas (*Alerta de regalo con capas*, *Aviso cuando termina un timer* y *Cada follow suma tiempo al timer*) y un bloque «Sugerencias para ti» que, según lo que ya tienes (timers, imágenes, fuentes, reglas), propone las que te sirven y aún no usas.
 
 ### Mejorado
 - **Ayudas en un icono ⓘ**: los textos de ayuda largos ya no ocupan sitio ni se desbordan; salen en una burbuja al pulsar o pasar el ratón por el icono ⓘ (en tarjetas, campos de formulario, Ajustes, Overlays, timers y reglas). El texto de la URL de los overlays ahora explica el HTTPS para TikTok LIVE Studio.
 - **MyInstants más compacto**: la búsqueda muestra solo los 3 primeros resultados, con un botón para ver el resto (y otro para volver a contraerlos).
+- **Registros sin secretos**: los mensajes del registro (pantalla, `hivebuzz.log` y el archivo exportado para soporte) enmascaran automáticamente tokens, contraseñas y cabeceras `Bearer`, por si algún día se coló uno.
+- **Pruebas de contrato con TikTok**: el sidecar ahora se prueba con mensajes que pasan por el codec protobuf real de la librería (con sus valores por defecto y campos nuevos desconocidos), para detectar cuanto antes un cambio de TikTok o de la librería.
 - **Robustez**: el código de producción ya no admite `unwrap`/`expect`/`panic!` (lo exige el CI) y un fallo inesperado queda registrado en `hivebuzz.log`. El CI avisa de dependencias con vulnerabilidades conocidas.
 
 ### Eliminado

@@ -153,6 +153,7 @@ pub fn run() {
             commands::download_google_font,
             commands::delete_font,
             commands::install_local_ca,
+            commands::uninstall_local_ca,
             commands::simulate_event,
             commands::simulate_burst,
             commands::recent_events,

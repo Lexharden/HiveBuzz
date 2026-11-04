@@ -46,6 +46,7 @@ export const api = {
   deleteFont: (family: string) => invoke<void>("delete_font", { family }),
   httpsStatus: () => invoke<HttpsStatus>("https_status"),
   installLocalCa: () => invoke<void>("install_local_ca"),
+  uninstallLocalCa: () => invoke<void>("uninstall_local_ca"),
   simulateEvent: (kind: SimKind, platform: Platform = "tiktok") => invoke<LiveEvent>("simulate_event", { kind, platform }),
   simulateBurst: (count: number, platform: Platform = "tiktok") => invoke<void>("simulate_burst", { count, platform }),
   recentEvents: (limit: number) => invoke<LiveEvent[]>("recent_events", { limit }),

@@ -204,7 +204,7 @@ pub async fn install_ca(tls: &LocalTls) -> Result<()> {
         let _ = run("certutil", &["-user", "-delstore", "Root", CA_NAME_PREFIX]).await;
         let path = tls.ca_path.to_string_lossy().into_owned();
         let out = run("certutil", &["-user", "-addstore", "Root", &path]).await?;
-        return if out.status.success() {
+        return if out.status.success() && ca_status(&tls.ca_name).await == CaStatus::Installed {
             Ok(())
         } else {
             Err(AppError::Server("no se instaló el certificado (¿rechazaste el aviso de Windows?)".into()))
@@ -226,6 +226,49 @@ pub async fn install_ca(tls: &LocalTls) -> Result<()> {
     {
         Err(AppError::Server(format!(
             "en este sistema instala a mano el certificado {} como autoridad de confianza",
+            tls.ca_path.display()
+        )))
+    }
+}
+
+/// Quita la CA del almacén de confianza del usuario (la de esta generación y las de generaciones anteriores de
+/// HiveBuzz que hubieran quedado). Si ya no estaba, no es un error. Los archivos del certificado se conservan:
+/// se puede volver a instalar cuando se quiera.
+#[allow(clippy::needless_return)]
+pub async fn uninstall_ca(tls: &LocalTls) -> Result<()> {
+    #[cfg(windows)]
+    {
+        if ca_status(&tls.ca_name).await == CaStatus::NotInstalled {
+            // Puede quedar alguna generación anterior aunque la actual ya no esté.
+            let _ = run("certutil", &["-user", "-delstore", "Root", CA_NAME_PREFIX]).await;
+            return Ok(());
+        }
+        let _ = run("certutil", &["-user", "-delstore", "Root", &tls.ca_name]).await?;
+        let _ = run("certutil", &["-user", "-delstore", "Root", CA_NAME_PREFIX]).await;
+        return if ca_status(&tls.ca_name).await == CaStatus::Installed {
+            Err(AppError::Server("no se pudo quitar el certificado (¿rechazaste el aviso de Windows?)".into()))
+        } else {
+            Ok(())
+        };
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if ca_status(&tls.ca_name).await == CaStatus::NotInstalled {
+            return Ok(());
+        }
+        let home = std::env::var("HOME").map_err(|_| AppError::Server("sin carpeta de usuario".into()))?;
+        let keychain = format!("{home}/Library/Keychains/login.keychain-db");
+        let _ = run("security", &["delete-certificate", "-c", &tls.ca_name, "-t", &keychain]).await?;
+        return if ca_status(&tls.ca_name).await == CaStatus::Installed {
+            Err(AppError::Server("no se pudo quitar el certificado (¿cancelaste la petición de contraseña?)".into()))
+        } else {
+            Ok(())
+        };
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        Err(AppError::Server(format!(
+            "en este sistema quita a mano el certificado {} de tus autoridades de confianza",
             tls.ca_path.display()
         )))
     }

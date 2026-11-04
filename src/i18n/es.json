@@ -92,6 +92,9 @@
     "httpsInstalled": "Certificado instalado: las URL https funcionan.",
     "httpsNotInstalled": "El certificado aún no está instalado.",
     "httpsManual": "Este sistema no permite instalarlo desde la app. Instala a mano como autoridad de confianza: {{path}}",
+    "httpsUninstall": "Quitar certificado",
+    "httpsUninstallConfirm": "¿Quitar el certificado de HiveBuzz de las autoridades de confianza? Las URL https dejarán de funcionar en TikTok LIVE Studio hasta que lo vuelvas a instalar.",
+    "httpsUninstallHint": "Úsalo si dejas de usar HiveBuzz o quieres revocar la confianza. Se puede volver a instalar cuando quieras; al desinstalar la app, el certificado no se quita solo.",
     "httpsInstall": "Instalar certificado",
     "httpsWhere": "Después, en la página Overlays, usa el botón «Copiar (HTTPS)» de cada overlay.",
     "httpsInstallHint": "Windows mostrará un aviso de seguridad: acéptalo. Solo afecta a tu usuario y el certificado solo vale para localhost y 127.0.0.1."
@@ -1085,7 +1088,7 @@
       "export": "Exportar configuración",
       "import": "Importar configuración",
       "exported": "Exportado.",
-      "summary": "{{rules}} reglas · {{goals}} metas · {{timers}} timers · {{overlays}} overlays · {{sounds}} sonidos · {{media}} imágenes · {{profiles}} perfiles",
+      "summary": "{{rules}} reglas · {{goals}} metas · {{timers}} timers · {{overlays}} overlays · {{sounds}} sonidos · {{media}} imágenes · {{fonts}} fuentes · {{profiles}} perfiles",
       "risky": "Este archivo contiene acciones que salen de tu equipo o lo controlan: {{list}}. Impórtalo solo si confías en quien te lo dio; revisa las reglas antes de abrir el LIVE.",
       "skipped": "{{n}} elementos descartados",
       "pending": "Importación lista. Se aplicará al reiniciar y SUSTITUIRÁ tus reglas, metas, timers, overlays, bibliotecas y perfiles.",

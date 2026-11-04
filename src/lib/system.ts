@@ -56,6 +56,7 @@ export interface BackupSummary {
   overlays: number;
   sounds: number;
   media: number;
+  fonts: number;
   profiles: number;
   skipped: string[];
   /** Acciones que tocan red, teclado u OBS, p. ej. "webhook × 3". */

@@ -697,6 +697,14 @@ pub async fn install_local_ca(state: State<'_, AppState>) -> Result<()> {
     crate::server::tls::install_ca(tls).await
 }
 
+/// Quita la CA local de las autoridades de confianza del usuario. Los overlays por HTTPS dejarán de funcionar en
+/// TikTok LIVE Studio hasta volver a instalarla; por HTTP siguen igual.
+#[tauri::command]
+pub async fn uninstall_local_ca(state: State<'_, AppState>) -> Result<()> {
+    let tls = state.local_tls.as_ref().ok_or_else(|| crate::error::AppError::Server("no hay certificado HTTPS".into()))?;
+    crate::server::tls::uninstall_ca(tls).await
+}
+
 // ---- Fuentes ----
 
 use crate::fonts::FontFamily;
