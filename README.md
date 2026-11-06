@@ -171,7 +171,7 @@ http://127.0.0.1:17890/overlay/feed?token=<TOKEN>
 
 Pégalas como **Browser Source** en OBS. TikTok LIVE Studio solo acepta `https://`: usa *Copiar (HTTPS)* tras instalar el
 certificado en *Ajustes → HTTPS*. El servidor HTTPS escucha en el puerto HTTP + 1, solo en loopback, con una CA propia
-restringida (name constraints) a `localhost` y `127.0.0.1`; su clave privada se descarta tras firmar y nunca se guarda.
+restringida (name constraints) a `localhost`, `127.0.0.1` y `hivebuzz.yafel.dev` (un registro DNS `A` a `127.0.0.1`: LIVE Studio rechaza IPs y `localhost`, pide algo con forma de dominio); su clave privada se descarta tras firmar y nunca se guarda.
 
 **Fuentes, capas y temas.** *Biblioteca → Fuentes* descarga fuentes de Google Fonts (o sube las tuyas) a disco; los overlays las sirven
 desde `/fonts` con el mismo token, así que no dependen de Internet en directo. La acción `overlayAlert` acepta `layers`

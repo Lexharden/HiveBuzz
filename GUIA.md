@@ -63,8 +63,9 @@ Cada pantalla trae una frase que explica para qué sirve.
 3. En **Ajustes → Overlays** copia la URL del overlay.
 4. En OBS: *Fuente → Navegador (Browser Source)* → pega la URL → ancho 1920, alto 1080. TikTok LIVE Studio no acepta
    direcciones `http://` («enlace no válido»): en *Ajustes → HTTPS* pulsa **Instalar certificado** (una sola vez; Windows
-   pedirá confirmación) y usa el botón *Copiar (HTTPS)* o las URL de esa sección. El certificado es propio de tu equipo y
-   solo vale para `localhost` y `127.0.0.1`.
+   pedirá confirmación) y usa el botón *Copiar (HTTPS)* o las URL de esa sección. Las URL HTTPS usan el nombre `hivebuzz.yafel.dev` (LIVE Studio no admite IPs ni `localhost`), que apunta a tu propio
+   equipo y necesita internet para resolverse; si no lo hace, *Ajustes → HTTPS* te dice qué línea añadir al archivo hosts.
+   El certificado es propio de tu equipo y solo vale para `localhost`, `127.0.0.1` y ese nombre.
 5. ⚠️ La URL lleva tu token: **no la compartas**.
 6. **Pantallas de alertas**: hay 5 de fábrica (*Alertas · Pantalla 1…5*) y puedes crear hasta 20 con *+ Añadir pantalla* (o quitar la última). Cada una es un overlay distinto con su propia URL, su estilo (posición, tamaño, fuente, animación…) y su propia cola: añade varias como *Navegador* en OBS, colócalas en sitios distintos y las alertas de pantallas diferentes se ven a la vez. En la acción *Alerta en overlay* eliges la **Pantalla** donde sale y, si quieres, cambias la animación o el tamaño de esa alerta. Solo la pantalla 1 muestra sola regalos, follows y suscripciones. Si quitas una pantalla, las reglas que la usaban pasan a la 1. Los vídeos con audio suenan en el overlay (*Volumen del vídeo* en la acción; en OBS, activa «Controlar audio mediante OBS» en la fuente Navegador para llevarlo a su propio canal). Para vídeos sin transparencia, la acción tiene *Fondo del vídeo*: quita el fondo negro o el verde sin filtros de OBS.
 7. **Jarrón de regalos**: lleva su propia cuenta de monedas (no necesita meta). En Overlays → Jarrón de regalos fija el *objetivo*, suma, llena o vacía a mano, y personaliza forma, colores, olas, burbujas, textos y efecto al llenarse. Con «Una meta de monedas» como origen sigue una meta de «Metas y timers».

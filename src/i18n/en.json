@@ -87,7 +87,7 @@
     "portHint": "Only listens on 127.0.0.1. The change applies after restarting HiveBuzz.",
     "serverError": "The local server could not start",
     "https": "HTTPS (TikTok LIVE Studio)",
-    "httpsHint": "TikTok LIVE Studio doesn't accept http:// addresses. HiveBuzz also serves the overlays over HTTPS with its own certificate, valid only for localhost. Install it once and use the URLs below.",
+    "httpsHint": "TikTok LIVE Studio doesn't accept http:// addresses. HiveBuzz also serves the overlays over HTTPS, with its own certificate and a domain name (hivebuzz.yafel.dev) that points to your own computer. Install the certificate once and use the URLs below.",
     "httpsError": "HTTPS could not start",
     "httpsInstalled": "Certificate installed: the https URLs work.",
     "httpsNotInstalled": "The certificate is not installed yet.",
@@ -97,7 +97,8 @@
     "httpsUninstallHint": "Use it if you stop using HiveBuzz or want to revoke the trust. You can install it again any time; uninstalling the app does not remove the certificate by itself.",
     "httpsInstall": "Install certificate",
     "httpsWhere": "Then, on the Overlays page, use each overlay's “Copy (HTTPS)” button.",
-    "httpsInstallHint": "Windows will show a security prompt: accept it. It only affects your user and the certificate is only valid for localhost and 127.0.0.1."
+    "httpsInstallHint": "Windows will show a security prompt: accept it. It only affects your user and the certificate is only valid for localhost, 127.0.0.1 and hivebuzz.yafel.dev.",
+    "httpsDnsFail": "The name {{host}} doesn't point to this computer (no internet, or your router blocks these answers?). Add this line to the hosts file as administrator:"
   },
   "role": {
     "moderator": "Moderator",
@@ -542,7 +543,7 @@
     "copyLocalhost": "Copy (localhost)",
     "copyLocalhostHint": "Same address with “localhost” instead of 127.0.0.1, in case TikTok LIVE Studio rejects the other.",
     "copyHttps": "Copy (HTTPS)",
-    "copyHttpsHint": "https://localhost address. For TikTok LIVE Studio: install the certificate first in Settings → HTTPS.",
+    "copyHttpsHint": "https://hivebuzz.yafel.dev address, a domain name as TikTok LIVE Studio requires. Install the certificate first in Settings → HTTPS.",
     "test": "Test",
     "reset": "Reset",
     "themeFiles": "HiveBuzz theme",

@@ -38,7 +38,8 @@ use crate::overlay::{OverlayHub, OverlayMessage, RecentEvents};
 /// video por HTTPS o del propio servidor, y conexión WS al propio servidor.
 const CSP: &str = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; \
                    img-src 'self' https: data:; media-src 'self'; font-src 'self'; \
-                   connect-src 'self' ws://127.0.0.1:* ws://localhost:* wss://127.0.0.1:* wss://localhost:*";
+                   connect-src 'self' ws://127.0.0.1:* ws://localhost:* wss://127.0.0.1:* wss://localhost:* \
+                   ws://hivebuzz.yafel.dev:* wss://hivebuzz.yafel.dev:*";
 
 /// Todo lo que el servidor necesita para arrancar.
 #[derive(Clone)]

@@ -41,6 +41,10 @@ export interface OverlayInfo {
 export interface HttpsStatus {
   installed: boolean | null;
   caPath: string | null;
+  /** Dominio de los overlays por HTTPS (el que acepta TikTok LIVE Studio). */
+  host: string;
+  /** ¿Resuelve ese dominio a esta máquina? */
+  dnsOk: boolean;
 }
 
 export interface AppInfo {

@@ -4,6 +4,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Mejorado
+- **HTTPS con nombre de dominio**: TikTok LIVE Studio rechaza IPs y `localhost`, así que *Copiar (HTTPS)* usa ahora `https://hivebuzz.yafel.dev:…`, que apunta a tu propio equipo. El certificado se regenera con ese nombre: tras actualizar, vuelve a pulsar *Instalar certificado* en *Ajustes → HTTPS*. Si el nombre no se resuelve (sin internet o router que lo bloquea), Ajustes avisa y muestra la línea para el archivo hosts.
+- Dependencias de JavaScript actualizadas (`undici`, `follow-redirects`) por avisos de `bun audit`.
+
 ## [0.5.0] - 2026-11-04
 
 ### Añadido

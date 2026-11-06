@@ -106,8 +106,10 @@ pub async fn get_app_info(state: State<'_, AppState>) -> Result<AppInfo> {
             .into_iter()
             .map(|d| OverlayInfo {
                 url: format!("{base}/overlay/{}?token={token}{lang}", d.id),
-                // `localhost` y no la IP: algunos programas rechazan una IP donde esperan un dominio.
-                https_url: state.https_port.map(|p| format!("https://localhost:{p}/overlay/{}?token={token}{lang}", d.id)),
+                // Con nombre de dominio y no la IP ni `localhost`: TikTok LIVE Studio solo acepta algo con forma de dominio.
+                https_url: state.https_port.map(|p| {
+                    format!("https://{}:{p}/overlay/{}?token={token}{lang}", crate::server::tls::OVERLAY_HOST, d.id)
+                }),
                 id: d.id,
                 name: d.name,
             })
@@ -677,17 +679,36 @@ pub struct HttpsStatus {
     /// `None` si este sistema no permite comprobarlo desde la app.
     pub installed: Option<bool>,
     pub ca_path: Option<String>,
+    /// Dominio de los overlays por HTTPS.
+    pub host: String,
+    /// ¿Resuelve el dominio a esta máquina? `false` si no hay internet o el router bloquea las respuestas que
+    /// apuntan a `127.0.0.1` (protección «DNS rebinding»); entonces hay que añadirlo al archivo hosts.
+    pub dns_ok: bool,
+}
+
+/// Comprueba (con límite de tiempo) que el dominio de los overlays apunta a la propia máquina.
+async fn overlay_host_resolves_locally() -> bool {
+    let lookup = tokio::net::lookup_host((crate::server::tls::OVERLAY_HOST, 0));
+    match tokio::time::timeout(std::time::Duration::from_secs(4), lookup).await {
+        Ok(Ok(addrs)) => {
+            let addrs: Vec<_> = addrs.collect();
+            !addrs.is_empty() && addrs.iter().all(|a| a.ip().is_loopback())
+        }
+        _ => false,
+    }
 }
 
 #[tauri::command]
 pub async fn https_status(state: State<'_, AppState>) -> Result<HttpsStatus> {
-    let Some(tls) = &state.local_tls else { return Ok(HttpsStatus { installed: None, ca_path: None }) };
+    let host = crate::server::tls::OVERLAY_HOST.to_string();
+    let dns_ok = overlay_host_resolves_locally().await;
+    let Some(tls) = &state.local_tls else { return Ok(HttpsStatus { installed: None, ca_path: None, host, dns_ok }) };
     let installed = match crate::server::tls::ca_status(&tls.ca_name).await {
         crate::server::tls::CaStatus::Installed => Some(true),
         crate::server::tls::CaStatus::NotInstalled => Some(false),
         crate::server::tls::CaStatus::Unsupported => None,
     };
-    Ok(HttpsStatus { installed, ca_path: Some(tls.ca_path.to_string_lossy().into_owned()) })
+    Ok(HttpsStatus { installed, ca_path: Some(tls.ca_path.to_string_lossy().into_owned()), host, dns_ok })
 }
 
 /// Instala la CA local como autoridad de confianza del usuario (el sistema pide confirmación).

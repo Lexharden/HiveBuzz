@@ -55,7 +55,9 @@ fn bare_host(value: &str) -> &str {
 }
 
 fn is_local(host: &str) -> bool {
-    matches!(host.to_ascii_lowercase().as_str(), "127.0.0.1" | "localhost" | "::1")
+    let host = host.to_ascii_lowercase();
+    // El dominio de los overlays resuelve a 127.0.0.1 (ver `tls::OVERLAY_HOST`); solo ese nombre exacto.
+    matches!(host.as_str(), "127.0.0.1" | "localhost" | "::1") || host == super::tls::OVERLAY_HOST
 }
 
 /// Defensa contra DNS rebinding: la petición debe ir dirigida a un nombre local.
@@ -101,6 +103,11 @@ mod tests {
         assert!(host_allowed(&headers(&[("host", "127.0.0.1:17890")])));
         assert!(host_allowed(&headers(&[("host", "localhost:1")])));
         assert!(host_allowed(&headers(&[("host", "[::1]:80")])));
+        assert!(host_allowed(&headers(&[("host", "hivebuzz.yafel.dev:17891")])));
+        assert!(host_allowed(&headers(&[("host", "HiveBuzz.Yafel.Dev")])));
+        assert!(!host_allowed(&headers(&[("host", "evil.hivebuzz.yafel.dev")])));
+        assert!(!host_allowed(&headers(&[("host", "hivebuzz.yafel.dev.evil.com")])));
+        assert!(!host_allowed(&headers(&[("host", "yafel.dev")])));
         assert!(!host_allowed(&headers(&[("host", "evil.com")])));
         assert!(!host_allowed(&headers(&[("host", "127.0.0.1.evil.com:80")])));
         assert!(!host_allowed(&HeaderMap::new()));

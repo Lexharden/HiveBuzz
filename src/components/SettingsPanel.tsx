@@ -75,6 +75,12 @@ function HttpsSection({ info }: { info: AppInfo }) {
             {status?.installed === false && <span className="text-amber-300">{t("settings.httpsNotInstalled")}</span>}
             {status?.installed === null && <span>{t("settings.httpsManual", { path: status.caPath ?? "" })}</span>}
           </p>
+          {status && !status.dnsOk && (
+            <p className="mt-2 text-xs text-amber-300">
+              {t("settings.httpsDnsFail", { host: status.host })}{" "}
+              <code className="rounded bg-zinc-800 px-1 py-0.5 text-zinc-200">127.0.0.1 {status.host}</code>
+            </p>
+          )}
           {status?.installed === true && (
             <div className="mt-2">
               <button

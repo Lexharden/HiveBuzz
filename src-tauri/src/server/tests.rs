@@ -549,6 +549,18 @@ async fn https_serves_overlays_to_a_client_that_trusts_the_local_ca() {
 }
 
 #[tokio::test]
+async fn https_serves_overlays_under_the_public_looking_domain() {
+    // TikTok LIVE Studio solo acepta nombres con forma de dominio; ese nombre apunta a 127.0.0.1 por DNS.
+    let r = https_started().await;
+    let host = format!("{}:{}", tls::OVERLAY_HOST, r.handle.addr.port());
+    let (status, raw) = https_get(&r, tls::OVERLAY_HOST, &host, &format!("/overlay/alerts?token={TOKEN}")).await;
+    assert_eq!(status, 200, "{raw}");
+    // Un subdominio o un dominio padre no están cubiertos por el certificado.
+    assert!(tls_connect(&r, &format!("otro.{}", tls::OVERLAY_HOST)).await.is_err());
+    assert!(tls_connect(&r, "yafel.dev").await.is_err());
+}
+
+#[tokio::test]
 async fn https_applies_the_same_token_and_host_rules() {
     let r = https_started().await;
     let host = format!("localhost:{}", r.handle.addr.port());
@@ -579,8 +591,8 @@ async fn the_certificate_is_not_valid_for_other_names() {
 #[tokio::test]
 async fn secure_websocket_streams_bus_events() {
     let r = https_started().await;
-    let stream = tls_connect(&r, "localhost").await.expect("handshake TLS");
-    let url = format!("wss://localhost:{}/ws?token={TOKEN}", r.handle.addr.port());
+    let stream = tls_connect(&r, tls::OVERLAY_HOST).await.expect("handshake TLS");
+    let url = format!("wss://{}:{}/ws?token={TOKEN}", tls::OVERLAY_HOST, r.handle.addr.port());
     let (mut ws, _) = tokio_tungstenite::client_async(url.into_client_request().expect("req"), stream).await.expect("wss");
     assert_eq!(next_json(&mut ws).await["type"], "hello");
 }

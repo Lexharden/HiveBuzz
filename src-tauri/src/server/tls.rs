@@ -2,7 +2,8 @@
 //! servidor también atiende por HTTPS con un certificado propio.
 //!
 //! Cómo se mantiene seguro:
-//! - Se crea una CA propia **restringida por nombre** (X.509 *name constraints*) a `localhost` y `127.0.0.1`:
+//! - Se crea una CA propia **restringida por nombre** (X.509 *name constraints*) a `localhost`, `127.0.0.1` y
+//!   [`OVERLAY_HOST`] (el dominio que LIVE Studio sí acepta y que apunta a la propia máquina):
 //!   aunque el usuario la instale como raíz de confianza, no sirve para suplantar ningún otro sitio.
 //! - La clave privada de la CA **no se guarda**: se usa una vez para firmar el certificado del servidor y se
 //!   descarta. Lo único que queda en disco es la CA pública, el certificado y la clave del servidor.
@@ -17,6 +18,12 @@ use rcgen::{
 
 use crate::error::{AppError, Result};
 
+/// Nombre de dominio de los overlays. TikTok LIVE Studio rechaza IPs y `localhost`: pide algo con forma de
+/// dominio. El registro DNS `A hivebuzz.yafel.dev → 127.0.0.1` lo hace apuntar a la propia máquina.
+/// Va en el certificado, en la CA (restricción de nombre) y en la comprobación de `Host`.
+pub const OVERLAY_HOST: &str = "hivebuzz.yafel.dev";
+/// Línea de la CA que recuerda para qué dominio se generó; si no coincide, se regenera todo.
+const HOST_MARK_PREFIX: &str = "# host: ";
 const CA_FILE: &str = "hivebuzz-local-ca.pem";
 const CERT_FILE: &str = "overlay-cert.pem";
 const KEY_FILE: &str = "overlay-key.pem";
@@ -61,7 +68,11 @@ impl LocalTls {
             return None;
         }
         // El nombre va dentro del fichero (comentario) para no tener que analizar el certificado.
-        let ca_name = ca_pem.lines().find_map(|l| l.strip_prefix("# ")).map(str::to_string)?;
+        let ca_name = ca_pem.lines().find(|l| l.starts_with("# ") && !l.starts_with(HOST_MARK_PREFIX))?.trim_start_matches("# ").to_string();
+        // Generado para otro dominio (p. ej. una versión anterior solo con `localhost`): hay que rehacerlo.
+        if !ca_pem.lines().any(|l| l.trim_end() == format!("{HOST_MARK_PREFIX}{OVERLAY_HOST}")) {
+            return None;
+        }
         Some(Self { cert_pem, key_pem, ca_path, ca_name })
     }
 }
@@ -92,6 +103,7 @@ fn generate() -> Result<Fresh> {
     ca.name_constraints = Some(NameConstraints {
         permitted_subtrees: vec![
             GeneralSubtree::DnsName("localhost".into()),
+            GeneralSubtree::DnsName(OVERLAY_HOST.into()),
             GeneralSubtree::IpAddress(CidrSubnet::V4([127, 0, 0, 1], [255, 255, 255, 255])),
         ],
         excluded_subtrees: vec![],
@@ -109,6 +121,7 @@ fn generate() -> Result<Fresh> {
     };
     leaf.subject_alt_names = vec![
         SanType::DnsName("localhost".try_into().map_err(tls)?),
+        SanType::DnsName(OVERLAY_HOST.try_into().map_err(tls)?),
         SanType::IpAddress(std::net::IpAddr::from([127, 0, 0, 1])),
     ];
     leaf.key_usages = vec![KeyUsagePurpose::DigitalSignature];
@@ -120,7 +133,7 @@ fn generate() -> Result<Fresh> {
     // `ca_key` se descarta aquí: nadie podrá firmar nuevos certificados con la CA instalada.
 
     Ok(Fresh {
-        ca_pem: format!("# {ca_name}\n{}", ca_cert.pem()),
+        ca_pem: format!("# {ca_name}\n{HOST_MARK_PREFIX}{OVERLAY_HOST}\n{}", ca_cert.pem()),
         // Cadena completa: el navegador recibe el certificado del servidor y después la CA.
         cert_pem: format!("{}{}", leaf_cert.pem(), ca_cert.pem()),
         key_pem: leaf_key.serialize_pem(),
@@ -299,6 +312,20 @@ mod tests {
         assert!(!cert.contains("PRIVATE KEY"));
         let files: Vec<_> = std::fs::read_dir(dir.path()).expect("ls").flatten().collect();
         assert_eq!(files.len(), 3, "solo CA pública, certificado y clave del servidor");
+    }
+
+    #[test]
+    fn a_certificate_made_for_another_domain_is_regenerated() {
+        // Versiones anteriores solo cubrían `localhost`: su CA no lleva la marca del dominio actual.
+        let dir = tempfile::tempdir().expect("dir");
+        let a = LocalTls::load_or_create(dir.path()).expect("crea");
+        let ca_path = dir.path().join(CA_FILE);
+        let old = std::fs::read_to_string(&ca_path).expect("ca").replace(OVERLAY_HOST, "otro.ejemplo.com");
+        std::fs::write(&ca_path, old).expect("write");
+        let b = LocalTls::load_or_create(dir.path()).expect("regenera");
+        assert_ne!(a.ca_name, b.ca_name);
+        let ca = std::fs::read_to_string(&ca_path).expect("ca");
+        assert!(ca.contains(&format!("{HOST_MARK_PREFIX}{OVERLAY_HOST}")));
     }
 
     #[test]
