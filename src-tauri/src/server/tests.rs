@@ -616,3 +616,31 @@ async fn fonts_are_served_with_the_token_and_cannot_escape_their_folder() {
         assert!(!raw.contains("SECRETO"), "{evil} filtró el archivo (status {status})");
     }
 }
+
+/// Chrome y TikTok LIVE Studio negocian HTTP/2 por HTTPS. Ahí no hay cabecera `Host` (el destino va en
+/// `:authority`), y el servidor debe aceptarlo igualmente. Regresión: antes daba «host no permitido».
+async fn h2_get(r: &HttpsRig, authority: &str, path: &str) -> u16 {
+    let tcp = TcpStream::connect(r.handle.addr).await.expect("tcp");
+    let mut cfg = (*client_config(&r.tls)).clone();
+    cfg.alpn_protocols = vec![b"h2".to_vec()];
+    let name = ServerName::try_from(tls::OVERLAY_HOST.to_string()).expect("nombre");
+    let stream = tokio_rustls::TlsConnector::from(Arc::new(cfg)).connect(name, tcp).await.expect("handshake TLS");
+    assert_eq!(stream.get_ref().1.alpn_protocol(), Some(&b"h2"[..]), "el servidor debe ofrecer HTTP/2");
+    let (mut client, conn) = h2::client::handshake(stream).await.expect("h2");
+    tokio::spawn(async move {
+        let _ = conn.await;
+    });
+    let req = http::Request::builder().uri(format!("https://{authority}{path}")).body(()).expect("req");
+    let (resp, _) = client.send_request(req, true).expect("send");
+    resp.await.expect("respuesta").status().as_u16()
+}
+
+#[tokio::test]
+async fn https_over_http2_accepts_the_authority_instead_of_a_host_header() {
+    let r = https_started().await;
+    let port = r.handle.addr.port();
+    let path = format!("/overlay/alerts?token={TOKEN}");
+    assert_eq!(h2_get(&r, &format!("{}:{port}", tls::OVERLAY_HOST), &path).await, 200);
+    assert_eq!(h2_get(&r, &format!("localhost:{port}"), &path).await, 200);
+    assert_eq!(h2_get(&r, &format!("evil.com:{port}"), &path).await, 403, "destino ajeno");
+}

@@ -2064,6 +2064,8 @@ dependencies = [
  "cpal",
  "csv",
  "futures-util",
+ "h2",
+ "http",
  "keyring",
  "rand 0.10.3",
  "rcgen",

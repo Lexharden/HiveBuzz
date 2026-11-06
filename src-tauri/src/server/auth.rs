@@ -2,7 +2,7 @@
 
 use axum::body::Body;
 use axum::extract::State;
-use axum::http::{header, HeaderMap, Request, StatusCode};
+use axum::http::{header, HeaderMap, Request, StatusCode, Uri};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 
@@ -10,7 +10,10 @@ use super::ServerState;
 
 pub async fn guard(State(state): State<ServerState>, req: Request<Body>, next: Next) -> Response {
     let headers = req.headers();
-    if !host_allowed(headers) {
+    if !request_host_allowed(headers, req.uri()) {
+        // Sin la URL (lleva el token): solo el `Host` recibido, acortado, para poder diagnosticar clientes raros.
+        let host = request_host(headers, req.uri()).unwrap_or("<sin Host>");
+        tracing::warn!(host = %host.chars().take(80).collect::<String>().escape_debug(), "petición rechazada: host no permitido");
         return (StatusCode::FORBIDDEN, "host no permitido").into_response();
     }
     if !origin_allowed(headers) {
@@ -60,7 +63,19 @@ fn is_local(host: &str) -> bool {
     matches!(host.as_str(), "127.0.0.1" | "localhost" | "::1") || host == super::tls::OVERLAY_HOST
 }
 
+/// Destino de la petición. En HTTP/1.x es la cabecera `Host`; en HTTP/2 (que Chrome y LIVE Studio negocian por
+/// HTTPS) no hay `Host`, el destino va en `:authority` y llega en la URI.
+fn request_host<'a>(headers: &'a HeaderMap, uri: &'a Uri) -> Option<&'a str> {
+    headers.get(header::HOST).and_then(|h| h.to_str().ok()).or_else(|| uri.authority().map(|a| a.as_str()))
+}
+
+/// Como [`host_allowed`], pero también acepta el destino de HTTP/2 cuando no hay cabecera `Host`.
+pub fn request_host_allowed(headers: &HeaderMap, uri: &Uri) -> bool {
+    request_host(headers, uri).is_some_and(|h| is_local(bare_host(h)))
+}
+
 /// Defensa contra DNS rebinding: la petición debe ir dirigida a un nombre local.
+#[cfg(test)]
 pub fn host_allowed(headers: &HeaderMap) -> bool {
     headers
         .get(header::HOST)
@@ -111,6 +126,19 @@ mod tests {
         assert!(!host_allowed(&headers(&[("host", "evil.com")])));
         assert!(!host_allowed(&headers(&[("host", "127.0.0.1.evil.com:80")])));
         assert!(!host_allowed(&HeaderMap::new()));
+    }
+
+    #[test]
+    fn http2_requests_carry_the_destination_in_the_uri_not_in_a_host_header() {
+        let none = HeaderMap::new();
+        let uri = |s: &str| s.parse::<Uri>().expect("uri");
+        assert!(request_host_allowed(&none, &uri("https://hivebuzz.yafel.dev:17891/overlay/alerts")));
+        assert!(request_host_allowed(&none, &uri("https://127.0.0.1:17891/x")));
+        assert!(!request_host_allowed(&none, &uri("https://evil.com/x")));
+        assert!(!request_host_allowed(&none, &uri("/overlay/alerts")), "sin Host ni autoridad");
+        // Si hay `Host`, manda él: una autoridad local en la URI no lo compensa.
+        assert!(!request_host_allowed(&headers(&[("host", "evil.com")]), &uri("https://hivebuzz.yafel.dev/x")));
+        assert!(request_host_allowed(&headers(&[("host", "localhost:1")]), &uri("/x")));
     }
 
     #[test]
