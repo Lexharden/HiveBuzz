@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.5.3] - 2026-11-06
+
 ### Añadido
 - **Overlay «Top likes»**: ranking de quienes más likes («tap taps») dan en el directo, de la sesión o del día. Es un overlay aparte del de donadores (puedes tener los dos a la vez), con las mismas opciones: puestos, título, avatar, medallas y mostrar u ocultar los likes. Los likes del día se guardan en disco; lo simulado solo se ve en la sesión.
 
