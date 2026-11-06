@@ -17,6 +17,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("chat", include_str!("../../../overlays/chat/index.html")),
     ("gifts", include_str!("../../../overlays/gifts/index.html")),
     ("leaderboard", include_str!("../../../overlays/leaderboard/index.html")),
+    ("likeboard", include_str!("../../../overlays/likeboard/index.html")),
     ("goals", include_str!("../../../overlays/goals/index.html")),
     ("timer", include_str!("../../../overlays/timer/index.html")),
     ("counters", include_str!("../../../overlays/counters/index.html")),

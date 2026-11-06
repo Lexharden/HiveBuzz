@@ -2,6 +2,7 @@
 
 mod backup;
 mod donors;
+mod likers;
 mod event_log;
 mod goals;
 mod media;

@@ -33,6 +33,7 @@ use crate::goals::service::{GoalService, GoalTiming};
 use crate::jar::JarService;
 use crate::viewer_groups::ViewerGroups;
 use crate::leaderboard::{LeaderboardService, LeaderboardTiming};
+use crate::likeboard::{LikeBoardService, LikeBoardTiming};
 use crate::fonts::FontLibrary;
 use crate::media::MediaLibrary;
 use crate::overlay::{OverlayHub, RecentEvents};
@@ -114,6 +115,7 @@ pub struct AppState {
     pub viewer_groups: Arc<ViewerGroups>,
     pub timers: Arc<TimerService>,
     pub leaderboard: Arc<LeaderboardService>,
+    pub likeboard: Arc<LikeBoardService>,
     pub counters: Arc<CounterService>,
     pub points: Arc<PointsService>,
     pub wheel: Arc<WheelService>,
@@ -357,6 +359,8 @@ impl AppState {
         }
         let leaderboard = LeaderboardService::new(db.clone(), hub.clone(), Arc::new(LeaderboardService::local_today));
         leaderboard.publish().await;
+        let likeboard = LikeBoardService::new(db.clone(), hub.clone(), Arc::new(LeaderboardService::local_today));
+        likeboard.publish().await;
         let counters = CounterService::new(hub.clone());
         let recent = RecentEvents::new(OVERLAY_HISTORY);
         let stats = StatsService::new(db.clone(), Arc::clone(&clock));
@@ -368,6 +372,7 @@ impl AppState {
         jar.spawn(&bus, Duration::from_secs(3));
         timers.spawn(&bus, TimerTiming::default());
         leaderboard.spawn(&bus, session.subscribe(), LeaderboardTiming::default());
+        likeboard.spawn(&bus, session.subscribe(), LikeBoardTiming::default());
         counters.spawn(&bus, total_viewers.clone(), session.subscribe(), Duration::from_millis(250));
         recent.spawn(&bus);
         stats.spawn(&bus, total_viewers, session.subscribe(), Duration::from_secs(20));
@@ -450,6 +455,7 @@ impl AppState {
             viewer_groups,
             timers,
             leaderboard,
+            likeboard,
             counters,
             points,
             wheel,
@@ -497,6 +503,9 @@ impl AppState {
             }
             if let Err(e) = self.leaderboard.flush().await {
                 tracing::warn!(error = %e, "no se pudieron guardar las donaciones pendientes");
+            }
+            if let Err(e) = self.likeboard.flush().await {
+                tracing::warn!(error = %e, "no se pudieron guardar los likes pendientes");
             }
         };
         if tokio::time::timeout(SHUTDOWN_FLUSH_TIMEOUT, flush).await.is_err() {

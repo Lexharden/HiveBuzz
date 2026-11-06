@@ -56,7 +56,7 @@ Cada pantalla trae una frase que explica para qué sirve.
 
 ## 4. Overlays (lo que se ve en pantalla)
 
-1. Pestaña **Overlays**: elige uno (Alertas, Feed, Chat, Regalos recientes, Top donadores, Metas, Timer,
+1. Pestaña **Overlays**: elige uno (Alertas, Feed, Chat, Regalos recientes, Top donadores, Top likes, Metas, Timer,
    Contadores, Ruleta, Encuesta, Sonando ahora, Jarrón de regalos).
 2. Cambia colores, fuente, posición, tamaño… la **vista previa** se actualiza al instante. Botón ▶ *Probar* manda ejemplos.
    **Alertas** funciona sin reglas: regalos, follows y suscripciones salen solos (ajústalo en *Comportamiento*).

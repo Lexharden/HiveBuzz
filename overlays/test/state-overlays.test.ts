@@ -207,3 +207,40 @@ describe("contadores", () => {
     expect(p.root.querySelector("img")).toBeNull();
   });
 });
+
+
+describe("ranking de likes", () => {
+  const like = (nickname: string, likes: number, avatar = "") => ({ userId: nickname, uniqueId: nickname.toLowerCase(), nickname, avatar, likes });
+  const cfg = { width: 320, scope: "session", size: 2, title: "Top likes", showAvatar: false, showLikes: true, medals: true };
+  const board = { session: [like("Ana", 15000), like("Beto", 900), like("Cata", 5)], day: [like("Zoe", 77)] };
+
+  it("muestra el ámbito elegido, limitado al tamaño, con medallas y likes", () => {
+    const p = load("likeboard");
+    p.send(config("likeboard", cfg));
+    p.send(overlayMsg("likeboard", board));
+    const rows = q<HTMLElement>(p.root, ".entry");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.textContent).toContain("🥇");
+    expect(rows[0]?.textContent).toContain("Ana");
+    expect(rows[0]?.textContent).toContain("15.000");
+    expect(p.root.textContent).not.toContain("Cata");
+  });
+
+  it("cambia de ámbito en vivo y puede ocultar los likes", () => {
+    const p = load("likeboard");
+    p.send(overlayMsg("likeboard", board));
+    p.send(config("likeboard", { ...cfg, scope: "day", showLikes: false, medals: false }));
+    const rows = q<HTMLElement>(p.root, ".entry");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.textContent).toContain("Zoe");
+    expect(rows[0]?.textContent).not.toContain("77");
+  });
+
+  it("no ejecuta HTML ni acepta avatares peligrosos", () => {
+    const p = load("likeboard");
+    p.send(config("likeboard", { ...cfg, showAvatar: true }));
+    p.send(overlayMsg("likeboard", { session: [like('<img src=x onerror="window.__p=1">', 5, "javascript:alert(1)")], day: [] }));
+    expect(q(p.root, "img")).toHaveLength(0);
+    expect(q(p.root, ".name")[0]?.textContent).toContain("<img");
+  });
+});

@@ -27,6 +27,7 @@ pub mod goals;
 pub mod jar;
 pub mod interact;
 pub mod leaderboard;
+pub mod likeboard;
 pub mod logs;
 pub mod media;
 pub mod mic;

@@ -327,6 +327,22 @@ fn other_overlays() -> Vec<OverlayDef> {
             },
         },
         OverlayDef {
+            id: "likeboard",
+            name: "overlay.likeboard",
+            screen: None,
+            fields: {
+                let mut f = common_style("top-left", true);
+                f.push(num("width", "field.width", Group::Style, 320.0, 200.0, 900.0, 10.0));
+                f.push(select("scope", "field.scope", B, "session", &[("session", "scope.session"), ("day", "scope.day")]));
+                f.push(num("size", "field.boardSize", B, 5.0, 1.0, 15.0, 1.0));
+                f.push(text("title", "field.title", B, "Top likes", 60));
+                f.push(boolean("showAvatar", "field.showAvatar", B, true));
+                f.push(boolean("showLikes", "field.showLikes", B, true));
+                f.push(boolean("medals", "field.medals", B, true));
+                f
+            },
+        },
+        OverlayDef {
             id: "goals",
             name: "overlay.goals",
             screen: None,
@@ -493,7 +509,7 @@ mod tests {
         let ids: Vec<_> = registry().iter().map(|d| d.id).collect();
         let (alerts, rest): (Vec<&str>, Vec<&str>) = ids.iter().copied().partition(|i| i.starts_with("alerts"));
         assert_eq!(alerts.len(), MAX_ALERT_SCREENS);
-        assert_eq!(rest, ["feed", "chat", "gifts", "leaderboard", "goals", "timer", "counters", "wheel", "poll", "nowplaying", "songqueue", "jar"]);
+        assert_eq!(rest, ["feed", "chat", "gifts", "leaderboard", "likeboard", "goals", "timer", "counters", "wheel", "poll", "nowplaying", "songqueue", "jar"]);
         assert_eq!(ids.iter().collect::<HashSet<_>>().len(), ids.len());
     }
 

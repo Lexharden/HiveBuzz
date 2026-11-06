@@ -95,6 +95,7 @@ async fn every_overlay_page_is_served_with_security_headers() {
         ("chat", "Chat"),
         ("gifts", "Regalos recientes"),
         ("leaderboard", "Top donadores"),
+        ("likeboard", "Top likes"),
         ("goals", "Metas"),
         ("timer", "Timer"),
         ("counters", "Contadores"),
