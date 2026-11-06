@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.5.2] - 2026-11-05
+
+### Corregido
+- **HTTPS en TikTok LIVE Studio y Chrome**: el servidor rechazaba con «host no permitido» toda petición HTTP/2 (el protocolo que negocian por HTTPS), porque ahí el destino no viaja en la cabecera `Host`. Ahora se acepta el destino de HTTP/2 con las mismas reglas de siempre; los destinos ajenos siguen dando 403.
+- Las peticiones rechazadas por destino quedan anotadas en `hivebuzz.log` (solo el `Host`, sin la URL ni el token), para diagnosticar clientes raros.
+
 ## [0.5.1] - 2026-11-05
 
 ### Mejorado
