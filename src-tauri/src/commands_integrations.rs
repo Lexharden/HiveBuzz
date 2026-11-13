@@ -10,7 +10,7 @@ use crate::executors::webhook::{WebhookExecutor, WebhookReport};
 use crate::rules::template::event_vars;
 use crate::simulator::{build_event, SimKind};
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_obs_config(state: State<'_, AppState>) -> ObsConfig {
     state.obs.config()
 }
@@ -20,13 +20,13 @@ pub async fn set_obs_config(state: State<'_, AppState>, config: ObsConfig) -> Re
     state.obs.set_config(config).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn has_obs_password(state: State<'_, AppState>) -> bool {
     state.obs.has_password()
 }
 
 /// Guarda la contraseña de OBS en el llavero (vacía = borrarla). Nunca se devuelve a la UI.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_obs_password(state: State<'_, AppState>, password: String) -> Result<()> {
     state.obs.set_password(&password)
 }

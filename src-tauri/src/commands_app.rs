@@ -8,7 +8,7 @@ use crate::error::{AppError, Result};
 use crate::logs::{self, LogEntry};
 use crate::prefs::AppPrefs;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_app_prefs(state: State<'_, AppState>) -> AppPrefs {
     state.prefs.get()
 }
@@ -20,12 +20,12 @@ pub async fn set_app_prefs(state: State<'_, AppState>, prefs: AppPrefs) -> Resul
     Ok(saved)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_autostart(app: AppHandle) -> Result<bool> {
     app.autolaunch().is_enabled().map_err(|e| AppError::Invalid(format!("inicio con el sistema: {e}")))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool> {
     let manager = app.autolaunch();
     let res = if enabled { manager.enable() } else { manager.disable() };
@@ -33,14 +33,22 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool> {
     manager.is_enabled().map_err(|e| AppError::Invalid(format!("inicio con el sistema: {e}")))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_logs(min_level: String, limit: usize) -> Vec<LogEntry> {
     logs::global().snapshot(&min_level, limit.clamp(1, 2_000))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_logs() {
     logs::global().clear();
+}
+
+/// Error de render de la interfaz (lo atrapa un ErrorBoundary): se anota para poder diagnosticarlo.
+#[tauri::command(async)]
+pub fn report_ui_error(message: String, stack: String) {
+    // Acotado: la pila de React puede ser enorme y el registro es un búfer en memoria.
+    let cut = |s: &str, n: usize| s.chars().take(n).collect::<String>();
+    tracing::error!(target: "ui", message = %cut(&message, 500), stack = %cut(&stack, 4_000), "error en la interfaz");
 }
 
 /// Ruta recibida de la interfaz (viene de un diálogo del sistema): absoluta, sin `..` y con una de
@@ -94,7 +102,7 @@ pub async fn list_profiles(state: State<'_, AppState>) -> Result<Vec<ProfileInfo
     state.profiles.list().await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn active_profile(state: State<'_, AppState>) -> Option<String> {
     state.profiles.active()
 }
@@ -138,25 +146,27 @@ pub async fn import_config(state: State<'_, AppState>, path: String) -> Result<S
         .map_err(|e| AppError::Invalid(format!("la importación falló: {e}")))?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn has_pending_import(state: State<'_, AppState>) -> bool {
     backup::has_pending(&state.data_dir)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn cancel_pending_import(state: State<'_, AppState>) -> Result<()> {
     backup::cancel_pending(&state.data_dir)
 }
 
 /// Aviso del último arranque sobre una importación (aplicada o fallida), una sola vez.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn take_import_notice(state: State<'_, AppState>) -> Option<String> {
     state.import_notice.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take()
 }
 
-#[tauri::command]
+/// Reinicia pasando por `RunEvent::Exit` (que guarda metas, puntos y timers pendientes y detiene el sidecar).
+/// `restart()` desde el hilo principal reinicia el proceso al instante, sin ese paso.
+#[tauri::command(async)]
 pub fn restart_app(app: AppHandle) {
-    app.restart();
+    app.request_restart();
 }
 
 // ---- Actualizaciones ----

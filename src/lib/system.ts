@@ -155,6 +155,8 @@ export const systemApi = {
 
   getLogs: (minLevel: string, limit: number) => invoke<LogEntry[]>("get_logs", { minLevel, limit }),
   clearLogs: () => invoke<void>("clear_logs"),
+  /** Deja en `hivebuzz.log` un error de la interfaz (lo atrapa el ErrorBoundary). */
+  reportUiError: (message: string, stack: string) => invoke<void>("report_ui_error", { message, stack }),
   exportLogs: async (): Promise<boolean> => {
     const path = await save({ defaultPath: "hivebuzz-logs.txt", filters: [{ name: "Texto", extensions: ["txt"] }] });
     if (!path) return false;

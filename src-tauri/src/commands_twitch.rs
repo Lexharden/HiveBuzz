@@ -13,7 +13,7 @@ pub async fn twitch_status(state: State<'_, AppState>) -> Result<TwitchStatus> {
     Ok(state.twitch.status().await)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn twitch_get_config(state: State<'_, AppState>) -> TwitchConfig {
     state.twitch.config()
 }
@@ -29,23 +29,23 @@ pub async fn twitch_login_start(state: State<'_, AppState>) -> Result<DeviceInfo
     state.twitch.auth().begin_login().await.map_err(AppError::from)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn twitch_login_state(state: State<'_, AppState>) -> LoginState {
     state.twitch.auth().login_state()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn twitch_login_cancel(state: State<'_, AppState>) {
     state.twitch.auth().cancel_login();
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn twitch_logout(state: State<'_, AppState>) -> Result<()> {
     state.twitch.auth().logout()
 }
 
 /// Abre la página de activación de Twitch en el navegador (solo esa dirección, nunca una que llegue de fuera).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn twitch_open_activation(app: tauri::AppHandle, state: State<'_, AppState>) -> Result<()> {
     let url = match state.twitch.auth().login_state() {
         LoginState::Pending { info } if info.verification_uri.starts_with("https://www.twitch.tv/") || info.verification_uri.starts_with("https://twitch.tv/") => info.verification_uri,

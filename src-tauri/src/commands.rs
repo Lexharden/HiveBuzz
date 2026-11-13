@@ -83,7 +83,7 @@ pub async fn disconnect(state: State<'_, AppState>, platform: Platform) -> Resul
     state.connections.service(platform).disconnect().await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_statuses(state: State<'_, AppState>) -> Vec<PlatformStatus> {
     state.connections.statuses()
 }
@@ -127,7 +127,7 @@ pub async fn set_server_port(state: State<'_, AppState>, port: u16) -> Result<()
     state.db.set_server_port(port).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn simulate_event(state: State<'_, AppState>, kind: SimKind, platform: Option<Platform>) -> LiveEvent {
     state.sim.emit_for(kind, platform.unwrap_or_default())
 }
@@ -149,7 +149,7 @@ pub async fn recent_events(state: State<'_, AppState>, limit: u32) -> Result<Vec
 
 // ---- Reglas y cola -------------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_rules(state: State<'_, AppState>) -> Vec<Rule> {
     state.rules.list()
 }
@@ -180,7 +180,7 @@ pub async fn test_rule(state: State<'_, AppState>, id: String) -> Result<&'stati
 }
 
 /// Tipos de acción disponibles (los ejecutores registrados).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_action_types(state: State<'_, AppState>) -> Vec<String> {
     state.registry.kinds().into_iter().map(str::to_string).collect()
 }
@@ -199,7 +199,7 @@ impl From<QueueStats> for QueueInfo {
     }
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn queue_stats(state: State<'_, AppState>) -> QueueInfo {
     state.queue.stats().into()
 }
@@ -294,7 +294,7 @@ pub async fn myinstants_download(state: State<'_, AppState>, file: String, name:
     state.sounds.import(&path, Some(name)).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stop_audio(state: State<'_, AppState>) {
     state.audio.stop_all();
 }
@@ -341,7 +341,7 @@ pub struct TtsStatus {
     pub custom: Vec<VoiceInfo>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_tts_config(state: State<'_, AppState>) -> TtsConfig {
     state.tts.config()
 }
@@ -356,7 +356,7 @@ pub async fn list_tts_voices(state: State<'_, AppState>) -> Result<Vec<VoiceInfo
     Ok(state.tts.voices().await)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_tts_status(state: State<'_, AppState>) -> TtsStatus {
     let paths = state.tts.piper_paths();
     TtsStatus {
@@ -399,13 +399,13 @@ pub async fn test_audio_output(state: State<'_, AppState>) -> Result<()> {
 }
 
 /// Nivel actual del micrófono y si detecta voz (para calibrar la sensibilidad).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_mic_status(state: State<'_, AppState>) -> crate::mic::MicStatus {
     state.mic.status()
 }
 
 /// Escucha el micrófono con los ajustes que se están calibrando, sin guardarlos (`None` = volver a lo guardado).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn mic_preview(state: State<'_, AppState>, guard: Option<crate::tts::policy::MicGuard>) {
     state.mic.preview(guard.map(|g| {
         let g = g.sanitized();
@@ -422,7 +422,7 @@ pub async fn tts_preview(state: State<'_, AppState>, text: String, voice: Option
 }
 
 /// Botón «saltar»: corta la voz actual; la cola sigue con la siguiente.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn tts_skip(state: State<'_, AppState>) {
     state.tts.skip();
 }
@@ -465,7 +465,7 @@ pub async fn delete_piper_voice(state: State<'_, AppState>, name: String) -> Res
 // ---- Configuración y pruebas de overlays -----------------------------------------------------------------
 
 /// Esquema de todos los overlays (campos, rangos, valores por defecto) para generar el editor.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_overlays() -> Vec<OverlayDef> {
     registry()
 }
@@ -500,7 +500,7 @@ pub async fn reset_overlay_config(state: State<'_, AppState>, id: String) -> Res
 
 /// Manda contenido de ejemplo a un overlay para ver cómo queda. Los overlays de estado (metas, timer,
 /// ranking, contadores) muestran datos reales y no tienen prueba.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn test_overlay(state: State<'_, AppState>, id: String) -> Result<()> {
     match id.as_str() {
         alert if alert_screen_number(alert).is_some() => state.hub.publish(
@@ -559,7 +559,7 @@ pub fn test_overlay(state: State<'_, AppState>, id: String) -> Result<()> {
 
 // ---- Metas ----------------------------------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_goals(state: State<'_, AppState>) -> Vec<Goal> {
     state.goals.list()
 }
@@ -586,7 +586,7 @@ pub async fn reset_goal(state: State<'_, AppState>, id: String) -> Result<()> {
 
 // ---- Jarrón ----------------------------------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn jar_state(state: State<'_, AppState>) -> crate::jar::JarState {
     state.jar.state()
 }
@@ -597,19 +597,19 @@ pub async fn jar_add(state: State<'_, AppState>, delta: i64) -> Result<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn jar_set(state: State<'_, AppState>, coins: u64) {
     state.jar.set(coins);
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn jar_reset(state: State<'_, AppState>) {
     state.jar.reset();
 }
 
 // ---- Timers ----------------------------------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_timers(state: State<'_, AppState>) -> Vec<TimerView> {
     state.timers.list()
 }
@@ -659,13 +659,13 @@ pub async fn clear_donor_history(state: State<'_, AppState>) -> Result<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_counters(state: State<'_, AppState>) -> Counters {
     state.counters.get()
 }
 
 /// Empieza una sesión nueva (vacía el ranking de la sesión y reinicia las metas que así lo piden).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn new_session(state: State<'_, AppState>) -> u64 {
     state.session.start_new()
 }
@@ -730,7 +730,7 @@ pub async fn uninstall_local_ca(state: State<'_, AppState>) -> Result<()> {
 
 use crate::fonts::FontFamily;
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn list_fonts(state: State<'_, AppState>) -> Vec<FontFamily> {
     state.fonts.list()
 }

@@ -13,7 +13,7 @@ fn redirect_uri(port: u16) -> String {
     format!("http://127.0.0.1:{port}{CALLBACK_PATH}")
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn spotify_get_config(state: State<'_, AppState>) -> SpotifyConfig {
     state.spotify.config()
 }
@@ -23,13 +23,13 @@ pub async fn spotify_set_config(state: State<'_, AppState>, config: SpotifyConfi
     state.spotify.set_config(config).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn spotify_status(state: State<'_, AppState>) -> SpotifyStatus {
     state.spotify.status(redirect_uri(state.server_port))
 }
 
 /// Abre el navegador del usuario en la página de autorización de Spotify.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn spotify_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     if state.server_error.is_some() {
         return Err(AppError::Invalid("el servidor local no está activo; Spotify no podría devolver la autorización".into()));
@@ -38,7 +38,7 @@ pub fn spotify_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()>
     app.opener().open_url(url, None::<&str>).map_err(|e| AppError::Invalid(format!("no se pudo abrir el navegador: {e}")))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn spotify_disconnect(state: State<'_, AppState>) -> Result<()> {
     state.spotify_auth.disconnect()?;
     state.spotify.apply_playing(None);
@@ -58,7 +58,7 @@ pub async fn spotify_control(state: State<'_, AppState>, op: String, value: Opti
 }
 
 /// Lo que suena y lo que viene (último sondeo), para el panel del reproductor.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn spotify_overview(state: State<'_, AppState>) -> Overview {
     state.spotify.overview()
 }

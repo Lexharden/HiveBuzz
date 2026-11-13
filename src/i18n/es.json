@@ -74,7 +74,10 @@
     "spanishOnly": "Las notas de versión están en español."
   },
   "ui": {
-    "help": "Ayuda"
+    "help": "Ayuda",
+    "crashTitle": "Esta pantalla tuvo un error",
+    "crashText": "El resto de HiveBuzz sigue funcionando (alertas, voz y overlays no se detienen). El detalle quedó en el registro.",
+    "crashRetry": "Reintentar"
   },
   "settings": {
     "overlays": "Overlays",

@@ -15,7 +15,7 @@ use crate::points::{HistoryEntry, SortKey, Viewer};
 
 // ---- Puntos -------------------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_points_config(state: State<'_, AppState>) -> PointsConfig {
     state.points.config()
 }
@@ -100,7 +100,7 @@ pub async fn import_viewers_csv(state: State<'_, AppState>, path: String, mode: 
 
 // ---- Ruleta y encuestas -----------------------------------------------------------------------------
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_wheel_config(state: State<'_, AppState>) -> WheelConfig {
     state.wheel.config()
 }
@@ -111,7 +111,7 @@ pub async fn set_wheel_config(state: State<'_, AppState>, config: WheelConfig) -
 }
 
 /// Gira la ruleta como prueba (el premio también se ejecuta). No espera al final del giro.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn spin_wheel_test(state: State<'_, AppState>) -> Result<()> {
     if state.wheel.config().segments.iter().all(|s| s.weight == 0) {
         return Err(AppError::Invalid("la ruleta no tiene premios con probabilidad".into()));
@@ -126,22 +126,22 @@ pub fn spin_wheel_test(state: State<'_, AppState>) -> Result<()> {
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_poll(state: State<'_, AppState>) -> Option<PollView> {
     state.polls.current()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn start_poll(state: State<'_, AppState>, question: String, options: Vec<String>, duration_sec: u64) -> Result<PollView> {
     state.polls.start(&question, &options, duration_sec)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn stop_poll(state: State<'_, AppState>) -> Option<PollView> {
     state.polls.stop()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn clear_poll(state: State<'_, AppState>) {
     state.polls.clear();
 }

@@ -1,5 +1,3 @@
-// El enlazador de MSVC informa «Creando biblioteca…» al generar la cdylib; es solo informativo.
-#![allow(linker_messages)]
 // El código de producción no debe poder entrar en pánico: con `panic = "abort"` un pánico cierra la app en pleno directo.
 // Los errores se propagan con `Result`; los tests pueden usar `unwrap`/`expect`.
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
@@ -253,6 +251,7 @@ pub fn run() {
             commands_app::set_autostart,
             commands_app::get_logs,
             commands_app::clear_logs,
+            commands_app::report_ui_error,
             commands_app::export_logs,
             commands_app::list_streams,
             commands_app::get_stream,

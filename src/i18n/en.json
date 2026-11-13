@@ -74,7 +74,10 @@
     "spanishOnly": "Release notes are written in Spanish."
   },
   "ui": {
-    "help": "Help"
+    "help": "Help",
+    "crashTitle": "This screen hit an error",
+    "crashText": "The rest of HiveBuzz keeps working (alerts, voice and overlays don't stop). The details were written to the log.",
+    "crashRetry": "Try again"
   },
   "settings": {
     "overlays": "Overlays",

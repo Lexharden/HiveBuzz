@@ -1,4 +1,5 @@
 import { AboutPage } from "./components/about/AboutPage";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -102,27 +103,29 @@ function App() {
           </div>
         )}
 
-        {page === "dashboard" && !touring && <TourOffer onStart={() => setTouring(true)} />}
+        <ErrorBoundary key={page}>
+          {page === "dashboard" && !touring && <TourOffer onStart={() => setTouring(true)} />}
 
-        {page === "dashboard" && <HomePage statuses={statuses} events={events} info={info} onClear={clearEvents} onNavigate={setPage} onInfoChanged={refreshInfo} />}
-        {page === "rules" && <RulesPage />}
-        {page === "overlays" && <OverlaysPage info={info} />}
-        {page === "goals" && <GoalsPage />}
-        {page === "interact" && <InteractPage />}
-        {page === "integrations" && <IntegrationsPage info={info} />}
-        {page === "stats" && <StatsPage />}
-        {page === "library" && <LibraryPage info={info} />}
-        {page === "tts" && <TtsPage />}
-        {page === "about" && <AboutPage />}
-        {page === "help" && <HelpPage onNavigate={setPage} onStartTour={() => setTouring(true)} onShowWhatsNew={showCurrentNotes} />}
-        {page === "settings" && (
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {info ? <SettingsPanel info={info} onChanged={refreshInfo} /> : null}
-            <div className="mt-4 pb-4">
-              <SystemPanel onChanged={refreshInfo} />
+          {page === "dashboard" && <HomePage statuses={statuses} events={events} info={info} onClear={clearEvents} onNavigate={setPage} onInfoChanged={refreshInfo} />}
+          {page === "rules" && <RulesPage />}
+          {page === "overlays" && <OverlaysPage info={info} />}
+          {page === "goals" && <GoalsPage />}
+          {page === "interact" && <InteractPage />}
+          {page === "integrations" && <IntegrationsPage info={info} />}
+          {page === "stats" && <StatsPage />}
+          {page === "library" && <LibraryPage info={info} />}
+          {page === "tts" && <TtsPage />}
+          {page === "about" && <AboutPage />}
+          {page === "help" && <HelpPage onNavigate={setPage} onStartTour={() => setTouring(true)} onShowWhatsNew={showCurrentNotes} />}
+          {page === "settings" && (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {info ? <SettingsPanel info={info} onChanged={refreshInfo} /> : null}
+              <div className="mt-4 pb-4">
+                <SystemPanel onChanged={refreshInfo} />
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </ErrorBoundary>
       </main>
 
       <ToastHost />

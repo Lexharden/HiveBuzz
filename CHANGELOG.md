@@ -4,6 +4,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Corregido
+- **Reiniciar HiveBuzz desde la app ya no pierde datos**: el botón de reinicio (tras importar una configuración o cambiar el puerto) cerraba al instante, sin guardar las metas, los puntos, los timers ni las estadísticas pendientes de los últimos segundos. Ahora reinicia igual que al cerrar normalmente.
+
+### Mejorado
+- **La ventana ya no se congela por una operación lenta**: ninguna acción de la interfaz se ejecuta en el hilo de la ventana (activar el inicio con Windows, guardar la contraseña de OBS, cerrar sesión en Spotify o Twitch, probar overlays…).
+- **Un error en una pantalla ya no deja la ventana en blanco**: esa pantalla muestra el aviso con un botón *Reintentar*, el resto de la app (alertas, voz, overlays) sigue funcionando y el detalle queda en el registro.
+
 ## [0.5.4] - 2026-11-13
 
 ### Añadido
