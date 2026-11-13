@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.5.4] - 2026-11-13
+
 ### Añadido
 - **Voces por usuario** (*Voz → Voces*): asigna una voz fija a espectadores concretos (`@usuario`). Suena siempre con esa voz, sea cual sea el modo (única, por rol o aleatoria); una regla con su propia voz sigue mandando. Cada plataforma tiene su lista.
 
