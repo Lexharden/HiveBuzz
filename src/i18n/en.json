@@ -4,6 +4,12 @@
     "tagline": "Alerts, TTS and automation for your TikTok LIVE",
     "version": "HiveBuzz version"
   },
+  "boot": {
+    "starting": "Starting HiveBuzz…",
+    "failed": "HiveBuzz couldn't start",
+    "failedHint": "The details are in hivebuzz.log, in HiveBuzz's data folder. If the port is in use, close the program using it or change the port.",
+    "retry": "Try again"
+  },
   "tabs": {
     "dashboard": "Home",
     "rules": "Rules",

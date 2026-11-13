@@ -4,6 +4,12 @@
     "tagline": "Alertas, TTS y automatización para tu LIVE de TikTok",
     "version": "Versión de HiveBuzz"
   },
+  "boot": {
+    "starting": "Iniciando HiveBuzz…",
+    "failed": "HiveBuzz no pudo iniciarse",
+    "failedHint": "El detalle está en hivebuzz.log, en la carpeta de datos de HiveBuzz. Si el puerto está ocupado, cierra el programa que lo usa o cambia el puerto.",
+    "retry": "Reintentar"
+  },
   "tabs": {
     "dashboard": "Inicio",
     "rules": "Reglas",

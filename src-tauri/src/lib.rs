@@ -6,6 +6,7 @@ pub mod actions;
 pub mod app;
 pub mod audio;
 pub mod backup;
+pub mod boot;
 pub mod bus;
 pub mod commands;
 pub mod commands_app;
@@ -130,11 +131,9 @@ pub fn run() {
             };
             let _ = std::fs::create_dir_all(&data_dir);
             logs::global().enable_file(data_dir.join("hivebuzz.log"));
-            let handle = app.handle().clone();
-            let state = tauri::async_runtime::block_on(AppState::init(handle, &data_dir))?;
-            let prefs = state.prefs.get();
-            app.manage(state);
-            if let Err(e) = tray::install(app.handle(), &prefs.language) {
+            app.manage(boot::Boot::default());
+            // La bandeja existe desde el primer momento (en español; se traduce al leer las preferencias).
+            if let Err(e) = tray::install(app.handle(), "es") {
                 tracing::warn!(error = %e, "no se pudo crear el icono de la bandeja");
             }
             // Icono de la ventana (barra de tareas, Alt+Tab): el de HiveBuzz, nunca el de Tauri por defecto.
@@ -143,17 +142,46 @@ pub fn run() {
                     tracing::warn!(error = %e, "no se pudo poner el icono de la ventana");
                 }
             }
-            // Arranque con el sistema: sin ventana si así se pidió.
-            if prefs.start_minimized && std::env::args().any(|a| a == "--minimized") {
+            // Arranque con el sistema (`--minimized`): se oculta ya, sin esperar a las preferencias; si resulta que
+            // no hay que empezar minimizado, se muestra al terminar de arrancar.
+            let launched_minimized = std::env::args().any(|a| a == "--minimized");
+            if launched_minimized {
                 if let Some(w) = app.get_webview_window("main") {
                     if w.hide().is_ok() {
                         ui_sync::set_ui_visible(false);
                     }
                 }
             }
+            // El resto, en segundo plano: la ventana muestra el splash mientras tanto (ver `boot`).
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let started = std::time::Instant::now();
+                let status = match AppState::init(handle.clone(), &data_dir).await {
+                    Ok(state) => {
+                        let prefs = state.prefs.get();
+                        handle.manage(state);
+                        tray::set_language(&handle, &prefs.language);
+                        if launched_minimized && !prefs.start_minimized {
+                            tray::show_main(&handle);
+                        }
+                        tracing::info!(ms = started.elapsed().as_millis() as u64, "HiveBuzz listo");
+                        boot::BootStatus::Ready
+                    }
+                    Err(e) => {
+                        tracing::error!(error = %e, "no se pudo iniciar HiveBuzz");
+                        // Aunque se arrancara minimizado: un fallo tiene que verse.
+                        tray::show_main(&handle);
+                        boot::BootStatus::Failed { error: e.to_string() }
+                    }
+                };
+                if let Some(b) = handle.try_state::<boot::Boot>() {
+                    b.set(&handle, status);
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            boot::app_status,
             commands::connect,
             commands::disconnect,
             commands::get_statuses,

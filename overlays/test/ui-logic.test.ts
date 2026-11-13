@@ -6,6 +6,7 @@ import { countByPlatform, filterEvents, platformOf } from "../../src/lib/feedFil
 import { computeSteps, nextStep, progress } from "../../src/lib/gettingStarted";
 import { ALL_PAGES, DOCUMENTED, ICONS, NAV } from "../../src/lib/nav";
 import { isSatisfied, placePopover, TOUR } from "../../src/lib/tour";
+import { advance } from "../../src/lib/boot";
 import { liveRemaining } from "../../src/lib/timers";
 import type { LiveEvent, StatusUpdate, TimerView } from "../../src/lib/types";
 
@@ -236,5 +237,15 @@ describe("cuenta de los timers en pantalla", () => {
 
   it("un reloj que va hacia atrás no suma tiempo", () => {
     expect(liveRemaining(timer({}), 5_000, 1_000)).toBe(10_000);
+  });
+});
+
+describe("arranque", () => {
+  it("solo avanza: un «starting» tardío no deshace el resultado", () => {
+    const ready = { state: "ready" } as const;
+    const failed = { state: "failed", error: "puerto ocupado" } as const;
+    expect(advance({ state: "starting" }, ready)).toEqual(ready);
+    expect(advance(ready, { state: "starting" })).toEqual(ready);
+    expect(advance(failed, ready)).toEqual(failed);
   });
 });
