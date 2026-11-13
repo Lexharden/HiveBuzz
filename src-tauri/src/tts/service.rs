@@ -200,7 +200,7 @@ impl TtsService {
 
         let voices = self.voices().await;
         let voice_id = resolve_voice(chat, vars, &voices, voice).ok_or_else(|| {
-            AppError::Invalid("no hay voces de TTS disponibles: instala Piper o usa las de Windows (SAPI)".into())
+            AppError::coded("tts.noVoices", "no hay voces de TTS disponibles: instala Piper o usa las de Windows (SAPI)")
         })?;
         let (engine_id, voice_name) = split_voice_id(&voice_id).ok_or_else(|| AppError::Invalid(format!("voz no válida: {voice_id}")))?;
         let engine = self

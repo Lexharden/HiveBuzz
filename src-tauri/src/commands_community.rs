@@ -1,13 +1,12 @@
 //! Comandos de la UI para puntos, ruleta y encuestas.
 
-use std::path::PathBuf;
-
 use serde::Serialize;
 use tauri::State;
 
 use crate::app::AppState;
 use crate::db::{ImportMode, ImportReport};
 use crate::error::{AppError, Result};
+use crate::paths::user_file;
 use crate::interact::poll::PollView;
 use crate::interact::wheel::WheelConfig;
 use crate::points::config::PointsConfig;
@@ -77,7 +76,7 @@ pub async fn clear_viewers(state: State<'_, AppState>) -> Result<()> {
 #[tauri::command]
 pub async fn export_viewers_csv(state: State<'_, AppState>, path: String) -> Result<()> {
     let csv = state.points.export_csv().await?;
-    tokio::fs::write(PathBuf::from(path), csv).await?;
+    tokio::fs::write(user_file(&path, &["csv"])?, csv).await?;
     Ok(())
 }
 
@@ -90,9 +89,9 @@ pub async fn import_viewers_csv(state: State<'_, AppState>, path: String, mode: 
         other => return Err(AppError::Invalid(format!("modo de importación desconocido: «{other}»"))),
     };
     const MAX_CSV_BYTES: u64 = 20 * 1024 * 1024;
-    let path = PathBuf::from(path);
+    let path = user_file(&path, &["csv"])?;
     if tokio::fs::metadata(&path).await?.len() > MAX_CSV_BYTES {
-        return Err(AppError::Invalid("el archivo CSV es demasiado grande (máximo 20 MB)".into()));
+        return Err(AppError::coded("file.tooBig", "el archivo CSV es demasiado grande (máximo 20 MB)").with("mb", "20"));
     }
     let text = tokio::fs::read_to_string(&path).await?;
     state.points.import_csv(&text, mode).await
@@ -114,7 +113,7 @@ pub async fn set_wheel_config(state: State<'_, AppState>, config: WheelConfig) -
 #[tauri::command(async)]
 pub fn spin_wheel_test(state: State<'_, AppState>) -> Result<()> {
     if state.wheel.config().segments.iter().all(|s| s.weight == 0) {
-        return Err(AppError::Invalid("la ruleta no tiene premios con probabilidad".into()));
+        return Err(AppError::coded("wheel.noPrizes", "la ruleta no tiene premios con probabilidad"));
     }
     let wheel = std::sync::Arc::clone(&state.wheel);
     tauri::async_runtime::spawn(async move {

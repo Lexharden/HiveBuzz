@@ -1,6 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { errorMessage } from "../../lib/api";
 import { systemApi as api, type SpotifyConfig, type SpotifyOp, type SpotifyOverview, type SpotifyStatus } from "../../lib/system";
 import { useUiChanged } from "../../lib/useUiChanged";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
@@ -132,7 +133,7 @@ export function SpotifySection() {
           </div>
         )}
 
-        {connected && <PlayerPanel onError={(e) => setMsg(String(e))} />}
+        {connected && <PlayerPanel onError={(e) => setMsg(errorMessage(e))} />}
 
         {connected && (
           <details className="rounded-md border border-zinc-800 p-3">

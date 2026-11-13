@@ -1644,5 +1644,50 @@
   "queueMode": {
     "always": "Siempre que haya canciones",
     "onCommand": "Solo al pedirla con !cola"
+  },
+  "errors": {
+    "kind": {
+      "sidecar": "Conexión con TikTok: {{detail}}",
+      "db": "Base de datos: {{detail}}",
+      "migrate": "No se pudo actualizar la base de datos: {{detail}}",
+      "keyring": "Llavero del sistema: {{detail}}",
+      "json": "Datos no válidos: {{detail}}",
+      "io": "Error de archivo: {{detail}}",
+      "server": "Servidor local: {{detail}}"
+    },
+    "code": {
+      "file": {
+        "invalidPath": "La ruta del archivo no es válida.",
+        "badExtension": "El archivo debe ser {{ext}}.",
+        "badFormat": "Formato no admitido (usa {{formats}}).",
+        "emptyOrTooBig": "El archivo está vacío o supera los {{mb}} MB.",
+        "tooBig": "El archivo es demasiado grande (máximo {{mb}} MB)."
+      },
+      "tiktok": {
+        "badUsername": "Usuario de TikTok no válido: solo letras, números, «_» y «.», máximo 24."
+      },
+      "twitch": {
+        "badChannel": "Canal de Twitch no válido: de 3 a 25 letras, números o «_»."
+      },
+      "settings": {
+        "badPort": "El puerto debe estar entre 1024 y 65535."
+      },
+      "tts": {
+        "noVoices": "No hay voces de TTS disponibles: instala Piper o usa las de Windows (SAPI)."
+      },
+      "spotify": {
+        "serverDown": "El servidor local no está activo, así que Spotify no podría devolver la autorización. Revisa el puerto en Ajustes."
+      },
+      "app": {
+        "browser": "No se pudo abrir el navegador: {{detail}}",
+        "autostart": "No se pudo cambiar el inicio con el sistema: {{detail}}"
+      },
+      "wheel": {
+        "noPrizes": "La ruleta no tiene premios con probabilidad."
+      },
+      "overlay": {
+        "noTest": "Este overlay muestra datos reales y no tiene prueba."
+      }
+    }
   }
 }

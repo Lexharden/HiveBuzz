@@ -48,9 +48,7 @@ impl Db {
 
     pub async fn set_server_port(&self, port: u16) -> Result<()> {
         if port < 1024 {
-            return Err(AppError::Invalid(
-                "el puerto debe estar entre 1024 y 65535".into(),
-            ));
+            return Err(AppError::coded("settings.badPort", "el puerto debe estar entre 1024 y 65535"));
         }
         self.set_setting(KEY_SERVER_PORT, &port.to_string()).await
     }

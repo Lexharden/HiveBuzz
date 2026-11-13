@@ -59,11 +59,12 @@ impl SoundLibrary {
             .map(str::to_ascii_lowercase)
             .filter(|e| EXTENSIONS.contains(&e.as_str()))
             .ok_or_else(|| {
-                AppError::Invalid(format!("formato no admitido (usa {})", EXTENSIONS.join(", ")))
+                let list = EXTENSIONS.join(", ");
+                AppError::coded("file.badFormat", format!("formato no admitido (usa {list})")).with("formats", list)
             })?;
         let len = tokio::fs::metadata(src).await?.len();
         if len == 0 || len > MAX_BYTES {
-            return Err(AppError::Invalid("el archivo está vacío o supera los 25 MB".into()));
+            return Err(AppError::coded("file.emptyOrTooBig", "el archivo está vacío o supera los 25 MB").with("mb", "25"));
         }
 
         let id = uuid::Uuid::new_v4().to_string();

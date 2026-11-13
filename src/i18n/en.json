@@ -1644,5 +1644,50 @@
   "queueMode": {
     "always": "Whenever there are songs",
     "onCommand": "Only when asked with !queue"
+  },
+  "errors": {
+    "kind": {
+      "sidecar": "TikTok connection: {{detail}}",
+      "db": "Database: {{detail}}",
+      "migrate": "Couldn't update the database: {{detail}}",
+      "keyring": "System keychain: {{detail}}",
+      "json": "Invalid data: {{detail}}",
+      "io": "File error: {{detail}}",
+      "server": "Local server: {{detail}}"
+    },
+    "code": {
+      "file": {
+        "invalidPath": "The file path is not valid.",
+        "badExtension": "The file must be {{ext}}.",
+        "badFormat": "Unsupported format (use {{formats}}).",
+        "emptyOrTooBig": "The file is empty or larger than {{mb}} MB.",
+        "tooBig": "The file is too large (max {{mb}} MB)."
+      },
+      "tiktok": {
+        "badUsername": "Invalid TikTok username: only letters, numbers, «_» and «.», up to 24."
+      },
+      "twitch": {
+        "badChannel": "Invalid Twitch channel: 3 to 25 letters, numbers or «_»."
+      },
+      "settings": {
+        "badPort": "The port must be between 1024 and 65535."
+      },
+      "tts": {
+        "noVoices": "No TTS voices available: install Piper or use the Windows (SAPI) voices."
+      },
+      "spotify": {
+        "serverDown": "The local server isn't running, so Spotify couldn't return the authorization. Check the port in Settings."
+      },
+      "app": {
+        "browser": "Couldn't open the browser: {{detail}}",
+        "autostart": "Couldn't change start with the system: {{detail}}"
+      },
+      "wheel": {
+        "noPrizes": "The wheel has no prizes with a probability."
+      },
+      "overlay": {
+        "noTest": "This overlay shows real data and has no test."
+      }
+    }
   }
 }

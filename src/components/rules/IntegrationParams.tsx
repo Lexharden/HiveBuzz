@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { errorMessage } from "../../lib/api";
 import { integrationsApi, type WebhookReport } from "../../lib/integrations";
 import type { ActionSpec } from "../../lib/types";
 import { Btn, Checkbox, Field, NumberInput, Select, TextInput } from "../ui";
@@ -92,7 +93,7 @@ export function WebhookParams({ action, onChange }: P) {
     try {
       setReport(await integrationsApi.testWebhook(action));
     } catch (e) {
-      setTestError(String(e));
+      setTestError(errorMessage(e));
     } finally {
       setTesting(false);
     }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, onEvents, onStatus } from "./api";
+import { api, errorMessage, onEvents, onStatus } from "./api";
 import type { AppInfo, LiveEvent, Platform, StatusUpdate } from "./types";
 
 /** Máximo de eventos que se conservan en memoria en la UI. */
@@ -34,7 +34,7 @@ export function useLive() {
     try {
       setInfo(await api.getAppInfo());
     } catch (e) {
-      setError(String(e));
+      setError(errorMessage(e));
     }
   }, []);
 
@@ -65,7 +65,7 @@ export function useLive() {
         const recent = await api.recentEvents(100);
         setEvents((prev) => appendEvents(recent, prev));
       } catch (e) {
-        setError(String(e));
+        setError(errorMessage(e));
       }
       await refreshInfo();
     })();

@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
+import i18n from "../i18n";
+import { describeError, isAppError } from "./errors";
 import type {
   AppInfo,
   Counters,
@@ -155,7 +157,13 @@ export async function pickFile(name: string, extensions: string[]): Promise<stri
   return typeof picked === "string" ? picked : null;
 }
 
-/** Los errores de los comandos llegan como string (AppError serializado). */
+/**
+ * Texto de un error para la UI. Los de los comandos llegan como objeto (`AppError` serializado) y se traducen;
+ * los de los plugins y del propio JS, como texto o `Error`.
+ */
 export function errorMessage(err: unknown): string {
-  return typeof err === "string" ? err : err instanceof Error ? err.message : String(err);
+  if (typeof err === "string") return err;
+  if (err instanceof Error) return err.message;
+  if (isAppError(err)) return describeError(err, { t: (k, p) => i18n.t(k, p), exists: (k) => i18n.exists(k) });
+  return String(err);
 }

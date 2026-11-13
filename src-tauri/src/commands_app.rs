@@ -5,6 +5,7 @@ use tauri_plugin_autostart::ManagerExt;
 
 use crate::app::AppState;
 use crate::error::{AppError, Result};
+use crate::paths::user_file;
 use crate::logs::{self, LogEntry};
 use crate::prefs::AppPrefs;
 
@@ -24,17 +25,21 @@ pub async fn set_app_prefs(app: AppHandle, state: State<'_, AppState>, prefs: Ap
     Ok(saved)
 }
 
+fn autostart_error(e: impl std::fmt::Display) -> AppError {
+    AppError::coded("app.autostart", format!("inicio con el sistema: {e}")).with("detail", e.to_string())
+}
+
 #[tauri::command(async)]
 pub fn get_autostart(app: AppHandle) -> Result<bool> {
-    app.autolaunch().is_enabled().map_err(|e| AppError::Invalid(format!("inicio con el sistema: {e}")))
+    app.autolaunch().is_enabled().map_err(autostart_error)
 }
 
 #[tauri::command(async)]
 pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<bool> {
     let manager = app.autolaunch();
     let res = if enabled { manager.enable() } else { manager.disable() };
-    res.map_err(|e| AppError::Invalid(format!("inicio con el sistema: {e}")))?;
-    manager.is_enabled().map_err(|e| AppError::Invalid(format!("inicio con el sistema: {e}")))
+    res.map_err(autostart_error)?;
+    manager.is_enabled().map_err(autostart_error)
 }
 
 #[tauri::command(async)]
@@ -55,24 +60,9 @@ pub fn report_ui_error(message: String, stack: String) {
     tracing::error!(target: "ui", message = %cut(&message, 500), stack = %cut(&stack, 4_000), "error en la interfaz");
 }
 
-/// Ruta recibida de la interfaz (viene de un diálogo del sistema): absoluta, sin `..` y con una de
-/// las extensiones esperadas, así un fallo en la interfaz no puede escribir o leer cualquier archivo.
-fn checked_path(path: &str, extensions: &[&str]) -> Result<std::path::PathBuf> {
-    use std::path::Component;
-    let p = std::path::PathBuf::from(path);
-    let ext = p.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).unwrap_or_default();
-    if !p.is_absolute() || p.components().any(|c| matches!(c, Component::ParentDir)) {
-        return Err(AppError::Invalid("ruta de archivo no válida".into()));
-    }
-    if !extensions.contains(&ext.as_str()) {
-        return Err(AppError::Invalid(format!("el archivo debe terminar en .{}", extensions.join(" o ."))));
-    }
-    Ok(p)
-}
-
 #[tauri::command]
 pub async fn export_logs(path: String) -> Result<()> {
-    let path = checked_path(&path, &["txt", "log"])?;
+    let path = user_file(&path, &["txt", "log"])?;
     tokio::fs::write(path, logs::global().to_text()).await?;
     Ok(())
 }
@@ -137,14 +127,14 @@ pub async fn export_config(state: State<'_, AppState>, path: String) -> Result<S
     // Lo que está en memoria (progreso de metas y timers) se vuelca antes para exportarlo al día.
     state.goals.flush().await;
     state.timers.flush().await;
-    let dest = checked_path(&path, &["zip"])?;
+    let dest = user_file(&path, &["zip"])?;
     backup::export(&state.db, &state.data_dir, &dest, env!("CARGO_PKG_VERSION"), state.clock.now_ms()).await
 }
 
 /// Valida el archivo y lo deja pendiente: se aplica al reiniciar.
 #[tauri::command]
 pub async fn import_config(state: State<'_, AppState>, path: String) -> Result<Summary> {
-    let (src, data_dir) = (checked_path(&path, &["zip"])?, state.data_dir.clone());
+    let (src, data_dir) = (user_file(&path, &["zip"])?, state.data_dir.clone());
     tokio::task::spawn_blocking(move || backup::stage_import(&src, &data_dir))
         .await
         .map_err(|e| AppError::Invalid(format!("la importación falló: {e}")))?
@@ -209,7 +199,7 @@ use crate::overlay_config::{schema, theme};
 #[tauri::command]
 pub async fn export_overlay_theme(state: State<'_, AppState>, id: String, path: String, name: String) -> Result<()> {
     let def = schema::find(&id).ok_or_else(|| AppError::Invalid(format!("overlay desconocido: «{id}»")))?;
-    let dest = checked_path(&path, &["json"])?;
+    let dest = user_file(&path, &["json"])?;
     let config = state.overlay_cfg.get(&id).await?;
     let text = serde_json::to_string_pretty(&theme::export(&def, &config, &name))?;
     tokio::fs::write(dest, text).await?;
@@ -229,7 +219,7 @@ pub struct ThemeImported {
 #[tauri::command]
 pub async fn import_overlay_theme(state: State<'_, AppState>, id: String, path: String) -> Result<ThemeImported> {
     let def = schema::find(&id).ok_or_else(|| AppError::Invalid(format!("overlay desconocido: «{id}»")))?;
-    let src = checked_path(&path, &["json"])?;
+    let src = user_file(&path, &["json"])?;
     let size = tokio::fs::metadata(&src).await?.len();
     if size > theme::MAX_BYTES {
         return Err(AppError::Invalid("el archivo del tema es demasiado grande".into()));
@@ -238,19 +228,4 @@ pub async fn import_overlay_theme(state: State<'_, AppState>, id: String, path: 
     let imported = theme::import(&def, &text)?;
     let config = state.overlay_cfg.set(&id, &imported.patch).await?;
     Ok(ThemeImported { config, skipped: imported.skipped })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::checked_path;
-
-    #[test]
-    fn checked_path_rejects_relative_traversal_and_bad_extensions() {
-        let abs = if cfg!(windows) { r"C:\datos\copia.zip" } else { "/datos/copia.zip" };
-        assert!(checked_path(abs, &["zip"]).is_ok());
-        assert!(checked_path(&abs.to_uppercase(), &["zip"]).is_ok(), "la extensión no distingue mayúsculas");
-        assert!(checked_path("copia.zip", &["zip"]).is_err());
-        assert!(checked_path(&abs.replace("datos", "datos/../x"), &["zip"]).is_err());
-        assert!(checked_path(&abs.replace(".zip", ".exe"), &["zip"]).is_err());
-    }
 }

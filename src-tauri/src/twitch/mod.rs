@@ -46,7 +46,7 @@ pub fn normalize_channel(raw: &str) -> Result<String> {
     if (3..=25).contains(&c.len()) && c.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
         Ok(c)
     } else {
-        Err(AppError::Invalid("canal de Twitch no válido (3 a 25 letras, números o «_»)".into()))
+        Err(AppError::coded("twitch.badChannel", "canal de Twitch no válido (3 a 25 letras, números o «_»)"))
     }
 }
 

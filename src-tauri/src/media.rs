@@ -76,15 +76,12 @@ impl MediaLibrary {
         } else if VIDEO_EXT.contains(&ext.as_str()) {
             MediaKind::Video
         } else {
-            return Err(AppError::Invalid(format!(
-                "formato no admitido (usa {}, {})",
-                IMAGE_EXT.join(", "),
-                VIDEO_EXT.join(", ")
-            )));
+            let list = format!("{}, {}", IMAGE_EXT.join(", "), VIDEO_EXT.join(", "));
+            return Err(AppError::coded("file.badFormat", format!("formato no admitido (usa {list})")).with("formats", list));
         };
         let len = tokio::fs::metadata(src).await?.len();
         if len == 0 || len > MAX_BYTES {
-            return Err(AppError::Invalid("el archivo está vacío o supera los 60 MB".into()));
+            return Err(AppError::coded("file.emptyOrTooBig", "el archivo está vacío o supera los 60 MB").with("mb", "60"));
         }
 
         let id = uuid::Uuid::new_v4().to_string();

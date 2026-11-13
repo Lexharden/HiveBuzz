@@ -33,6 +33,7 @@ pub mod mic;
 pub mod myinstants;
 pub mod overlay;
 pub mod overlay_config;
+pub mod paths;
 pub mod points;
 pub mod profiles;
 pub mod prefs;

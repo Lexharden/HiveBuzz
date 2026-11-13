@@ -32,10 +32,12 @@ pub fn spotify_status(state: State<'_, AppState>) -> SpotifyStatus {
 #[tauri::command(async)]
 pub fn spotify_connect(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     if state.server_error.is_some() {
-        return Err(AppError::Invalid("el servidor local no está activo; Spotify no podría devolver la autorización".into()));
+        return Err(AppError::coded("spotify.serverDown", "el servidor local no está activo; Spotify no podría devolver la autorización"));
     }
     let url = state.spotify_auth.begin(&redirect_uri(state.server_port))?;
-    app.opener().open_url(url, None::<&str>).map_err(|e| AppError::Invalid(format!("no se pudo abrir el navegador: {e}")))
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| AppError::coded("app.browser", format!("no se pudo abrir el navegador: {e}")).with("detail", e.to_string()))
 }
 
 #[tauri::command(async)]

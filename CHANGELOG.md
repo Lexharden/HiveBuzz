@@ -12,6 +12,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - **Reiniciar HiveBuzz desde la app ya no pierde datos**: el botón de reinicio (tras importar una configuración o cambiar el puerto) cerraba al instante, sin guardar las metas, los puntos, los timers ni las estadísticas pendientes de los últimos segundos. Ahora reinicia igual que al cerrar normalmente.
 
 ### Mejorado
+- **Errores en tu idioma**: los mensajes de error más comunes (formatos y tamaños de archivo, usuario de TikTok o canal de Twitch no válidos, puerto, voces de TTS, Spotify, navegador, inicio con el sistema, ruleta) salen en inglés si la app está en inglés, y los fallos de base de datos, archivos o llavero llevan el prefijo traducido. Los demás se irán traduciendo.
+- **Importar y exportar archivos es más estricto**: todas las rutas que llegan del selector de archivos (sonidos, medios, fuentes, voces de Piper, CSV de espectadores, copias, temas y registros) se validan igual: ruta completa, sin `..` y con la extensión esperada.
 - **Menos trabajo durante el directo**: las pantallas de Reglas (cola), Metas y timers, Encuesta, Jarrón y Spotify ya no preguntan cada segundo si algo cambió; HiveBuzz les avisa solo cuando cambia, y los timers cuentan en pantalla por su cuenta. Con la ventana en la bandeja la interfaz no recibe nada y se pone al día al volver a abrirla (los últimos 300 eventos del feed se conservan).
 - **El menú del icono de la bandeja cambia de idioma** al cambiarlo en Ajustes (antes había que reiniciar).
 - **La ventana ya no se congela por una operación lenta**: ninguna acción de la interfaz se ejecuta en el hilo de la ventana (activar el inicio con Windows, guardar la contraseña de OBS, cerrar sesión en Spotify o Twitch, probar overlays…).

@@ -113,8 +113,9 @@ pub fn normalize_username(raw: &str) -> Result<String> {
     if valid {
         Ok(candidate.to_string())
     } else {
-        Err(AppError::Invalid(
-            "usuario de TikTok no válido (solo letras, números, '_' y '.', máximo 24)".into(),
+        Err(AppError::coded(
+            "tiktok.badUsername",
+            "usuario de TikTok no válido (solo letras, números, '_' y '.', máximo 24)",
         ))
     }
 }

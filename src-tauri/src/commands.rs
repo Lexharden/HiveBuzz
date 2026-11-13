@@ -16,6 +16,7 @@ use crate::db::KEY_LAST_USERNAME;
 /// Último canal de Twitch al que se conectó (para rellenar el campo la próxima vez).
 const KEY_LAST_TWITCH_CHANNEL: &str = "twitch_last_channel";
 use crate::error::{AppError, Result};
+use crate::paths::user_file;
 use crate::events::{LiveEvent, Platform};
 use crate::goals::Goal;
 use crate::leaderboard::{DonorEntry, Scope};
@@ -220,7 +221,7 @@ pub async fn list_sounds(state: State<'_, AppState>) -> Result<Vec<Sound>> {
 
 #[tauri::command]
 pub async fn import_sound(state: State<'_, AppState>, path: String, name: Option<String>) -> Result<Sound> {
-    state.sounds.import(&PathBuf::from(path), name).await
+    state.sounds.import(&user_file(&path, crate::sounds::EXTENSIONS)?, name).await
 }
 
 #[tauri::command]
@@ -306,7 +307,8 @@ pub async fn list_media(state: State<'_, AppState>) -> Result<Vec<Media>> {
 
 #[tauri::command]
 pub async fn import_media(state: State<'_, AppState>, path: String, name: Option<String>) -> Result<Media> {
-    state.media.import(&PathBuf::from(path), name).await
+    let allowed: Vec<&str> = crate::media::IMAGE_EXT.iter().chain(crate::media::VIDEO_EXT).copied().collect();
+    state.media.import(&user_file(&path, &allowed)?, name).await
 }
 
 #[tauri::command]
@@ -450,7 +452,7 @@ pub async fn install_piper_voice(app: AppHandle, state: State<'_, AppState>, id:
 /// Importa un modelo de Piper propio (`.onnx` con su `.onnx.json` al lado). Devuelve el id de la voz.
 #[tauri::command]
 pub async fn import_piper_voice(state: State<'_, AppState>, path: String, name: Option<String>) -> Result<String> {
-    let voice = provision::import_custom_voice(&state.tts.piper_paths().voices_dir, &PathBuf::from(path), name.as_deref()).await?;
+    let voice = provision::import_custom_voice(&state.tts.piper_paths().voices_dir, &user_file(&path, &["onnx"])?, name.as_deref()).await?;
     state.tts.invalidate_voices();
     Ok(format!("piper:{voice}"))
 }
@@ -552,7 +554,7 @@ pub fn test_overlay(state: State<'_, AppState>, id: String) -> Result<()> {
                 spotify.republish();
             });
         }
-        _ => return Err(AppError::Invalid("este overlay muestra datos reales y no tiene prueba".into())),
+        _ => return Err(AppError::coded("overlay.noTest", "este overlay muestra datos reales y no tiene prueba")),
     }
     Ok(())
 }
@@ -737,7 +739,7 @@ pub fn list_fonts(state: State<'_, AppState>) -> Vec<FontFamily> {
 
 #[tauri::command]
 pub async fn import_font(state: State<'_, AppState>, path: String, name: Option<String>) -> Result<FontFamily> {
-    state.fonts.import(&PathBuf::from(path), name).await
+    state.fonts.import(&user_file(&path, crate::fonts::FONT_EXT)?, name).await
 }
 
 /// Descarga una familia de Google Fonts a la biblioteca local (los overlays la usan sin conectarse a Google).

@@ -51,5 +51,7 @@ pub fn twitch_open_activation(app: tauri::AppHandle, state: State<'_, AppState>)
         LoginState::Pending { info } if info.verification_uri.starts_with("https://www.twitch.tv/") || info.verification_uri.starts_with("https://twitch.tv/") => info.verification_uri,
         _ => "https://www.twitch.tv/activate".to_string(),
     };
-    app.opener().open_url(url, None::<&str>).map_err(|e| AppError::Invalid(format!("no se pudo abrir el navegador: {e}")))
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| AppError::coded("app.browser", format!("no se pudo abrir el navegador: {e}")).with("detail", e.to_string()))
 }
