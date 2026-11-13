@@ -1043,6 +1043,7 @@
       "languageHint": "Interface and overlay texts (overlays take their language from ?lang=en in their URL).",
       "closeToTray": "When closing the window, keep running in the system tray",
       "startMinimized": "When starting with the system, start minimized",
+      "notifyConnection": "Show a notification if the connection drops while HiveBuzz is in the tray",
       "autostart": "Start HiveBuzz with the system"
     },
     "update": {

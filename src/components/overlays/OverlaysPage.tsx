@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { save } from "@tauri-apps/plugin-dialog";
 import { api, errorMessage, pickFile } from "../../lib/api";
+import { useUiChanged } from "../../lib/useUiChanged";
 import type { AppInfo, OverlayConfig, OverlayDef } from "../../lib/types";
 import { Btn, Card, ErrorText, toast } from "../ui";
 import { Preview } from "./Preview";
@@ -211,16 +212,8 @@ function JarControls({ target, onError }: { target: number; onError: (e: unknown
   const { t } = useTranslation();
   const [state, setState] = useState({ coins: 0, laps: 0 });
 
-  useEffect(() => {
-    let alive = true;
-    const refresh = () => void api.jarState().then((s) => alive && setState(s)).catch(() => undefined);
-    refresh();
-    const id = setInterval(refresh, 1000);
-    return () => {
-      alive = false;
-      clearInterval(id);
-    };
-  }, []);
+  // Se relee cuando el backend avisa de que el jarrón cambió (antes, cada segundo).
+  useUiChanged(["jar"], () => void api.jarState().then(setState).catch(() => undefined));
 
   const run = (op: Promise<void>) => void op.catch(onError);
 

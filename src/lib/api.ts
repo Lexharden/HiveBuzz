@@ -137,7 +137,16 @@ export const onEvents = (cb: (events: LiveEvent[]) => void): Promise<UnlistenFn>
 export const onRuleFired = (cb: (r: FiredReport) => void): Promise<UnlistenFn> =>
   listen<FiredReport>("rule-fired", (e) => cb(e.payload));
 
-export const onInstallProgress = (cb: (p: InstallProgress) => void): Promise<UnlistenFn> =>
+/** Temas de `ui-changed` (espejo de `Topic` en src-tauri/src/ui_sync.rs). */
+export type UiTopic = "goals" | "timers" | "poll" | "wheel" | "jar" | "spotify" | "queue";
+
+/** Avisa cuando cambia alguno de `topics` (el backend agrupa los cambios cada 250 ms). */
+export const onUiChanged = (topics: readonly UiTopic[], cb: () => void): Promise<UnlistenFn> =>
+  listen<{ topics: UiTopic[] }>("ui-changed", (e) => {
+    if (e.payload.topics.some((t) => topics.includes(t))) cb();
+  });
+
+export const onInstallProgress =(cb: (p: InstallProgress) => void): Promise<UnlistenFn> =>
   listen<InstallProgress>("tts-install-progress", (e) => cb(e.payload));
 
 /** Abre el selector de archivos del sistema; devuelve la ruta elegida o `null` si se cancela. */

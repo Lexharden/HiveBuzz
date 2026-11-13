@@ -6,7 +6,8 @@ import { countByPlatform, filterEvents, platformOf } from "../../src/lib/feedFil
 import { computeSteps, nextStep, progress } from "../../src/lib/gettingStarted";
 import { ALL_PAGES, DOCUMENTED, ICONS, NAV } from "../../src/lib/nav";
 import { isSatisfied, placePopover, TOUR } from "../../src/lib/tour";
-import type { LiveEvent, StatusUpdate } from "../../src/lib/types";
+import { liveRemaining } from "../../src/lib/timers";
+import type { LiveEvent, StatusUpdate, TimerView } from "../../src/lib/types";
 
 type Tree = { [k: string]: string | Tree };
 const lookup = (tree: Tree, key: string): string | undefined => {
@@ -207,5 +208,33 @@ describe("posición del cuadro del tutorial", () => {
     }
     const tiny = placePopover({ left: 5, top: 5, width: 20, height: 20 }, pop, { w: 300, h: 150 });
     expect(Number.isFinite(tiny.left) && Number.isFinite(tiny.top)).toBe(true);
+  });
+});
+
+describe("cuenta de los timers en pantalla", () => {
+  const timer = (over: Partial<TimerView> & { mode?: "countdown" | "stopwatch"; maxSeconds?: number }): TimerView => ({
+    config: { id: "t", name: "T", mode: over.mode ?? "countdown", startSeconds: 60, maxSeconds: over.maxSeconds, extensions: [] },
+    status: over.status ?? "running",
+    remainingMs: over.remainingMs ?? 10_000,
+  });
+
+  it("la cuenta atrás baja en local y no pasa de cero", () => {
+    expect(liveRemaining(timer({}), 1_000, 4_000)).toBe(7_000);
+    expect(liveRemaining(timer({}), 1_000, 60_000)).toBe(0);
+  });
+
+  it("el cronómetro sube hasta su tope", () => {
+    expect(liveRemaining(timer({ mode: "stopwatch" }), 0, 5_000)).toBe(15_000);
+    expect(liveRemaining(timer({ mode: "stopwatch", maxSeconds: 12 }), 0, 5_000)).toBe(12_000);
+  });
+
+  it("parado, en pausa o terminado muestra lo leído", () => {
+    for (const status of ["idle", "paused", "ended"] as const) {
+      expect(liveRemaining(timer({ status }), 0, 99_000)).toBe(10_000);
+    }
+  });
+
+  it("un reloj que va hacia atrás no suma tiempo", () => {
+    expect(liveRemaining(timer({}), 5_000, 1_000)).toBe(10_000);
   });
 });

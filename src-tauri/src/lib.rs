@@ -13,6 +13,7 @@ pub mod commands_community;
 pub mod commands_integrations;
 pub mod commands_spotify;
 pub mod commands_twitch;
+pub mod conn_notify;
 pub mod connection;
 pub mod connections;
 pub mod counters;
@@ -50,6 +51,7 @@ pub mod testutil;
 pub mod twitch;
 pub mod tray;
 pub mod tts;
+pub mod ui_sync;
 pub mod updater;
 pub mod viewer_groups;
 
@@ -94,6 +96,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
+        // Recuerda tamaño, posición y maximizado de la ventana; la visibilidad no (arrancar minimizado decide eso).
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(tauri_plugin_window_state::StateFlags::all() & !tauri_plugin_window_state::StateFlags::VISIBLE)
+                .build(),
+        )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .on_window_event(|window, event| {
@@ -106,7 +115,9 @@ pub fn run() {
                 let to_tray = window.try_state::<AppState>().is_some_and(|s| s.prefs.get().close_to_tray);
                 if to_tray {
                     api.prevent_close();
-                    let _ = window.hide();
+                    if window.hide().is_ok() {
+                        ui_sync::set_ui_visible(false);
+                    }
                 }
             }
         })
@@ -122,8 +133,7 @@ pub fn run() {
             let state = tauri::async_runtime::block_on(AppState::init(handle, &data_dir))?;
             let prefs = state.prefs.get();
             app.manage(state);
-            let (show, quit) = if prefs.language == "en" { ("Show HiveBuzz", "Quit") } else { ("Mostrar HiveBuzz", "Salir") };
-            if let Err(e) = tray::install(app.handle(), show, quit) {
+            if let Err(e) = tray::install(app.handle(), &prefs.language) {
                 tracing::warn!(error = %e, "no se pudo crear el icono de la bandeja");
             }
             // Icono de la ventana (barra de tareas, Alt+Tab): el de HiveBuzz, nunca el de Tauri por defecto.
@@ -135,7 +145,9 @@ pub fn run() {
             // Arranque con el sistema: sin ventana si así se pidió.
             if prefs.start_minimized && std::env::args().any(|a| a == "--minimized") {
                 if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.hide();
+                    if w.hide().is_ok() {
+                        ui_sync::set_ui_visible(false);
+                    }
                 }
             }
             Ok(())

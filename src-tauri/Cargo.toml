@@ -54,6 +54,8 @@ base64 = "0.23.1"
 rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem", "ring"] }
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+tauri-plugin-window-state = "2"
+tauri-plugin-notification = "2"
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2"

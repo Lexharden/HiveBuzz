@@ -51,6 +51,7 @@ function PrefsCard({ onChanged }: { onChanged: () => Promise<void> }) {
         <div className="grid grid-cols-2 gap-2">
           <Checkbox checked={prefs.closeToTray} onChange={(closeToTray) => save({ ...prefs, closeToTray })} label={t("system.prefs.closeToTray")} />
           <Checkbox checked={prefs.startMinimized} onChange={(startMinimized) => save({ ...prefs, startMinimized })} label={t("system.prefs.startMinimized")} />
+          <Checkbox checked={prefs.notifyConnection} onChange={(notifyConnection) => save({ ...prefs, notifyConnection })} label={t("system.prefs.notifyConnection")} />
           <Checkbox
             checked={autostart}
             onChange={(v) => void run(async () => setAutostart(await api.setAutostart(v)))}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, errorMessage, onRuleFired } from "../../lib/api";
+import { useUiChanged } from "../../lib/useUiChanged";
 import type { Goal, Media, QueueInfo, Rule, Sound, TimerView, VoiceInfo } from "../../lib/types";
 import { Btn, Card, ErrorText } from "../ui";
 import { useViewerGroups } from "../groups/useViewerGroups";
@@ -54,7 +55,6 @@ export function RulesPage() {
   useEffect(() => {
     alive.current = true;
     void reload();
-    const poll = setInterval(() => void api.queueStats().then((q) => alive.current && setQueue(q)).catch(() => undefined), 1500);
     let off: (() => void) | undefined;
     let disposed = false;
     void onRuleFired((r) => {
@@ -64,10 +64,12 @@ export function RulesPage() {
     return () => {
       disposed = true;
       alive.current = false;
-      clearInterval(poll);
       off?.();
     };
   }, [reload]);
+
+  // La cola se actualiza cuando el backend avisa de un cambio (antes se consultaba cada 1,5 s).
+  useUiChanged(["queue"], () => void api.queueStats().then((q) => alive.current && setQueue(q)).catch(() => undefined));
 
   async function act(fn: () => Promise<unknown>) {
     setError(null);

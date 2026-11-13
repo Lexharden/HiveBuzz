@@ -2,6 +2,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { systemApi as api, type SpotifyConfig, type SpotifyOp, type SpotifyOverview, type SpotifyStatus } from "../../lib/system";
+import { useUiChanged } from "../../lib/useUiChanged";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
 
 const DASHBOARD_URL = "https://developer.spotify.com/dashboard";
@@ -18,11 +19,8 @@ function PlayerPanel({ onError }: { onError: (e: unknown) => void }) {
   const { t } = useTranslation();
   const [view, setView] = useState<SpotifyOverview | null>(null);
   const refresh = useCallback(() => void api.spotifyOverview().then(setView).catch(() => undefined), []);
-  useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, 2000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+  // Lo que suena y la cola se releen cuando cambian (antes, cada 2 s).
+  useUiChanged(["spotify"], refresh);
 
   const send = (op: SpotifyOp, value?: number) => {
     void api
@@ -73,11 +71,9 @@ export function SpotifySection() {
   const refreshStatus = useCallback(() => void api.spotifyStatus().then(setStatus).catch(() => undefined), []);
   useEffect(() => {
     void api.spotifyGetConfig().then(setCfg);
-    refreshStatus();
-    // Tras autorizar en el navegador la app no recibe aviso: se consulta cada pocos segundos.
-    const timer = setInterval(refreshStatus, 2000);
-    return () => clearInterval(timer);
-  }, [refreshStatus]);
+  }, []);
+  // Al autorizar en el navegador, la conexión cambia en el backend y este avisa (antes se consultaba cada 2 s).
+  useUiChanged(["spotify"], refreshStatus);
   if (!cfg) return null;
   const song = cfg.song;
   const setSong = (patch: Partial<typeof song>) => setCfg({ ...cfg, song: { ...song, ...patch } });

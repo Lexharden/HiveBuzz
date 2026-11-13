@@ -8,6 +8,7 @@ import {
   type Viewer,
   type WheelConfig,
 } from "../../lib/interact";
+import { useUiChanged } from "../../lib/useUiChanged";
 import { ViewerGroupsSection } from "../groups/ViewerGroupsSection";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, TextInput, useAction } from "../ui";
 
@@ -212,12 +213,8 @@ function PollSection() {
   const [seconds, setSeconds] = useState<number | null>(60);
   const [poll, setPoll] = useState<PollView | null>(null);
   const { run, error, busy } = useAction();
-  useEffect(() => {
-    const load = () => void api.getPoll().then(setPoll).catch(() => undefined);
-    load();
-    const timer = setInterval(load, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // Se relee cuando el backend avisa de un voto o un cambio de estado (antes, cada segundo).
+  useUiChanged(["poll"], () => void api.getPoll().then(setPoll).catch(() => undefined));
 
   return (
     <Card title={t("interact.poll.title")} hint={t("interact.poll.hint")}>

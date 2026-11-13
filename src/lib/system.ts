@@ -9,6 +9,8 @@ export interface AppPrefs {
   autoUpdateCheck: boolean;
   /** Salida de audio de sonidos y voz; `null` = la predeterminada del sistema. */
   audioOutput: string | null;
+  /** Notificación del sistema si se cae la conexión con la ventana en la bandeja. */
+  notifyConnection: boolean;
 }
 
 export interface AudioOutput {

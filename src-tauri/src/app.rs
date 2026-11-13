@@ -63,6 +63,9 @@ use crate::source::tauri_spawner::TauriSpawner;
 use crate::source::LiveSource;
 use crate::timers::service::{TimerService, TimerTiming};
 use crate::mic::MicMonitor;
+use crate::ui_sync::{self, fingerprint, Probe, Topic, UiChanged, UiSink, EVT_UI_CHANGED};
+use crate::conn_notify;
+use tauri_plugin_notification::NotificationExt;
 use crate::tts::edge::EdgeEngine;
 use crate::tts::engine::TtsEngine;
 use crate::tts::piper::{PiperEngine, PiperPaths};
@@ -80,6 +83,10 @@ pub const EVT_RULE_FIRED: &str = "rule-fired";
 pub const EVT_TTS_INSTALL: &str = "tts-install-progress";
 /// Cada cuánto se envían a la UI los eventos acumulados.
 const UI_BATCH_INTERVAL: Duration = Duration::from_millis(50);
+/// Eventos que se guardan para la UI mientras la ventana está oculta (lo mismo que conserva el feed).
+const UI_HIDDEN_BACKLOG: usize = 300;
+/// Etiqueta de la ventana principal: los eventos de la UI van solo a ella.
+const MAIN_WINDOW: &str = "main";
 /// Eventos recientes que se reenvían a un overlay recién conectado.
 const OVERLAY_HISTORY: usize = 80;
 /// Tiempo máximo para guardar el estado pendiente al cerrar la app.
@@ -425,7 +432,8 @@ impl AppState {
             (_, None) => (None, Some("el puerto HTTP es el último posible; no queda puerto para HTTPS".to_string())),
         };
 
-        spawn_ui_forwarders(app, &connections, &bus, &rules);
+        spawn_ui_sync(app.clone(), &hub, &queue, &spotify);
+        spawn_ui_forwarders(app, &connections, &bus, &rules, &prefs);
 
         Ok(Self {
             conn,
@@ -514,15 +522,59 @@ impl AppState {
     }
 }
 
-/// Reenvía a la UI el estado de conexión, los eventos (en lotes) y los disparos de reglas.
-fn spawn_ui_forwarders(app: AppHandle, connections: &ConnectionManager, bus: &EventBus, rules: &Arc<RuleEngine>) {
+/// Avisos de «esto cambió» a la ventana (sustituyen a las consultas periódicas de cada pantalla).
+fn spawn_ui_sync(app: AppHandle, hub: &OverlayHub, queue: &Arc<ActionQueue>, spotify: &Arc<SongService>) {
+    struct MainWindow(AppHandle);
+    impl UiSink for MainWindow {
+        fn changed(&self, change: UiChanged) {
+            if let Err(e) = self.0.emit_to(MAIN_WINDOW, EVT_UI_CHANGED, change) {
+                tracing::warn!(error = %e, "no se pudo avisar de cambios a la UI");
+            }
+        }
+    }
+    let queue = Arc::clone(queue);
+    let spotify = Arc::clone(spotify);
+    let probes = vec![
+        Probe {
+            topic: Topic::Queue,
+            read: Box::new(move || {
+                let s = queue.stats();
+                fingerprint(&(s.pending, s.running, s.jobs))
+            }),
+        },
+        Probe {
+            topic: Topic::Spotify,
+            read: Box::new(move || {
+                let s = spotify.status(String::new());
+                fingerprint(&(s.connected, s.client_id_set, s.pending_requests))
+            }),
+        },
+    ];
+    ui_sync::spawn(Arc::new(MainWindow(app)), hub, probes, Arc::new(ui_sync::ui_visible));
+}
+
+/// Reenvía a la ventana principal el estado de conexión, los eventos (en lotes) y los disparos de reglas.
+/// Con la ventana oculta en la bandeja no se envían eventos ni disparos: se guardan los últimos
+/// [`UI_HIDDEN_BACKLOG`] eventos y llegan juntos al volver a mostrarla. Si en ese tiempo se cae una conexión,
+/// se avisa con una notificación del sistema (ver [`conn_notify`]).
+fn spawn_ui_forwarders(app: AppHandle, connections: &ConnectionManager, bus: &EventBus, rules: &Arc<RuleEngine>, prefs: &Arc<PrefsService>) {
     for (platform, mut status) in connections.subscribe_statuses() {
         let status_app = app.clone();
+        let prefs = Arc::clone(prefs);
         tokio::spawn(async move {
+            let mut tracker = conn_notify::Tracker::default();
             while status.changed().await.is_ok() {
                 let current = PlatformStatus { platform, status: status.borrow_and_update().clone() };
-                if let Err(e) = status_app.emit(EVT_STATUS, current) {
+                let notice = tracker.update(current.status.state);
+                if let Err(e) = status_app.emit_to(MAIN_WINDOW, EVT_STATUS, current) {
                     tracing::warn!(error = %e, "no se pudo emitir el estado a la UI");
+                }
+                let p = prefs.get();
+                if let Some(notice) = notice.filter(|_| p.notify_connection && !ui_sync::ui_visible()) {
+                    let (title, body) = conn_notify::text(notice, platform, &p.language);
+                    if let Err(e) = status_app.notification().builder().title(title).body(body).show() {
+                        tracing::warn!(error = %e, "no se pudo mostrar la notificación de conexión");
+                    }
                 }
             }
         });
@@ -533,10 +585,11 @@ fn spawn_ui_forwarders(app: AppHandle, connections: &ConnectionManager, bus: &Ev
     tokio::spawn(async move {
         loop {
             match fired.recv().await {
-                Ok(report) => {
-                    let _ = fired_app.emit(EVT_RULE_FIRED, report);
+                // El destello de «regla disparada» solo tiene sentido si alguien mira.
+                Ok(report) if ui_sync::ui_visible() => {
+                    let _ = fired_app.emit_to(MAIN_WINDOW, EVT_RULE_FIRED, report);
                 }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
@@ -544,20 +597,25 @@ fn spawn_ui_forwarders(app: AppHandle, connections: &ConnectionManager, bus: &Ev
 
     let mut events = bus.subscribe();
     tokio::spawn(async move {
-        let mut pending = Vec::new();
+        let mut pending = std::collections::VecDeque::new();
         let mut tick = tokio::time::interval(UI_BATCH_INTERVAL);
         loop {
             tokio::select! {
                 ev = events.recv() => match ev {
-                    Ok(ev) => pending.push(ev),
+                    Ok(ev) => {
+                        pending.push_back(ev);
+                        if pending.len() > UI_HIDDEN_BACKLOG {
+                            pending.pop_front();
+                        }
+                    }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                         tracing::warn!(missed = n, "la UI se quedó atrás en el bus");
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 },
                 _ = tick.tick() => {
-                    if !pending.is_empty() {
-                        if let Err(e) = app.emit(EVT_EVENTS, &pending) {
+                    if !pending.is_empty() && ui_sync::ui_visible() {
+                        if let Err(e) = app.emit_to(MAIN_WINDOW, EVT_EVENTS, &*pending.make_contiguous()) {
                             tracing::warn!(error = %e, "no se pudo emitir eventos a la UI");
                         }
                         pending.clear();

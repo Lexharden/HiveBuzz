@@ -1043,6 +1043,7 @@
       "languageHint": "Interfaz y textos de los overlays (los overlays toman el idioma con ?lang=en en su URL).",
       "closeToTray": "Al cerrar la ventana, seguir en la bandeja del sistema",
       "startMinimized": "Al iniciar con el sistema, empezar minimizado",
+      "notifyConnection": "Avisarme con una notificación si se cae la conexión mientras HiveBuzz está en la bandeja",
       "autostart": "Iniciar HiveBuzz con el sistema"
     },
     "update": {

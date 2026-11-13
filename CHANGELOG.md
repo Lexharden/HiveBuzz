@@ -4,10 +4,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Aviso si se cae la conexión con HiveBuzz en la bandeja**: si se pierde la conexión con TikTok o Twitch mientras la ventana está oculta, sale una notificación del sistema (y otra cuando se recupera). Desconectar a mano o que termine el LIVE no avisan. Se desactiva en *Ajustes → Aplicación*.
+- **HiveBuzz recuerda el tamaño y la posición de la ventana** (y si estaba maximizada) entre una sesión y otra.
+
 ### Corregido
 - **Reiniciar HiveBuzz desde la app ya no pierde datos**: el botón de reinicio (tras importar una configuración o cambiar el puerto) cerraba al instante, sin guardar las metas, los puntos, los timers ni las estadísticas pendientes de los últimos segundos. Ahora reinicia igual que al cerrar normalmente.
 
 ### Mejorado
+- **Menos trabajo durante el directo**: las pantallas de Reglas (cola), Metas y timers, Encuesta, Jarrón y Spotify ya no preguntan cada segundo si algo cambió; HiveBuzz les avisa solo cuando cambia, y los timers cuentan en pantalla por su cuenta. Con la ventana en la bandeja la interfaz no recibe nada y se pone al día al volver a abrirla (los últimos 300 eventos del feed se conservan).
+- **El menú del icono de la bandeja cambia de idioma** al cambiarlo en Ajustes (antes había que reiniciar).
 - **La ventana ya no se congela por una operación lenta**: ninguna acción de la interfaz se ejecuta en el hilo de la ventana (activar el inicio con Windows, guardar la contraseña de OBS, cerrar sesión en Spotify o Twitch, probar overlays…).
 - **Un error en una pantalla ya no deja la ventana en blanco**: esa pantalla muestra el aviso con un botón *Reintentar*, el resto de la app (alertas, voz, overlays) sigue funcionando y el detalle queda en el registro.
 

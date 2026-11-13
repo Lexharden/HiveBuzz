@@ -14,9 +14,13 @@ pub fn get_app_prefs(state: State<'_, AppState>) -> AppPrefs {
 }
 
 #[tauri::command]
-pub async fn set_app_prefs(state: State<'_, AppState>, prefs: AppPrefs) -> Result<AppPrefs> {
+pub async fn set_app_prefs(app: AppHandle, state: State<'_, AppState>, prefs: AppPrefs) -> Result<AppPrefs> {
+    let previous_language = state.prefs.get().language;
     let saved = state.prefs.set(prefs).await?;
     state.audio.set_output(saved.audio_output.clone());
+    if saved.language != previous_language {
+        crate::tray::set_language(&app, &saved.language);
+    }
     Ok(saved)
 }
 

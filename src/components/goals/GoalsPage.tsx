@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, errorMessage } from "../../lib/api";
+import { liveRemaining } from "../../lib/timers";
+import { useUiChanged } from "../../lib/useUiChanged";
 import type { Goal, TimerConfig, TimerView } from "../../lib/types";
 import { Btn, Card, ErrorText, NumberInput } from "../ui";
 import { GoalEditor, newGoal } from "./GoalEditor";
 import { newTimer, TimerEditor } from "./TimerEditor";
 
-const POLL_MS = 1000;
+/** Cada cuánto se repinta la cuenta de un timer en marcha (solo en pantalla: no consulta al backend). */
+const TICK_MS = 250;
 
 function clock(ms: number): string {
   const total = Math.max(0, Math.ceil(ms / 1000));
@@ -21,6 +24,9 @@ export function GoalsPage() {
   const { t } = useTranslation();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [timers, setTimers] = useState<TimerView[]>([]);
+  /** Momento en que se leyeron los timers (base para avanzar la cuenta en local). */
+  const [fetchedAt, setFetchedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [editGoal, setEditGoal] = useState<{ goal: Goal; isNew: boolean } | null>(null);
   const [editTimer, setEditTimer] = useState<{ cfg: TimerConfig; isNew: boolean } | null>(null);
   const [step, setStep] = useState<number | null>(100);
@@ -31,8 +37,11 @@ export function GoalsPage() {
     try {
       const [g, tm] = await Promise.all([api.listGoals(), api.listTimers()]);
       if (!alive.current) return;
+      const at = Date.now();
       setGoals(g);
       setTimers(tm);
+      setFetchedAt(at);
+      setNow(at);
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -41,12 +50,21 @@ export function GoalsPage() {
   useEffect(() => {
     alive.current = true;
     void reload();
-    const poll = setInterval(() => void reload(), POLL_MS);
     return () => {
       alive.current = false;
-      clearInterval(poll);
     };
   }, [reload]);
+
+  // Metas y timers se releen cuando el backend avisa de un cambio (antes, cada segundo).
+  useUiChanged(["goals", "timers"], () => void reload());
+
+  // Repintado local mientras haya algún timer en marcha.
+  const anyRunning = timers.some((tm) => tm.status === "running");
+  useEffect(() => {
+    if (!anyRunning) return;
+    const id = setInterval(() => setNow(Date.now()), TICK_MS);
+    return () => clearInterval(id);
+  }, [anyRunning]);
 
   async function act(fn: () => Promise<unknown>) {
     setError(null);
@@ -157,7 +175,7 @@ export function GoalsPage() {
                   <div className="text-sm font-semibold">{tm.config.name}</div>
                   <div className="text-xs text-zinc-500">{t(`timers.status.${tm.status}`)}</div>
                 </div>
-                <div className={`font-mono text-3xl font-bold tabular-nums ${tm.status === "running" ? "text-amber-300" : "text-zinc-400"}`}>{clock(tm.remainingMs)}</div>
+                <div className={`font-mono text-3xl font-bold tabular-nums ${tm.status === "running" ? "text-amber-300" : "text-zinc-400"}`}>{clock(liveRemaining(tm, fetchedAt, now))}</div>
                 <div className="flex flex-wrap gap-2">
                   {tm.status === "running" ? (
                     <Btn onClick={() => act(() => api.controlTimer(id, "pause"))}>⏸ {t("timers.pause")}</Btn>
