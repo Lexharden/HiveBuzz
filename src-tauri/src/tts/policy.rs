@@ -78,6 +78,16 @@ impl MicGuard {
     }
 }
 
+/// Voz fija para un espectador concreto (gana a la del modo de voz).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UserVoice {
+    /// `@usuario` (sin `@` y en minúsculas tras `sanitized`).
+    pub user: String,
+    /// `motor:voz`.
+    pub voice: String,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoleVoices {
@@ -110,6 +120,9 @@ pub struct ChatTts {
     /// Solo quienes hayan enviado un regalo en los últimos N minutos.
     #[serde(default)]
     pub recent_donors_minutes: Option<u32>,
+    /// Los moderadores se leen siempre, aunque no cumplan el rol, los niveles ni lo de donador reciente.
+    #[serde(default = "yes")]
+    pub always_read_moderators: bool,
     #[serde(default = "default_user_cooldown")]
     pub user_cooldown_ms: u64,
     /// `@usuario` a los que nunca se lee.
@@ -135,6 +148,9 @@ pub struct ChatTts {
     pub role_voices: RoleVoices,
     #[serde(default)]
     pub random_voices: Vec<String>,
+    /// Voces asignadas a espectadores concretos: ganan a la del modo.
+    #[serde(default)]
+    pub user_voices: Vec<UserVoice>,
     /// Velocidad, 0.5–2.0.
     #[serde(default = "default_rate")]
     pub rate: f64,
@@ -228,6 +244,11 @@ impl Default for TtsConfig {
     }
 }
 
+/// `@Usuario ` → `usuario`.
+fn normalize_user(u: &str) -> String {
+    u.trim().trim_start_matches('@').trim().to_lowercase()
+}
+
 impl ChatTts {
     /// Corrige valores fuera de rango (por ediciones manuales o importaciones).
     pub fn sanitized(mut self) -> Self {
@@ -240,8 +261,16 @@ impl ChatTts {
         self.ignore_users = self
             .ignore_users
             .iter()
-            .map(|u| u.trim().trim_start_matches('@').to_lowercase())
+            .map(|u| normalize_user(u))
             .filter(|u| !u.is_empty())
+            .collect();
+        // Una sola voz por usuario (manda la primera), sin filas vacías.
+        let mut seen = std::collections::HashSet::new();
+        self.user_voices = self
+            .user_voices
+            .into_iter()
+            .map(|uv| UserVoice { user: normalize_user(&uv.user), voice: uv.voice.trim().to_string() })
+            .filter(|uv| !uv.user.is_empty() && !uv.voice.is_empty() && seen.insert(uv.user.clone()))
             .collect();
         if self.template.trim().is_empty() {
             self.template = default_template();
@@ -343,24 +372,28 @@ pub fn decide_chat(cfg: &ChatTts, ev: &LiveEvent, mem: &mut ChatMemory, now_ms: 
         }
     };
 
-    // Quién puede.
-    let role_ok = cfg.roles_any.is_empty()
-        || cfg.roles_any.iter().any(|r| match r {
-            Role::Moderator => u.is_moderator,
-            Role::Subscriber => u.is_subscriber,
-            Role::Follower => u.is_follower,
-        });
-    if !role_ok
-        || cfg.min_team_level.is_some_and(|m| u.team_level.unwrap_or(0) < m)
-        || cfg.min_gifter_level.is_some_and(|m| u.gifter_level.unwrap_or(0) < m)
-    {
-        return ChatDecision::Skip("no cumple el rol o nivel");
-    }
-    if let Some(minutes) = cfg.recent_donors_minutes {
-        let window = i64::from(minutes) * 60_000;
-        let recent = mem.last_gift_ms.get(&u.id).is_some_and(|t| now_ms.saturating_sub(*t) <= window);
-        if !recent {
-            return ChatDecision::Skip("no es donador reciente");
+    // Quién puede. Los moderadores (si así se configuró) pasan siempre: rol, niveles y donador
+    // reciente se exigen todos a la vez, y un mod sin nivel de fan ni regalos se quedaría sin voz.
+    let moderator_pass = cfg.always_read_moderators && u.is_moderator;
+    if !moderator_pass {
+        let role_ok = cfg.roles_any.is_empty()
+            || cfg.roles_any.iter().any(|r| match r {
+                Role::Moderator => u.is_moderator,
+                Role::Subscriber => u.is_subscriber,
+                Role::Follower => u.is_follower,
+            });
+        if !role_ok
+            || cfg.min_team_level.is_some_and(|m| u.team_level.unwrap_or(0) < m)
+            || cfg.min_gifter_level.is_some_and(|m| u.gifter_level.unwrap_or(0) < m)
+        {
+            return ChatDecision::Skip("no cumple el rol o nivel");
+        }
+        if let Some(minutes) = cfg.recent_donors_minutes {
+            let window = i64::from(minutes) * 60_000;
+            let recent = mem.last_gift_ms.get(&u.id).is_some_and(|t| now_ms.saturating_sub(*t) <= window);
+            if !recent {
+                return ChatDecision::Skip("no es donador reciente");
+            }
         }
     }
 
@@ -410,14 +443,20 @@ fn flag(vars: &Vars, key: &str) -> bool {
     vars.get(key).is_some_and(|v| v == "true")
 }
 
-/// Decide la voz: la pedida explícitamente > la del modo (rol / aleatoria por usuario) >
-/// la predeterminada > la primera disponible. Solo devuelve voces que existan.
+/// Decide la voz: la pedida explícitamente > la asignada a ese espectador > la del modo
+/// (rol / aleatoria por usuario) > la predeterminada > la primera disponible. Solo devuelve voces que existan.
 pub fn resolve_voice(cfg: &ChatTts, vars: &Vars, available: &[VoiceInfo], explicit: Option<&str>) -> Option<String> {
     let exists = |id: &str| available.iter().any(|v| v.id == id);
     let pick = |id: Option<&String>| id.filter(|i| exists(i)).cloned();
 
     if let Some(e) = explicit.filter(|e| exists(e)) {
         return Some(e.to_string());
+    }
+    if let Some(user) = vars.get("user").map(|u| normalize_user(u)).filter(|u| !u.is_empty()) {
+        let assigned = cfg.user_voices.iter().find(|uv| normalize_user(&uv.user) == user);
+        if let Some(uv) = assigned.filter(|uv| exists(&uv.voice)) {
+            return Some(uv.voice.clone());
+        }
     }
     let by_mode = match cfg.voice_mode {
         VoiceMode::Single => None,
@@ -559,6 +598,36 @@ mod tests {
     }
 
     #[test]
+    fn moderators_skip_role_level_and_donor_filters_by_default() {
+        let c = ChatTts {
+            roles_any: vec![Role::Subscriber],
+            min_team_level: Some(5),
+            min_gifter_level: Some(10),
+            recent_donors_minutes: Some(10),
+            ..cfg()
+        };
+        let mut ev = chat("hola");
+        assert_eq!(skip_reason(decide(&c, &ev)), "no cumple el rol o nivel");
+        ev.user.is_moderator = true;
+        assert!(matches!(decide(&c, &ev), ChatDecision::Speak { .. }), "un mod sin nivel de fan ni regalos se lee");
+
+        let strict = ChatTts { always_read_moderators: false, ..c };
+        assert_eq!(skip_reason(decide(&strict, &ev)), "no cumple el rol o nivel");
+    }
+
+    #[test]
+    fn moderators_still_respect_ignore_list_and_cooldown() {
+        let c = ChatTts { min_team_level: Some(5), user_cooldown_ms: 5_000, ..cfg() };
+        let mut ev = chat("hola");
+        ev.user.is_moderator = true;
+        let mut mem = ChatMemory::default();
+        assert!(matches!(decide_chat(&c, &ev, &mut mem, 0), ChatDecision::Speak { .. }));
+        assert_eq!(skip_reason(decide_chat(&c, &ev, &mut mem, 1_000)), "cooldown del usuario");
+        let ignored = ChatTts { ignore_users: vec!["@ANA".into()], ..c }.sanitized();
+        assert_eq!(skip_reason(decide(&ignored, &ev)), "usuario ignorado");
+    }
+
+    #[test]
     fn ignored_users_are_never_read() {
         let c = ChatTts { ignore_users: vec!["@ANA".into()], ..cfg() }.sanitized();
         assert_eq!(skip_reason(decide(&c, &chat("hola"))), "usuario ignorado");
@@ -614,6 +683,7 @@ mod tests {
     fn config_defaults_and_partial_json() {
         let d = ChatTts::default();
         assert!(!d.enabled && d.rate == 1.0 && d.volume == 100 && d.ignore_bang_commands);
+        assert!(d.always_read_moderators && d.user_voices.is_empty());
         let c: ChatTts = serde_json::from_str(r#"{"enabled": true, "voiceMode": "byRole"}"#).expect("parsea");
         assert!(c.enabled);
         assert_eq!(c.voice_mode, VoiceMode::ByRole);
@@ -673,6 +743,41 @@ mod tests {
         let missing = ChatTts { default_voice: Some("piper:no-existe".into()), ..Default::default() };
         assert_eq!(resolve_voice(&missing, &vars(&[]), &voices(), None).as_deref(), Some("piper:a"));
         assert_eq!(resolve_voice(&missing, &vars(&[]), &[], None), None);
+    }
+
+    #[test]
+    fn a_user_voice_beats_the_mode_but_not_an_explicit_voice() {
+        let c = ChatTts {
+            voice_mode: VoiceMode::ByRole,
+            default_voice: Some("piper:a".into()),
+            role_voices: RoleVoices { moderator: Some("piper:b".into()), ..Default::default() },
+            user_voices: vec![
+                UserVoice { user: "@Luna".into(), voice: "edge:d".into() },
+                UserVoice { user: "sol".into(), voice: "ghost:x".into() },
+            ],
+            ..Default::default()
+        }
+        .sanitized();
+        let pick = |v: &[(&str, &str)], explicit| resolve_voice(&c, &vars(v), &voices(), explicit);
+        assert_eq!(pick(&[("user", "LUNA"), ("ismoderator", "true")], None).as_deref(), Some("edge:d"));
+        assert_eq!(pick(&[("user", "luna")], Some("sapi:c")).as_deref(), Some("sapi:c"), "la voz de una regla gana");
+        assert_eq!(pick(&[("user", "sol"), ("ismoderator", "true")], None).as_deref(), Some("piper:b"), "voz inexistente: sigue el modo");
+        assert_eq!(pick(&[("user", "otro")], None).as_deref(), Some("piper:a"));
+    }
+
+    #[test]
+    fn sanitized_normalizes_and_dedupes_user_voices() {
+        let c = ChatTts {
+            user_voices: vec![
+                UserVoice { user: " @Ana ".into(), voice: "piper:a".into() },
+                UserVoice { user: "ana".into(), voice: "piper:b".into() },
+                UserVoice { user: "@".into(), voice: "piper:a".into() },
+                UserVoice { user: "leo".into(), voice: " ".into() },
+            ],
+            ..Default::default()
+        }
+        .sanitized();
+        assert_eq!(c.user_voices, vec![UserVoice { user: "ana".into(), voice: "piper:a".into() }]);
     }
 
     #[test]

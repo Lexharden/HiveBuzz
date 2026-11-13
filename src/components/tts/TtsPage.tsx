@@ -269,6 +269,11 @@ export function TtsPage() {
               onChange={(v) => patchChat({ ignoreUsers: v.split(",").map((u) => u.trim()).filter(Boolean) })}
             />
           </Field>
+          <Checkbox
+            checked={chat.alwaysReadModerators}
+            onChange={(alwaysReadModerators) => patchChat({ alwaysReadModerators })}
+            label={t("tts.alwaysReadModerators")}
+          />
           <Checkbox checked={chat.ignoreBangCommands} onChange={(ignoreBangCommands) => patchChat({ ignoreBangCommands })} label={t("tts.ignoreBang")} />
         </div>
       </Card>
@@ -327,6 +332,34 @@ export function TtsPage() {
               </div>
             </Field>
           )}
+          <Field label={t("tts.userVoices")} hint={t("tts.userVoicesHint")}>
+            <div className="space-y-2">
+              {chat.userVoices.map((uv, i) => (
+                <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+                  <TextInput
+                    value={uv.user}
+                    placeholder="@usuario"
+                    onChange={(user) => patchChat({ userVoices: chat.userVoices.map((x, j) => (j === i ? { ...x, user } : x)) })}
+                  />
+                  <Select
+                    value={uv.voice}
+                    onChange={(voice) => patchChat({ userVoices: chat.userVoices.map((x, j) => (j === i ? { ...x, voice } : x)) })}
+                    options={[{ value: "", label: t("tts.pickVoice") }, ...voiceOptions.slice(1)]}
+                  />
+                  <button
+                    title={t("tts.removeUserVoice")}
+                    onClick={() => patchChat({ userVoices: chat.userVoices.filter((_, j) => j !== i) })}
+                    className="px-2 text-zinc-500 hover:text-red-400"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <Btn onClick={() => patchChat({ userVoices: [...chat.userVoices, { user: "", voice: chat.defaultVoice ?? voices[0]?.id ?? "" }] })}>
+                + {t("tts.addUserVoice")}
+              </Btn>
+            </div>
+          </Field>
         </div>
       </Card>
 

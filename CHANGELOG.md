@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Voces por usuario** (*Voz → Voces*): asigna una voz fija a espectadores concretos (`@usuario`). Suena siempre con esa voz, sea cual sea el modo (única, por rol o aleatoria); una regla con su propia voz sigue mandando. Cada plataforma tiene su lista.
+
+### Corregido
+- **Los moderadores no se leían** si tenías puesto un nivel de fan, de donador o «donadores recientes»: esos filtros se exigían además del rol. Nueva opción *Leer siempre a los moderadores* (activa de fábrica): los mods se leen aunque no tengan nivel ni hayan donado; siguen respetando los usuarios ignorados, el cooldown, el comando `!tts` y los filtros de texto.
+
 ## [0.5.3] - 2026-11-06
 
 ### Añadido

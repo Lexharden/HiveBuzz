@@ -436,6 +436,12 @@
     "ignoreUsers": "Usuarios ignorados",
     "ignoreUsersHint": "@usuarios separados por comas",
     "ignoreBang": "No leer mensajes que empiecen por «!» (comandos de otros bots)",
+    "alwaysReadModerators": "Leer siempre a los moderadores (aunque no cumplan el rol, el nivel ni hayan donado)",
+    "userVoices": "Voces por usuario",
+    "userVoicesHint": "Estos espectadores siempre suenan con la voz elegida, sea cual sea el modo. Una regla con voz propia sigue mandando.",
+    "addUserVoice": "Añadir usuario",
+    "removeUserVoice": "Quitar",
+    "pickVoice": "(elige una voz)",
     "voices": "Voces",
     "voiceMode": "Modo",
     "mode": {

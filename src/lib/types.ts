@@ -215,6 +215,8 @@ export interface ChatTts {
   minTeamLevel: number | null;
   minGifterLevel: number | null;
   recentDonorsMinutes: number | null;
+  /** Los moderadores se leen aunque no cumplan rol, niveles ni lo de donador reciente. */
+  alwaysReadModerators: boolean;
   userCooldownMs: number;
   ignoreUsers: string[];
   ignoreBangCommands: boolean;
@@ -225,8 +227,17 @@ export interface ChatTts {
   defaultVoice: string | null;
   roleVoices: { moderator: string | null; subscriber: string | null; follower: string | null };
   randomVoices: string[];
+  /** Voz fija para espectadores concretos (gana a la del modo). */
+  userVoices: UserVoice[];
   rate: number;
   volume: number;
+}
+
+export interface UserVoice {
+  /** @usuario, sin la @. */
+  user: string;
+  /** `motor:voz`. */
+  voice: string;
 }
 
 export interface TtsConfig {
