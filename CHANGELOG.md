@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.6.0] - 2026-11-13
+
 ### Añadido
 - **Aviso si se cae la conexión con HiveBuzz en la bandeja**: si se pierde la conexión con TikTok o Twitch mientras la ventana está oculta, sale una notificación del sistema (y otra cuando se recupera). Desconectar a mano o que termine el LIVE no avisan. Se desactiva en *Ajustes → Aplicación*.
 - **HiveBuzz recuerda el tamaño y la posición de la ventana** (y si estaba maximizada) entre una sesión y otra.
