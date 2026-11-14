@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { errorMessage } from "../lib/api";
 import { advance, appStatus, onBootStatus, type BootStatus } from "../lib/boot";
 import { systemApi } from "../lib/system";
 
@@ -23,7 +24,7 @@ export function Boot({ children }: { children: ReactNode }) {
       off = unlisten;
       void appStatus()
         .then((s) => !disposed && setStatus((prev) => advance(prev, s)))
-        .catch((e: unknown) => !disposed && setStatus({ state: "failed", error: String(e) }));
+        .catch((e: unknown) => !disposed && setStatus({ state: "failed", error: errorMessage(e) }));
     });
     return () => {
       disposed = true;
