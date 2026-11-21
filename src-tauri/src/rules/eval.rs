@@ -10,6 +10,7 @@ use super::matcher::{match_trigger, TriggerInput};
 use super::model::{Conditions, Role, Rule, Schedule};
 use super::template::{event_vars, Vars};
 use crate::events::{Platform, User};
+use crate::gifts::catalog::Catalog;
 use crate::viewer_groups::GroupIndex;
 
 /// Estado mutable de una regla (cooldowns y acumulador de likes).
@@ -43,6 +44,8 @@ pub struct EvalEnv {
     pub balance: Option<u64>,
     /// Grupos de espectadores vigentes (para `groups_any` / `groups_none`).
     pub groups: Arc<GroupIndex>,
+    /// Catálogo de regalos vigente (variantes, alias y nombres sin acentos).
+    pub gifts: Arc<Catalog>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +73,7 @@ pub fn evaluate(rule: &Rule, input: &TriggerInput, state: &mut RuleState, env: &
     if !rule.enabled {
         return Decision::Blocked(Blocked::Disabled);
     }
-    let Some(hit) = match_trigger(&rule.trigger, input, &mut state.like_acc) else {
+    let Some(hit) = match_trigger(&rule.trigger, input, &mut state.like_acc, &env.gifts) else {
         return Decision::NoMatch;
     };
 
@@ -229,6 +232,7 @@ mod tests {
             roll: 0.0,
             balance: None,
             groups: Arc::default(),
+            gifts: Arc::default(),
         }
     }
 

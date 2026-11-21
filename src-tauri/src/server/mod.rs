@@ -52,6 +52,8 @@ pub struct ServerDeps {
     pub media_dir: PathBuf,
     /// Carpeta de la biblioteca de fuentes, servida en `/fonts`.
     pub fonts_dir: PathBuf,
+    /// Imágenes de la lista oficial de regalos, servidas en `/gifts` (si se encontraron los recursos).
+    pub gifts_dir: Option<PathBuf>,
     pub token: String,
     /// API local para disparar reglas. Sin ella, los endpoints `/api/*` responden 503.
     pub api: Option<api::SharedApi>,
@@ -90,13 +92,17 @@ pub fn router(deps: &ServerDeps) -> Router {
         api: deps.api.clone(),
         oauth: deps.oauth.clone(),
     };
-    Router::new()
+    let mut router = Router::new()
         .route("/overlay/{name}", get(overlay_page))
         .route("/ws", get(ws_upgrade))
         .merge(api::routes())
         .merge(oauth::routes())
         .nest_service("/media", ServeDir::new(&deps.media_dir))
-        .nest_service("/fonts", ServeDir::new(&deps.fonts_dir))
+        .nest_service("/fonts", ServeDir::new(&deps.fonts_dir));
+    if let Some(dir) = &deps.gifts_dir {
+        router = router.nest_service("/gifts", ServeDir::new(dir));
+    }
+    router
         .layer(middleware::from_fn_with_state(state.clone(), auth::guard))
         .with_state(state)
 }

@@ -56,6 +56,8 @@ pub struct AppInfo {
     pub overlays: Vec<OverlayInfo>,
     /// `http://127.0.0.1:<puerto>/media`: base para mostrar miniaturas de la biblioteca de medios.
     pub media_base: String,
+    /// `http://127.0.0.1:<puerto>/gifts`: imágenes de la lista oficial de regalos. `None` si faltan los recursos.
+    pub gifts_base: Option<String>,
     pub overlay_token: String,
     pub last_username: Option<String>,
     pub last_twitch_channel: Option<String>,
@@ -116,6 +118,7 @@ pub async fn get_app_info(state: State<'_, AppState>) -> Result<AppInfo> {
             })
             .collect(),
         media_base: format!("{base}/media"),
+        gifts_base: state.gifts.images_dir().map(|_| format!("{base}/gifts")),
         overlay_token: token.clone(),
         last_username: state.db.get_setting(KEY_LAST_USERNAME).await?,
         last_twitch_channel: state.db.get_setting(KEY_LAST_TWITCH_CHANNEL).await?,
@@ -751,4 +754,60 @@ pub async fn download_google_font(state: State<'_, AppState>, family: String) ->
 #[tauri::command]
 pub async fn delete_font(state: State<'_, AppState>, family: String) -> Result<()> {
     state.fonts.delete(&family).await
+}
+
+// ---- Catálogo de regalos ----
+
+use crate::gifts::service::ManualGift;
+use crate::gifts::GiftView;
+
+/// Tope de resultados de una búsqueda (el catálogo entero son unos cientos).
+const MAX_GIFT_RESULTS: usize = 2_000;
+
+/// Regalos del catálogo (lista oficial + aprendidos + hechos a mano), filtrados por nombre, alias o id.
+#[tauri::command(async)]
+pub fn list_gifts(state: State<'_, AppState>, query: Option<String>, limit: Option<usize>) -> Vec<GiftView> {
+    let limit = limit.unwrap_or(MAX_GIFT_RESULTS).clamp(1, MAX_GIFT_RESULTS);
+    state.gifts.search(query.as_deref().unwrap_or_default(), limit)
+}
+
+#[tauri::command(async)]
+pub fn get_gift(state: State<'_, AppState>, key: String) -> Option<GiftView> {
+    state.gifts.get(&key)
+}
+
+/// Da de alta o corrige un regalo a mano (nombre en español, alias, precio…).
+#[tauri::command]
+pub async fn save_gift(state: State<'_, AppState>, gift: ManualGift) -> Result<GiftView> {
+    state.gifts.save_manual(gift).await
+}
+
+/// Borra lo aprendido o hecho a mano de un regalo (si está en la lista oficial, vuelve a sus datos de fábrica).
+#[tauri::command]
+pub async fn delete_gift(state: State<'_, AppState>, key: String) -> Result<bool> {
+    state.gifts.delete(&key).await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GiftsInfo {
+    /// Filas del catálogo (variantes juntas).
+    pub total: usize,
+    /// Regalos de la lista oficial incluida en la app.
+    pub official: usize,
+    /// Vistos en algún directo.
+    pub seen: usize,
+    /// Con datos puestos a mano.
+    pub manual: usize,
+}
+
+#[tauri::command(async)]
+pub fn gifts_info(state: State<'_, AppState>) -> GiftsInfo {
+    let cat = state.gifts.catalog();
+    GiftsInfo {
+        total: cat.len(),
+        official: state.gifts.reference_len(),
+        seen: cat.gifts.iter().filter(|g| g.seen > 0).count(),
+        manual: cat.gifts.iter().filter(|g| g.manual).count(),
+    }
 }

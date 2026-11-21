@@ -792,6 +792,40 @@
     "confirmDelete": "Delete the font “{{name}}”? Overlays using it will go back to the system font.",
     "missing": "not installed"
   },
+  "gifts": {
+    "title": "Gift catalog",
+    "hint": "TikTok's official gift list, plus what HiveBuzz learns during your streams. Rules, goals and timers recognise a gift by its Spanish or English name, its aliases or any of its ids.",
+    "stats": "{{total}} gifts · {{official}} from the official list · {{seen}} seen live · {{manual}} edited by hand",
+    "search": "Search by name, alias or id…",
+    "loading": "Loading catalog…",
+    "none": "No gift matches.",
+    "add": "Add gift",
+    "edit": "Edit",
+    "save": "Save",
+    "cancel": "Cancel",
+    "reset": "Remove my changes",
+    "confirmReset": "Remove what was learned and edited for “{{name}}”? If it is on the official list, it goes back to its original data.",
+    "aliases": "also: {{list}}",
+    "showing": "Showing {{shown}} of {{total}}",
+    "more": "Show more",
+    "nameEs": "Spanish name",
+    "nameEsHint": "The one you see in the TikTok app in Spanish.",
+    "nameEn": "Official name (English)",
+    "nameEnHint": "The one TikTok sends during the stream.",
+    "diamonds": "Diamonds",
+    "badge": {
+      "official": "official",
+      "seen": "seen {{count}}×",
+      "manual": "by hand"
+    },
+    "picker": {
+      "placeholder": "Any gift",
+      "required": "Search for a gift…",
+      "any": "Empty = any gift",
+      "notInCatalog": "Not in the catalog: matched by name (ignoring case and accents)",
+      "byName": "Matched by name (ignoring case and accents)"
+    }
+  },
   "timers": {
     "title": "Timers / subathon",
     "hint": "A countdown that gifts, follows, etc. can extend. At zero the «Timer ended» trigger fires.",
@@ -1107,7 +1141,7 @@
       "export": "Export configuration",
       "import": "Import configuration",
       "exported": "Exported.",
-      "summary": "{{rules}} rules · {{goals}} goals · {{timers}} timers · {{overlays}} overlays · {{sounds}} sounds · {{media}} images · {{fonts}} fonts · {{profiles}} profiles",
+      "summary": "{{rules}} rules · {{goals}} goals · {{timers}} timers · {{overlays}} overlays · {{sounds}} sounds · {{media}} images · {{fonts}} fonts · {{profiles}} profiles · {{gifts}} custom gifts",
       "risky": "This file has actions that reach outside your PC or control it: {{list}}. Import it only if you trust its author, and review the rules before going live.",
       "skipped": "{{n}} items discarded",
       "pending": "Import ready. It will be applied on restart and will REPLACE your rules, goals, timers, overlays, libraries and profiles.",
@@ -1668,6 +1702,12 @@
         "badFormat": "Unsupported format (use {{formats}}).",
         "emptyOrTooBig": "The file is empty or larger than {{mb}} MB.",
         "tooBig": "The file is too large (max {{mb}} MB)."
+      },
+      "gifts": {
+        "needIdOrName": "Enter the gift id or at least one name.",
+        "nameTooLong": "The name can't be longer than {{max}} characters.",
+        "badId": "The gift id must be a positive number.",
+        "badDiamonds": "The diamond price is not valid."
       },
       "tiktok": {
         "badUsername": "Invalid TikTok username: only letters, numbers, «_» and «.», up to 24."

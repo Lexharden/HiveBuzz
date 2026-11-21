@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Extension, ExtensionSource, TimerConfig, TimerMode } from "../../lib/types";
 import { Btn, Card, ErrorText, Field, InfoTip, NumberInput, Select, TextInput, useAction } from "../ui";
+import { GiftPicker } from "../gifts/GiftPicker";
 
 const SOURCES: ExtensionSource["type"][] = ["coins", "likes", "follow", "share", "subscribe", "gift"];
 
@@ -99,8 +100,8 @@ export function TimerEditor({ initial, isNew, onSave, onCancel }: Props) {
                   </Field>
                 )}
                 {e.source.type === "gift" && (
-                  <Field label={t("trigger.giftName")} className="w-40">
-                    <TextInput value={e.source.giftName ?? ""} onChange={(v) => patchExt(i, { source: { type: "gift", giftName: v } })} />
+                  <Field label={t("trigger.giftName")} className="w-56">
+                    <GiftPicker value={e.source} onChange={(sel) => patchExt(i, { source: { type: "gift", ...sel } })} placeholder={t("gifts.picker.required")} />
                   </Field>
                 )}
                 <Field label={t("timers.addSeconds")} hint={t("timers.addSecondsHint")} className="w-32">

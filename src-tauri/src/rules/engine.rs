@@ -6,6 +6,8 @@ use std::sync::{Arc, Mutex, OnceLock, PoisonError, RwLock};
 use serde::Serialize;
 use tokio::sync::broadcast::{self, error::RecvError};
 
+use crate::gifts::catalog::Catalog;
+use crate::gifts::service::{GiftLink, GiftService};
 use crate::viewer_groups::ViewerGroups;
 use super::eval::{evaluate, Decision, EvalEnv, RuleState};
 use super::matcher::{match_trigger, TriggerInput};
@@ -103,6 +105,7 @@ pub struct RuleEngine {
     fired: broadcast::Sender<FiredReport>,
     points: OnceLock<Arc<dyn PointsGate>>,
     groups: OnceLock<Arc<ViewerGroups>>,
+    gifts: GiftLink,
     handled: Mutex<u64>,
 }
 
@@ -119,6 +122,7 @@ impl RuleEngine {
             fired,
             points: OnceLock::new(),
             groups: OnceLock::new(),
+            gifts: GiftLink::default(),
             handled: Mutex::new(0),
         })
     }
@@ -139,6 +143,11 @@ impl RuleEngine {
         if self.groups.set(groups).is_err() {
             tracing::warn!("los grupos de espectadores ya estaban conectados al motor de reglas");
         }
+    }
+
+    /// Conecta el catálogo de regalos (reconoce variantes, alias y nombres sin acentos).
+    pub fn attach_gifts(&self, gifts: Arc<GiftService>) {
+        self.gifts.attach(gifts, "motor de reglas");
     }
 
     /// Carga las reglas guardadas.
@@ -307,14 +316,15 @@ impl RuleEngine {
             _ => Platform::Tiktok,
         };
 
+        let groups = self.groups.get().map(|g| g.index()).unwrap_or_default();
+        let gifts = self.gifts.catalog();
         // El saldo solo se consulta si alguna recompensa con coste podría dispararse con este evento
         // (si no, cada like iría a la base de datos).
         let balance = match (user, gate) {
-            (Some(u), Some(g)) if costly_rule_may_match(&rules, &input) => g.balance(&u.id).await.map_err(|e| tracing::warn!(error = %e, "no se pudo consultar el saldo de puntos")).ok(),
+            (Some(u), Some(g)) if costly_rule_may_match(&rules, &input, &gifts) => g.balance(&u.id).await.map_err(|e| tracing::warn!(error = %e, "no se pudo consultar el saldo de puntos")).ok(),
             _ => None,
         };
 
-        let groups = self.groups.get().map(|g| g.index()).unwrap_or_default();
         let mut firings = Vec::new();
         {
             let mut states = self.states.lock().unwrap_or_else(PoisonError::into_inner);
@@ -327,7 +337,7 @@ impl RuleEngine {
                 }
                 for rule in rules.iter().filter(|r| r.replaces_general == exclusive_pass) {
                     let state = states.entry(rule.id.clone()).or_default();
-                    let env = EvalEnv { now_ms, local, roll: rand::random::<f64>(), balance, groups: Arc::clone(&groups) };
+                    let env = EvalEnv { now_ms, local, roll: rand::random::<f64>(), balance, groups: Arc::clone(&groups), gifts: Arc::clone(&gifts) };
                     if let Decision::Fire { times, vars } = evaluate(rule, &input, state, &env) {
                         replaced |= exclusive_pass;
                         firings.push((Arc::clone(rule), times, vars));
@@ -416,7 +426,7 @@ impl RuleEngine {
             _ => None,
         };
         if let Some(inp) = input {
-            if let Some(hit) = match_trigger(&rule.trigger, &inp, &mut 0) {
+            if let Some(hit) = match_trigger(&rule.trigger, &inp, &mut 0, &self.gifts.catalog()) {
                 vars.extend(hit.vars);
             }
         } else {
@@ -470,10 +480,10 @@ fn display_name(nickname: &str, unique_id: &str) -> String {
 }
 
 /// ¿Alguna regla activa con coste coincide con el disparador de esta entrada?
-fn costly_rule_may_match(rules: &[Arc<Rule>], input: &TriggerInput) -> bool {
+fn costly_rule_may_match(rules: &[Arc<Rule>], input: &TriggerInput, gifts: &Catalog) -> bool {
     rules
         .iter()
-        .any(|r| r.enabled && r.cost_points.is_some() && match_trigger(&r.trigger, input, &mut 0).is_some())
+        .any(|r| r.enabled && r.cost_points.is_some() && match_trigger(&r.trigger, input, &mut 0, gifts).is_some())
 }
 
 /// Atajo para tests y el simulador: evento en vivo como entrada.

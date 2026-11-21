@@ -13,6 +13,7 @@ use crate::bus::EventBus;
 use crate::db::Db;
 use crate::error::{AppError, Result};
 use crate::events::LiveEvent;
+use crate::gifts::service::{GiftLink, GiftService};
 use crate::overlay::OverlayHub;
 use crate::rules::engine::{SystemEvent, SystemSink};
 use crate::session::SessionStarted;
@@ -43,6 +44,7 @@ pub struct GoalService {
     /// Se engancha después de crear el servicio: el motor de reglas necesita el registro de
     /// ejecutores, y uno de ellos («modificar meta») necesita este servicio.
     sink: OnceLock<Arc<dyn SystemSink>>,
+    gifts: GiftLink,
 }
 
 impl GoalService {
@@ -54,7 +56,13 @@ impl GoalService {
             hub,
             db,
             sink: OnceLock::new(),
+            gifts: GiftLink::default(),
         })
+    }
+
+    /// Conecta el catálogo de regalos (reconoce variantes, alias y nombres sin acentos).
+    pub fn attach_gifts(&self, gifts: Arc<GiftService>) {
+        self.gifts.attach(gifts, "metas");
     }
 
     /// Conecta quien recibe «meta alcanzada» (el motor de reglas).
@@ -158,8 +166,9 @@ impl GoalService {
     pub fn apply_event(&self, ev: &LiveEvent) -> Vec<(String, u32)> {
         let mut reached = Vec::new();
         let mut changed = false;
+        let gifts = self.gifts.catalog();
         for g in self.lock().iter_mut() {
-            let amount = contribution(&g.kind, ev);
+            let amount = contribution(&g.kind, ev, &gifts);
             if amount == 0 {
                 continue;
             }

@@ -11,6 +11,7 @@
     "sidecar:build": "cd sidecar && bun run build",
     "sidecar:test": "cd sidecar && bun run test",
     "overlays:test": "vitest run",
+    "gifts:sync": "bun scripts/sync-gifts.mjs",
     "typecheck": "tsc --noEmit && tsc -p overlays/tsconfig.json && cd sidecar && bun run typecheck",
     "test": "bun run sidecar:test && bun run overlays:test && cargo test --manifest-path src-tauri/Cargo.toml",
     "app:dev": "bun scripts/with-env.mjs tauri dev",

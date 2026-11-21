@@ -17,6 +17,8 @@ impl Db {
             "DELETE FROM sounds",
             "DELETE FROM media",
             "DELETE FROM profiles",
+            // Solo lo hecho a mano es configuración; lo aprendido en directo se queda.
+            "DELETE FROM gift_catalog WHERE manual = 1",
         ] {
             sqlx::query(stmt).execute(&mut *tx).await?;
         }
@@ -87,6 +89,9 @@ impl Db {
                 .bind(value)
                 .execute(&mut *tx)
                 .await?;
+        }
+        for g in &b.gifts {
+            super::gifts::upsert(&mut tx, g).await?;
         }
         tx.commit().await?;
         Ok(())

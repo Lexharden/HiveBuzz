@@ -36,18 +36,18 @@ fn like_ev(count: u64) -> LiveEvent {
 
 #[test]
 fn contributions_by_kind() {
-    assert_eq!(contribution(&GoalKind::Likes, &like_ev(7)), 7);
-    assert_eq!(contribution(&GoalKind::Follows, &ev(EventType::Follow)), 1);
-    assert_eq!(contribution(&GoalKind::Shares, &ev(EventType::Share)), 1);
-    assert_eq!(contribution(&GoalKind::Subscribers, &ev(EventType::Subscribe)), 1);
-    assert_eq!(contribution(&GoalKind::Coins, &gift_ev("Rose", 1, 30, 3)), 30);
+    assert_eq!(contribution(&GoalKind::Likes, &like_ev(7), &Catalog::default()), 7);
+    assert_eq!(contribution(&GoalKind::Follows, &ev(EventType::Follow), &Catalog::default()), 1);
+    assert_eq!(contribution(&GoalKind::Shares, &ev(EventType::Share), &Catalog::default()), 1);
+    assert_eq!(contribution(&GoalKind::Subscribers, &ev(EventType::Subscribe), &Catalog::default()), 1);
+    assert_eq!(contribution(&GoalKind::Coins, &gift_ev("Rose", 1, 30, 3), &Catalog::default()), 30);
 }
 
 #[test]
 fn a_goal_ignores_unrelated_events() {
-    assert_eq!(contribution(&GoalKind::Likes, &ev(EventType::Follow)), 0);
-    assert_eq!(contribution(&GoalKind::Follows, &like_ev(5)), 0);
-    assert_eq!(contribution(&GoalKind::Coins, &ev(EventType::Chat)), 0);
+    assert_eq!(contribution(&GoalKind::Likes, &ev(EventType::Follow), &Catalog::default()), 0);
+    assert_eq!(contribution(&GoalKind::Follows, &like_ev(5), &Catalog::default()), 0);
+    assert_eq!(contribution(&GoalKind::Coins, &ev(EventType::Chat), &Catalog::default()), 0);
 }
 
 #[test]
@@ -55,12 +55,12 @@ fn specific_gift_goals_count_quantity_and_match_by_name_and_or_id() {
     let by_name = GoalKind::Gift { gift_id: None, gift_name: Some(" rose ".into()) };
     let by_id = GoalKind::Gift { gift_id: Some(7), gift_name: None };
     let both = GoalKind::Gift { gift_id: Some(7), gift_name: Some("Lion".into()) };
-    assert_eq!(contribution(&by_name, &gift_ev("Rose", 1, 1, 12)), 12, "cuenta unidades, no monedas");
-    assert_eq!(contribution(&by_name, &gift_ev("Lion", 7, 99, 1)), 0);
-    assert_eq!(contribution(&by_id, &gift_ev("Lion", 7, 99, 2)), 2);
-    assert_eq!(contribution(&both, &gift_ev("Lion", 7, 1, 1)), 1);
-    assert_eq!(contribution(&both, &gift_ev("Rose", 7, 1, 1)), 0);
-    assert_eq!(contribution(&by_name, &ev(EventType::Chat)), 0);
+    assert_eq!(contribution(&by_name, &gift_ev("Rose", 1, 1, 12), &Catalog::default()), 12, "cuenta unidades, no monedas");
+    assert_eq!(contribution(&by_name, &gift_ev("Lion", 7, 99, 1), &Catalog::default()), 0);
+    assert_eq!(contribution(&by_id, &gift_ev("Lion", 7, 99, 2), &Catalog::default()), 2);
+    assert_eq!(contribution(&both, &gift_ev("Lion", 7, 1, 1), &Catalog::default()), 1);
+    assert_eq!(contribution(&both, &gift_ev("Rose", 7, 1, 1), &Catalog::default()), 0);
+    assert_eq!(contribution(&by_name, &ev(EventType::Chat), &Catalog::default()), 0);
 }
 
 #[test]
@@ -160,4 +160,14 @@ fn json_shape_roundtrips_and_fills_defaults() {
     assert_eq!(back, g);
     let minimal: Goal = serde_json::from_str(r#"{"id":"b","name":"x","kind":{"type":"likes"},"target":1}"#).expect("parsea");
     assert_eq!(minimal.on_reach, OnReach::Stop);
+}
+
+#[test]
+fn gift_goal_counts_variants_and_aliases() {
+    let gifts = crate::gifts::testing::catalog();
+    let bear = GoalKind::Gift { gift_id: Some(5566), gift_name: None };
+    let rosa = GoalKind::Gift { gift_id: None, gift_name: Some("Rosa".into()) };
+    assert_eq!(contribution(&bear, &gift_ev("Mishka Bear", 5582, 100, 2), &gifts), 2);
+    assert_eq!(contribution(&rosa, &gift_ev("Rose", 5655, 1, 5), &gifts), 5);
+    assert_eq!(contribution(&rosa, &gift_ev("Rose", 5655, 1, 5), &Catalog::default()), 0, "sin catálogo no sabe que son el mismo");
 }

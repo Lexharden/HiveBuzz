@@ -54,6 +54,8 @@ export interface AppInfo {
   httpsError: string | null;
   overlays: OverlayInfo[];
   mediaBase: string;
+  /** Base de las imágenes de la lista oficial de regalos (`null` si faltan los recursos). */
+  giftsBase: string | null;
   overlayToken: string;
   lastUsername: string | null;
   lastTwitchChannel: string | null;
@@ -403,4 +405,43 @@ export interface Counters {
   likes: number;
   viewers: number;
   peakViewers: number;
+}
+
+/** Un regalo del catálogo: lista oficial + lo aprendido en directo + lo puesto a mano. */
+export interface GiftView {
+  /** Identifica la fila: el id en texto o `name:<clave>`. */
+  key: string;
+  id: number | null;
+  /** Otros ids del mismo regalo (variantes con el mismo nombre y precio). */
+  otherIds: number[];
+  nameEn: string | null;
+  nameEs: string | null;
+  also: string[];
+  displayName: string;
+  diamonds: number | null;
+  seen: number;
+  lastSeen: number | null;
+  /** Archivo de la imagen local (servida en `giftsBase`), o vacío. */
+  image: string;
+  /** Icono oficial en el CDN de TikTok. */
+  iconUrl: string;
+  /** Solo de la lista oficial: aún no visto en un directo. */
+  referenceOnly: boolean;
+  manual: boolean;
+}
+
+/** Alta o edición manual de un regalo. */
+export interface ManualGift {
+  previousKey?: string;
+  id?: number;
+  nameEn?: string;
+  nameEs?: string;
+  diamonds?: number;
+}
+
+export interface GiftsInfo {
+  total: number;
+  official: number;
+  seen: number;
+  manual: number;
 }

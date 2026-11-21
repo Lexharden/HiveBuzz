@@ -792,6 +792,40 @@
     "confirmDelete": "¿Borrar la fuente «{{name}}»? Los overlays que la usen volverán a la fuente del sistema.",
     "missing": "no instalada"
   },
+  "gifts": {
+    "title": "Catálogo de regalos",
+    "hint": "La lista oficial de regalos de TikTok, más lo que HiveBuzz aprende en tus directos. Las reglas, metas y timers reconocen un regalo por su nombre en español o inglés, sus alias o cualquiera de sus ids.",
+    "stats": "{{total}} regalos · {{official}} de la lista oficial · {{seen}} vistos en directo · {{manual}} corregidos a mano",
+    "search": "Buscar por nombre, alias o id…",
+    "loading": "Cargando catálogo…",
+    "none": "Ningún regalo coincide.",
+    "add": "Añadir regalo",
+    "edit": "Editar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "reset": "Quitar mis cambios",
+    "confirmReset": "¿Quitar lo aprendido y lo corregido de «{{name}}»? Si está en la lista oficial, vuelve a sus datos originales.",
+    "aliases": "también: {{list}}",
+    "showing": "Mostrando {{shown}} de {{total}}",
+    "more": "Ver más",
+    "nameEs": "Nombre en español",
+    "nameEsHint": "El que ves en la app de TikTok en español.",
+    "nameEn": "Nombre oficial (inglés)",
+    "nameEnHint": "El que manda TikTok en el directo.",
+    "diamonds": "Diamantes",
+    "badge": {
+      "official": "oficial",
+      "seen": "visto {{count}}×",
+      "manual": "a mano"
+    },
+    "picker": {
+      "placeholder": "Cualquier regalo",
+      "required": "Busca un regalo…",
+      "any": "Vacío = cualquier regalo",
+      "notInCatalog": "No está en el catálogo: se compara por nombre (sin mayúsculas ni acentos)",
+      "byName": "Se compara por nombre (sin mayúsculas ni acentos)"
+    }
+  },
   "timers": {
     "title": "Timers / subathon",
     "hint": "Cuenta regresiva que los regalos, follows, etc. pueden extender. Al llegar a cero se dispara «Timer terminado».",
@@ -1107,7 +1141,7 @@
       "export": "Exportar configuración",
       "import": "Importar configuración",
       "exported": "Exportado.",
-      "summary": "{{rules}} reglas · {{goals}} metas · {{timers}} timers · {{overlays}} overlays · {{sounds}} sonidos · {{media}} imágenes · {{fonts}} fuentes · {{profiles}} perfiles",
+      "summary": "{{rules}} reglas · {{goals}} metas · {{timers}} timers · {{overlays}} overlays · {{sounds}} sonidos · {{media}} imágenes · {{fonts}} fuentes · {{profiles}} perfiles · {{gifts}} regalos propios",
       "risky": "Este archivo contiene acciones que salen de tu equipo o lo controlan: {{list}}. Impórtalo solo si confías en quien te lo dio; revisa las reglas antes de abrir el LIVE.",
       "skipped": "{{n}} elementos descartados",
       "pending": "Importación lista. Se aplicará al reiniciar y SUSTITUIRÁ tus reglas, metas, timers, overlays, bibliotecas y perfiles.",
@@ -1668,6 +1702,12 @@
         "badFormat": "Formato no admitido (usa {{formats}}).",
         "emptyOrTooBig": "El archivo está vacío o supera los {{mb}} MB.",
         "tooBig": "El archivo es demasiado grande (máximo {{mb}} MB)."
+      },
+      "gifts": {
+        "needIdOrName": "Pon el id o al menos un nombre del regalo.",
+        "nameTooLong": "El nombre no puede pasar de {{max}} caracteres.",
+        "badId": "El id del regalo debe ser un número positivo.",
+        "badDiamonds": "El precio en diamantes no es válido."
       },
       "tiktok": {
         "badUsername": "Usuario de TikTok no válido: solo letras, números, «_» y «.», máximo 24."

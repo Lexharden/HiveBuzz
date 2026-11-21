@@ -4,6 +4,7 @@ mod backup;
 mod donors;
 mod likers;
 mod event_log;
+mod gifts;
 mod goals;
 mod media;
 mod overlay_config;

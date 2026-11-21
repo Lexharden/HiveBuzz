@@ -127,7 +127,7 @@ export function GoalsPage() {
                   <div className="truncate text-sm font-semibold">{g.name}</div>
                   <div className="text-xs text-zinc-500">
                     {t(`goals.kinds.${g.kind.type}`)}
-                    {g.kind.type === "gift" && g.kind.giftName ? ` · ${g.kind.giftName}` : ""} · {t("goals.reached", { n: g.reachedCount })}
+                    {g.kind.type === "gift" && (g.kind.giftName || g.kind.giftId !== undefined) ? ` · ${g.kind.giftName ?? `#${g.kind.giftId}`}` : ""} · {t("goals.reached", { n: g.reachedCount })}
                   </div>
                 </div>
                 <div className="flex shrink-0 gap-2">

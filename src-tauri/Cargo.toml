@@ -55,6 +55,8 @@ rcgen = { version = "0.14", default-features = false, features = ["crypto", "pem
 axum-server = { version = "0.8", default-features = false, features = ["tls-rustls-no-provider"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 tauri-plugin-window-state = "2"
+# Búsqueda y comparación de nombres de regalos sin acentos («Corazón» = «corazon»).
+unicode-normalization = "0.1"
 tauri-plugin-notification = "2"
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]

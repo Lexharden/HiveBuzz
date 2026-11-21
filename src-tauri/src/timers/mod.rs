@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, Result};
 use crate::events::{EventType, LiveEvent};
+use crate::gifts::catalog::Catalog;
 
 const MAX_START_SECONDS: u64 = 7 * 24 * 3600;
 const MAX_EXTENSIONS: usize = 20;
@@ -260,7 +261,7 @@ impl TimerState {
 
 /// Segundos que un evento suma a un timer. Actualiza los sobrantes de las extensiones «cada N».
 /// Positivo suma, negativo resta. Un cronómetro no tiene extensiones.
-pub fn extension_seconds(cfg: &TimerConfig, leftovers: &mut Vec<u64>, ev: &LiveEvent) -> i64 {
+pub fn extension_seconds(cfg: &TimerConfig, leftovers: &mut Vec<u64>, ev: &LiveEvent, gifts: &Catalog) -> i64 {
     if cfg.mode == TimerMode::Stopwatch {
         return 0;
     }
@@ -278,9 +279,7 @@ pub fn extension_seconds(cfg: &TimerConfig, leftovers: &mut Vec<u64>, ev: &LiveE
                 accumulate(&mut leftovers[i], ev.like.as_ref().map_or(0, |l| l.count), *per_likes)
             }
             (ExtensionSource::Gift { gift_id, gift_name }, EventType::Gift) => ev.gift.as_ref().map_or(0, |g| {
-                let id_ok = gift_id.is_none_or(|id| id == g.id);
-                let name_ok = gift_name.as_deref().is_none_or(|n| n.trim().eq_ignore_ascii_case(g.name.trim()));
-                if id_ok && name_ok {
+                if gifts.matches(*gift_id, gift_name.as_deref(), g.id, &g.name) {
                     u64::from(g.count)
                 } else {
                     0

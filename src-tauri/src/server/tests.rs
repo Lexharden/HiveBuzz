@@ -43,6 +43,7 @@ impl Rig {
             recent: self.recent.clone(),
             media_dir: self.media.path().to_path_buf(),
             fonts_dir: self.media.path().join("fonts"),
+            gifts_dir: Some(self.media.path().join("gifts")),
             token: TOKEN.into(),
             api: None,
             oauth: None,
@@ -61,6 +62,7 @@ async fn started() -> Rig {
         recent: recent.clone(),
         media_dir: media.path().to_path_buf(),
         fonts_dir: media.path().join("fonts"),
+        gifts_dir: Some(media.path().join("gifts")),
         token: TOKEN.into(),
         api: None,
         oauth: None,
@@ -157,6 +159,20 @@ async fn media_files_are_served_with_the_token_and_cannot_escape_the_folder() {
     }
     let _ = std::fs::remove_file(secret);
     assert_eq!(http_get(r.handle.addr, &format!("/media/noexiste.png?token={TOKEN}"), &host).await.0, 404);
+}
+
+#[tokio::test]
+async fn gift_images_are_served_with_the_token() {
+    let r = started().await;
+    let host = r.handle.addr.to_string();
+    let dir = r.media.path().join("gifts");
+    std::fs::create_dir_all(&dir).expect("mkdir");
+    std::fs::write(dir.join("5655_Rose.webp"), b"RIFFrose").expect("write");
+    let (status, raw) = http_get(r.handle.addr, &format!("/gifts/5655_Rose.webp?token={TOKEN}"), &host).await;
+    assert_eq!(status, 200);
+    assert!(raw.contains("RIFFrose"));
+    assert_eq!(http_get(r.handle.addr, "/gifts/5655_Rose.webp", &host).await.0, 401, "sin token");
+    assert_eq!(http_get(r.handle.addr, &format!("/gifts/..%2fa.png?token={TOKEN}"), &host).await.0 / 100, 4);
 }
 
 #[tokio::test]
@@ -298,6 +314,7 @@ async fn api_rig(queued: usize) -> (ServerHandle, Arc<FakeApi>, tempfile::TempDi
         recent: RecentEvents::new(10),
         media_dir: media.path().to_path_buf(),
         fonts_dir: media.path().join("fonts"),
+        gifts_dir: None,
         token: TOKEN.into(),
         api: Some(Arc::clone(&fake) as api::SharedApi),
         oauth: None,
@@ -423,6 +440,7 @@ async fn oauth_rig() -> (ServerHandle, Arc<FakeOAuth>, tempfile::TempDir) {
         recent: RecentEvents::new(10),
         media_dir: media.path().to_path_buf(),
         fonts_dir: media.path().join("fonts"),
+        gifts_dir: None,
         token: TOKEN.into(),
         api: None,
         oauth: Some(Arc::clone(&fake) as oauth::SharedOAuth),

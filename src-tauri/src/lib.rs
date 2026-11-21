@@ -23,6 +23,7 @@ pub mod error;
 pub mod events;
 pub mod executors;
 pub mod fonts;
+pub mod gifts;
 pub mod goals;
 pub mod jar;
 pub mod interact;
@@ -192,6 +193,11 @@ pub fn run() {
             commands::import_font,
             commands::download_google_font,
             commands::delete_font,
+            commands::list_gifts,
+            commands::get_gift,
+            commands::save_gift,
+            commands::delete_gift,
+            commands::gifts_info,
             commands::install_local_ca,
             commands::uninstall_local_ca,
             commands::simulate_event,

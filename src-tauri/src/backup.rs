@@ -17,6 +17,8 @@ use serde_json::{Map, Value};
 use crate::db::Db;
 use crate::error::{AppError, Result};
 use crate::fonts::{self, FontFace, FONT_EXT, MAX_FONT_BYTES};
+use crate::gifts::service::sanitize_imported;
+use crate::gifts::LearnedGift;
 use crate::goals::Goal;
 use crate::media::{Media, MediaKind, IMAGE_EXT, VIDEO_EXT};
 use crate::overlay_config::schema::find as find_overlay;
@@ -34,6 +36,9 @@ const MEDIA_DIR: &str = "media";
 const FONTS_DIR: &str = "fonts";
 /// Tope de archivos de fuente en un paquete (60 familias × negrita/normal con holgura).
 const MAX_FONT_FACES: usize = 240;
+/// Tope de regalos hechos a mano en un paquete.
+const MAX_GIFTS: usize = 2_000;
+
 pub const PENDING_FILE: &str = "pending-import.zip";
 const MAX_ENTRIES: usize = 5_000;
 const MAX_CONFIG_BYTES: u64 = 32 * 1024 * 1024;
@@ -80,6 +85,9 @@ pub struct Bundle {
     pub fonts: Vec<FontFace>,
     #[serde(default)]
     pub profiles: Vec<ProfileBundle>,
+    /// Regalos dados de alta o corregidos a mano en el catálogo (lo aprendido en directo no viaja).
+    #[serde(default)]
+    pub gifts: Vec<LearnedGift>,
 }
 
 /// Lo que contiene (o contenía) un archivo, para mostrarlo al usuario.
@@ -94,6 +102,7 @@ pub struct Summary {
     pub media: usize,
     pub fonts: usize,
     pub profiles: usize,
+    pub gifts: usize,
     /// Cosas del archivo que se descartaron y por qué.
     pub skipped: Vec<String>,
     /// Acciones que tocan la red, el teclado u OBS, con su número (`["webhook × 3"]`): quien importa
@@ -127,6 +136,7 @@ impl Summary {
             media: b.media.len(),
             fonts: b.fonts.len(),
             profiles: b.profiles.len(),
+            gifts: b.gifts.len(),
             skipped,
             risky: risky_actions(b),
         }
@@ -228,6 +238,7 @@ pub async fn export(db: &Db, data_dir: &Path, dest: &Path, version: &str, now_ms
         media,
         fonts,
         profiles,
+        gifts: db.list_learned_gifts().await?.into_iter().filter(|g| g.manual).collect(),
     };
     let summary = Summary::of(&bundle, skipped);
     let dest = dest.to_path_buf();
@@ -456,6 +467,20 @@ fn sanitize(b: &mut Bundle, archive: &mut zip::ZipArchive<File>, skipped: &mut V
         }
         why.is_none()
     });
+
+    // Regalos hechos a mano: validados, con la clave recalculada y sin repetidos.
+    let mut keys = HashSet::new();
+    let mut gifts = Vec::new();
+    for g in std::mem::take(&mut b.gifts) {
+        let label = g.name_es.clone().or_else(|| g.name_en.clone()).unwrap_or_else(|| g.gift_id.unwrap_or_default().to_string());
+        match sanitize_imported(g) {
+            Ok(_) if gifts.len() >= MAX_GIFTS => skipped.push(format!("regalo «{label}» descartado: demasiados regalos")),
+            Ok(g) if !keys.insert(g.key.clone()) => skipped.push(format!("regalo «{label}» descartado: repetido")),
+            Ok(g) => gifts.push(g),
+            Err(why) => skipped.push(format!("regalo «{label}» descartado: {why}")),
+        }
+    }
+    b.gifts = gifts;
     Ok(())
 }
 

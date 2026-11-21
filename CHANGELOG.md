@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+### Añadido
+- **Catálogo de regalos** (*Biblioteca → Catálogo de regalos*): HiveBuzz trae la lista oficial de regalos de TikTok (más de 680, con su imagen, precio e id) y aprende sola los que llegan en tus directos. Puedes buscar por nombre en español o en inglés, por alias o por id, y corregir a mano el nombre en español, el precio o el id.
+- **Selector de regalos** en reglas, metas y timers: en lugar de escribir el nombre exacto, busca el regalo y elígelo con su imagen. Si escribes un nombre que no está en el catálogo también vale, y `#5655` elige por id.
+
+### Mejorado
+- **Los regalos se reconocen aunque cambien de nombre o de id**: una regla, meta o timer con «Rosa» salta con «Rose», sin importar mayúsculas ni acentos («corazon» = «Corazón»), y las variantes de un mismo regalo (mismo nombre y precio, otro id) cuentan como el mismo. Dos regalos con el mismo nombre y distinto precio siguen siendo distintos. Las reglas guardadas no cambian.
+- **El simulador manda regalos reales** del catálogo (id, nombre, precio e imagen), así las reglas con regalos concretos se pueden probar sin estar en vivo.
+- **La copia de seguridad incluye tus regalos hechos a mano**. Lo aprendido en directo se queda en cada equipo.
+
 ## [0.6.0] - 2026-11-13
 
 ### Añadido

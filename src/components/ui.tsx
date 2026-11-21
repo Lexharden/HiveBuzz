@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { useTranslation } from "react-i18next";
 import { errorMessage } from "../lib/api";
 
-const inputCls =
+export const inputCls =
   "w-full rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm outline-none focus:border-amber-400 disabled:opacity-50";
 
 /** Pistas más largas que esto se muestran tras un icono ⓘ en vez de ocupar sitio en la pantalla. */

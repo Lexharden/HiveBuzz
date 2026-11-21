@@ -58,6 +58,10 @@ bun run tauri dev
 Al cambiar el código del sidecar hay que volver a ejecutar `bun run sidecar:build`: la app usa el
 binario compilado, no el código fuente.
 
+La lista oficial de regalos (`src-tauri/resources/gifts/`: `gifts.json` + imágenes `.webp`) se copia del proyecto
+HiveShock con `bun run gifts:sync [ruta]` (o `HIVESHOCK_DIR` en `.env`). Solo hace falta al actualizar la lista; el
+resultado va en el repositorio y se empaqueta con la app.
+
 ### Pruebas y verificación
 
 ```powershell
@@ -66,7 +70,7 @@ bun run typecheck     # TypeScript estricto: UI, tests de overlays y sidecar
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
-Sin estar en vivo puedes probar todo con el **simulador** del panel (regalos combinables y grandes,
+Sin estar en vivo puedes probar todo con el **simulador** del panel (regalos reales del catálogo, combinables y grandes,
 chat, likes, follows, shares, suscripciones, entradas y una ráfaga de 20 eventos).
 
 ## Compilar con tu entorno (`.env`)

@@ -102,7 +102,7 @@ mod tests {
         for t in triggers {
             let ev = sample_event_for(&t).unwrap_or_else(|| panic!("sin muestra: {t:?}"));
             assert!(
-                match_trigger(&t, &TriggerInput::Live(&ev), &mut 0).is_some(),
+                match_trigger(&t, &TriggerInput::Live(&ev), &mut 0, &crate::gifts::catalog::Catalog::default()).is_some(),
                 "la muestra no cumple su trigger: {t:?}"
             );
         }

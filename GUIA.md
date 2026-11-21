@@ -79,11 +79,15 @@ Cada pantalla trae una frase que explica para qué sirve.
 Pestaña **Reglas → Nueva regla**:
 
 1. **Nombre** (ej. "Gracias por la rosa").
-2. **Cuándo (disparador)**: regalo (por nombre/id/monedas mínimas), follow, share, suscripción, entrada al LIVE,
+2. **Cuándo (disparador)**: regalo (búscalo en el selector por nombre en español o inglés, alias o id; opcionalmente
+   con monedas mínimas), follow, share, suscripción, entrada al LIVE,
    likes (cada N), comando de chat (`!sonido`), palabra clave, meta alcanzada, timer terminado, o *llamada a la API local*.
 3. **Condiciones**: cooldown global y por usuario, roles (mod/suscriptor/seguidor), nivel mínimo, probabilidad, horario.
 4. **Acciones** (en secuencia o paralelo, con retardo): elige el tipo y rellena el formulario.
 5. **Guardar** y pulsa **Probar** (ignora condiciones) o usa el Simulador.
+
+Un regalo se reconoce por cualquiera de sus nombres (español o inglés, alias), sin importar mayúsculas ni acentos,
+y por cualquiera de sus ids (TikTok tiene variantes del mismo regalo con otro id). Vacío = cualquier regalo.
 
 Los regalos grandes se adelantan en la cola. La cola tiene límite y caducidad; sobrevive a un cierre de la app.
 
@@ -114,6 +118,9 @@ Los usuarios se reconocen por su @ (sin importar mayúsculas ni el `@`), y puede
 
 - **Biblioteca**: importa sonidos (mp3, wav, ogg, flac) e imágenes/GIF/video (png, jpg, gif, webp, mp4, webm). Ponles
   nombre y volumen; el botón *Escuchar* los previsualiza.
+- **Catálogo de regalos** (en *Biblioteca*): la lista oficial de TikTok con imagen, precio e id, más lo que HiveBuzz
+  aprende en tus directos. Si un regalo sale con otro nombre en tu idioma, edítalo y pon su nombre en español:
+  las reglas, metas y timers lo reconocerán por los dos. *Quitar mis cambios* lo devuelve a la lista oficial.
 - **Voz (TTS)**: instala **Piper** (offline, un clic) y una voz, o usa las voces de Windows / Edge-TTS. También puedes
   importar tu propio modelo de Piper (`.onnx` + `.onnx.json`) en *Voces personalizadas*.
   En *No hablar encima de ti* activa el micrófono: la voz se calla mientras hablas y luego repite la palabra cortada
@@ -197,7 +204,8 @@ Los usuarios se reconocen por su @ (sin importar mayúsculas ni el `@`), y puede
 
 - **Estadísticas**: una fila por LIVE: monedas, pico de espectadores, regalos por tipo, top donadores…
 - **Perfiles** (*Ajustes*): guarda tus reglas+overlays con un nombre ("Minecraft", "Charla") y cámbialos de un golpe.
-- **Exportar/Importar**: un `.zip` con reglas, metas, timers, overlays, perfiles, ajustes, sonidos e imágenes.
+- **Exportar/Importar**: un `.zip` con reglas, metas, timers, overlays, perfiles, ajustes, sonidos, imágenes y los
+  regalos que corregiste a mano en el catálogo.
   Importar se aplica **al reiniciar** y **sustituye** lo actual. No incluye contraseñas ni tokens, pero sí lo que
   pongas en reglas (p. ej. cabeceras de un webhook).
 

@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
-use tauri::{AppHandle, Emitter};
+use tauri::path::BaseDirectory;
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::mpsc;
 
 use crate::actions::clock::{AppClock, Clock};
@@ -35,6 +36,7 @@ use crate::viewer_groups::ViewerGroups;
 use crate::leaderboard::{LeaderboardService, LeaderboardTiming};
 use crate::likeboard::{LikeBoardService, LikeBoardTiming};
 use crate::fonts::FontLibrary;
+use crate::gifts::service::{GiftService, FLUSH_EVERY as GIFTS_FLUSH_EVERY};
 use crate::media::MediaLibrary;
 use crate::overlay::{OverlayHub, RecentEvents};
 use crate::overlay_config::OverlayConfigService;
@@ -108,6 +110,8 @@ pub struct AppState {
     pub sounds: Arc<SoundLibrary>,
     pub media: Arc<MediaLibrary>,
     pub fonts: Arc<FontLibrary>,
+    /// Catálogo de regalos (lista oficial + lo aprendido en los directos).
+    pub gifts: Arc<GiftService>,
     pub tts: Arc<TtsService>,
     /// Micrófono que pausa el TTS mientras el streamer habla.
     pub mic: Arc<MicMonitor>,
@@ -221,6 +225,19 @@ impl AppState {
         let sounds = Arc::new(SoundLibrary::new(db.clone(), data_dir.join("sounds"), Arc::clone(&clock))?);
         let media = Arc::new(MediaLibrary::new(db.clone(), data_dir.join("media"), Arc::clone(&clock))?);
         let fonts = Arc::new(FontLibrary::new(data_dir.join("fonts"), hub.clone())?);
+
+        // Catálogo de regalos: la lista oficial va con la app (`resources/gifts`); sin ella se sigue sin catálogo.
+        let gifts = GiftService::new(db.clone(), Arc::clone(&clock));
+        let gifts_dir = match app.path().resolve("gifts", BaseDirectory::Resource) {
+            Ok(dir) => Some(dir),
+            Err(e) => {
+                tracing::warn!(error = %e, "no se encontró la carpeta de la lista de regalos");
+                None
+            }
+        };
+        if let Err(e) = gifts.load(gifts_dir).await {
+            tracing::error!(error = %e, "no se pudo cargar el catálogo de regalos");
+        }
 
         let tts_dir = data_dir.join("tts");
         let default_piper = PiperPaths { exe: piper_exe_path(&tts_dir), voices_dir: tts_dir.join("voices") };
@@ -354,6 +371,9 @@ impl AppState {
 
         rules.attach_groups(Arc::clone(&viewer_groups));
         rules.attach_points(Arc::clone(&points) as Arc<dyn crate::rules::engine::PointsGate>);
+        rules.attach_gifts(Arc::clone(&gifts));
+        goals.attach_gifts(Arc::clone(&gifts));
+        timers.attach_gifts(Arc::clone(&gifts));
 
         // Metas y timers avisan al motor de reglas («meta alcanzada», «timer terminado»).
         let sink: Arc<dyn SystemSink> = rules.clone();
@@ -385,6 +405,7 @@ impl AppState {
         stats.spawn(&bus, total_viewers, session.subscribe(), Duration::from_secs(20));
         points.spawn(&bus, session.subscribe(), PointsTiming::default());
         polls.spawn(&bus);
+        gifts.spawn(&bus, GIFTS_FLUSH_EVERY);
         spotify.spawn(&bus);
 
         // Persistencia del log de eventos y su rotación (7 días).
@@ -399,6 +420,7 @@ impl AppState {
             recent,
             media_dir: media.dir().to_path_buf(),
             fonts_dir: fonts.dir().to_path_buf(),
+            gifts_dir: gifts.images_dir(),
             token: overlay_token.clone(),
             api: Some(Arc::clone(&rules) as server::api::SharedApi),
             oauth: Some(Arc::clone(&spotify_auth) as server::oauth::SharedOAuth),
@@ -441,7 +463,7 @@ impl AppState {
             twitch,
             db,
             secrets,
-            sim: Simulator::new(bus.clone()),
+            sim: Simulator::new(bus.clone()).with_gifts(Arc::clone(&gifts)),
             bus,
             sidecar,
             clock,
@@ -450,6 +472,7 @@ impl AppState {
             sounds,
             media,
             fonts,
+            gifts,
             tts,
             mic,
             tts_dir,
@@ -514,6 +537,9 @@ impl AppState {
             }
             if let Err(e) = self.likeboard.flush().await {
                 tracing::warn!(error = %e, "no se pudieron guardar los likes pendientes");
+            }
+            if let Err(e) = self.gifts.flush().await {
+                tracing::warn!(error = %e, "no se pudo guardar el catálogo de regalos");
             }
         };
         if tokio::time::timeout(SHUTDOWN_FLUSH_TIMEOUT, flush).await.is_err() {

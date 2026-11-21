@@ -15,6 +15,7 @@ use crate::bus::EventBus;
 use crate::db::Db;
 use crate::error::{AppError, Result};
 use crate::events::LiveEvent;
+use crate::gifts::service::{GiftLink, GiftService};
 use crate::overlay::OverlayHub;
 use crate::rules::engine::{SystemEvent, SystemSink};
 
@@ -74,6 +75,7 @@ pub struct TimerService {
     db: Db,
     clock: Arc<dyn Clock>,
     sink: OnceLock<Arc<dyn SystemSink>>,
+    gifts: GiftLink,
 }
 
 impl TimerService {
@@ -86,7 +88,13 @@ impl TimerService {
             db,
             clock,
             sink: OnceLock::new(),
+            gifts: GiftLink::default(),
         })
+    }
+
+    /// Conecta el catálogo de regalos (reconoce variantes, alias y nombres sin acentos).
+    pub fn attach_gifts(&self, gifts: Arc<GiftService>) {
+        self.gifts.attach(gifts, "timers");
     }
 
     /// Conecta quien recibe «timer terminado» (el motor de reglas).
@@ -187,8 +195,9 @@ impl TimerService {
     pub fn apply_event(&self, ev: &LiveEvent) -> bool {
         let now = self.clock.now_ms();
         let mut changed = false;
+        let gifts = self.gifts.catalog();
         for t in self.lock().iter_mut().filter(|t| matches!(t.state.status, Status::Running | Status::Paused)) {
-            let secs = extension_seconds(&t.config, &mut t.state.leftovers, ev);
+            let secs = extension_seconds(&t.config, &mut t.state.leftovers, ev, &gifts);
             if secs != 0 {
                 changed |= t.state.add(now, secs.saturating_mul(1000), t.config.max_ms());
             }

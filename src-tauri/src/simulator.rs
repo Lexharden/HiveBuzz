@@ -6,7 +6,12 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::Deserialize;
 
 use crate::bus::EventBus;
+use std::sync::Arc;
+
 use crate::events::{Chat, EventType, Gift, Like, LiveEvent, Platform, User};
+use crate::gifts::catalog::Catalog;
+use crate::gifts::service::GiftService;
+use crate::gifts::GiftView;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -81,17 +86,50 @@ pub fn build_event(kind: SimKind) -> LiveEvent {
 /// Evento falso de la plataforma indicada. Twitch no tiene likes, shares ni entradas, y sus «regalos» son
 /// bits: esas pruebas se adaptan a lo que Twitch realmente puede enviar.
 pub fn build_event_for(kind: SimKind, platform: Platform) -> LiveEvent {
+    build_event_from(kind, platform, &Catalog::default())
+}
+
+/// Un regalo real del catálogo para simular: pequeño (hasta 99 💎, combinable) o grande (desde 1000 💎).
+fn real_gift(catalog: &Catalog, big: bool) -> Option<&GiftView> {
+    let fits = |g: &&GiftView| g.id.is_some() && g.diamonds.is_some_and(|d| if big { d >= 1_000 } else { (1..=99).contains(&d) });
+    let n = catalog.gifts.iter().filter(fits).count();
+    if n == 0 {
+        return None;
+    }
+    catalog.gifts.iter().filter(fits).nth(rand::random_range(0..n))
+}
+
+fn sim_gift(g: &GiftView, big: bool) -> Gift {
+    let count: u32 = if big { 1 } else { rand::random_range(1..=30) };
+    Gift {
+        id: g.id.unwrap_or_default(),
+        // Llega con el nombre que manda TikTok (el oficial, en inglés).
+        name: g.name_en.clone().or_else(|| g.name_es.clone()).unwrap_or_else(|| g.display_name.clone()),
+        coins: g.diamonds.unwrap_or(1).saturating_mul(u64::from(count)),
+        count,
+        streakable: !big,
+        image: g.icon_url.clone(),
+    }
+}
+
+/// Como [`build_event_for`], pero con regalos reales del catálogo (id, nombre, precio e icono) si los hay.
+pub fn build_event_from(kind: SimKind, platform: Platform, catalog: &Catalog) -> LiveEvent {
     let kind = match (platform, kind) {
         (Platform::Twitch, SimKind::Like | SimKind::Share | SimKind::Join) => SimKind::Chat,
         (_, k) => k,
     };
     let twitch_bits = platform == Platform::Twitch && matches!(kind, SimKind::Gift | SimKind::BigGift);
+    let real = match kind {
+        SimKind::Gift | SimKind::BigGift if !twitch_bits => real_gift(catalog, kind == SimKind::BigGift).map(|g| sim_gift(g, kind == SimKind::BigGift)),
+        _ => None,
+    };
     let (event_type, gift, chat, like) = match kind {
         SimKind::Gift | SimKind::BigGift if twitch_bits => {
             let bits: u64 = if kind == SimKind::Gift { rand::random_range(1..=300) } else { rand::random_range(1_000..=10_000) };
             let gift = Gift { id: 0, name: "Bits".to_string(), coins: bits, count: 1, streakable: false, image: String::new() };
             (EventType::Gift, Some(gift), None, None)
         }
+        SimKind::Gift | SimKind::BigGift if real.is_some() => (EventType::Gift, real, None, None),
         SimKind::Gift => {
             let (name, unit, _) = *pick(GIFTS);
             let count: u32 = rand::random_range(1..=30);
@@ -164,11 +202,26 @@ pub fn build_event_for(kind: SimKind, platform: Platform) -> LiveEvent {
 #[derive(Clone)]
 pub struct Simulator {
     bus: EventBus,
+    gifts: Option<Arc<GiftService>>,
 }
 
 impl Simulator {
     pub fn new(bus: EventBus) -> Self {
-        Self { bus }
+        Self { bus, gifts: None }
+    }
+
+    /// Simula regalos reales del catálogo (los mismos ids y nombres que mandaría TikTok).
+    #[must_use]
+    pub fn with_gifts(mut self, gifts: Arc<GiftService>) -> Self {
+        self.gifts = Some(gifts);
+        self
+    }
+
+    fn build(&self, kind: SimKind, platform: Platform) -> LiveEvent {
+        match &self.gifts {
+            Some(g) => build_event_from(kind, platform, &g.catalog()),
+            None => build_event_for(kind, platform),
+        }
     }
 
     pub fn emit(&self, kind: SimKind) -> LiveEvent {
@@ -176,7 +229,7 @@ impl Simulator {
     }
 
     pub fn emit_for(&self, kind: SimKind, platform: Platform) -> LiveEvent {
-        let ev = build_event_for(kind, platform);
+        let ev = self.build(kind, platform);
         self.bus.publish(ev.clone());
         ev
     }
@@ -246,6 +299,20 @@ mod tests {
                     _ => {}
                 }
             }
+        }
+    }
+
+    #[test]
+    fn gifts_come_from_the_catalog_when_there_is_one() {
+        let catalog = crate::gifts::testing::catalog();
+        for _ in 0..30 {
+            let small = build_event_from(SimKind::Gift, Platform::Tiktok, &catalog).gift.expect("regalo");
+            assert!([5655, 5566, 5582, 7000].contains(&small.id), "{small:?}");
+            assert!(small.streakable && small.coins >= u64::from(small.count));
+            let big = build_event_from(SimKind::BigGift, Platform::Tiktok, &catalog).gift.expect("regalo");
+            assert_eq!((big.id, big.name.as_str(), big.coins, big.count), (7001, "Freestyle", 1800, 1));
+            let bits = build_event_from(SimKind::Gift, Platform::Twitch, &catalog).gift.expect("bits");
+            assert_eq!(bits.name, "Bits", "Twitch sigue mandando bits");
         }
     }
 

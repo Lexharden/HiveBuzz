@@ -3,6 +3,7 @@
 use super::model::Trigger;
 use super::template::Vars;
 use crate::events::{EventType, LiveEvent};
+use crate::gifts::catalog::Catalog;
 
 /// Lo que puede disparar una regla: un evento en vivo o un evento interno del sistema.
 #[derive(Debug, Clone, Copy)]
@@ -23,7 +24,8 @@ pub struct TriggerMatch {
 /// Tope de disparos por un solo evento de likes.
 const MAX_LIKE_FIRINGS: u64 = 10;
 
-pub fn match_trigger(trigger: &Trigger, input: &TriggerInput, like_acc: &mut u64) -> Option<TriggerMatch> {
+/// `gifts` sirve para reconocer un regalo por sus variantes, alias y nombres sin acentos.
+pub fn match_trigger(trigger: &Trigger, input: &TriggerInput, like_acc: &mut u64, gifts: &Catalog) -> Option<TriggerMatch> {
     match (trigger, input) {
         (Trigger::GoalReached { goal_id }, TriggerInput::GoalReached(id)) => {
             (goal_id == id).then(|| one(Vars::new()))
@@ -31,7 +33,7 @@ pub fn match_trigger(trigger: &Trigger, input: &TriggerInput, like_acc: &mut u64
         (Trigger::TimerEnded { timer_id }, TriggerInput::TimerEnded(id)) => {
             (timer_id == id).then(|| one(Vars::new()))
         }
-        (_, TriggerInput::Live(ev)) => match_live(trigger, ev, like_acc),
+        (_, TriggerInput::Live(ev)) => match_live(trigger, ev, like_acc, gifts),
         _ => None,
     }
 }
@@ -40,7 +42,7 @@ fn one(vars: Vars) -> TriggerMatch {
     TriggerMatch { times: 1, vars }
 }
 
-fn match_live(trigger: &Trigger, ev: &LiveEvent, like_acc: &mut u64) -> Option<TriggerMatch> {
+fn match_live(trigger: &Trigger, ev: &LiveEvent, like_acc: &mut u64, gifts: &Catalog) -> Option<TriggerMatch> {
     match trigger {
         Trigger::Gift {
             gift_id,
@@ -51,11 +53,7 @@ fn match_live(trigger: &Trigger, ev: &LiveEvent, like_acc: &mut u64) -> Option<T
                 return None;
             }
             let gift = ev.gift.as_ref()?;
-            let ok = gift_id.is_none_or(|id| id == gift.id)
-                && gift_name
-                    .as_deref()
-                    .is_none_or(|n| n.trim().eq_ignore_ascii_case(gift.name.trim()))
-                && min_coins.is_none_or(|m| gift.coins >= m);
+            let ok = gifts.matches(*gift_id, gift_name.as_deref(), gift.id, &gift.name) && min_coins.is_none_or(|m| gift.coins >= m);
             ok.then(|| one(Vars::new()))
         }
         Trigger::Follow => (ev.kind == EventType::Follow).then(|| one(Vars::new())),
@@ -173,7 +171,7 @@ mod tests {
     }
 
     fn m(t: &Trigger, ev: &LiveEvent) -> Option<TriggerMatch> {
-        match_trigger(t, &TriggerInput::Live(ev), &mut 0)
+        match_trigger(t, &TriggerInput::Live(ev), &mut 0, &Catalog::default())
     }
 
     #[test]
@@ -189,6 +187,21 @@ mod tests {
         assert!(m(&by_coins, &galaxy).is_some());
         assert!(m(&too_much, &galaxy).is_none());
         assert!(m(&wrong_id, &galaxy).is_none());
+    }
+
+    #[test]
+    fn gift_uses_catalog_for_variants_aliases_and_accents() {
+        let gifts = crate::gifts::testing::catalog();
+        let m = |t: &Trigger, ev: &LiveEvent| match_trigger(t, &TriggerInput::Live(ev), &mut 0, &gifts).is_some();
+        let bear = Trigger::Gift { gift_id: Some(5566), gift_name: None, min_coins: None };
+        assert!(m(&bear, &gift_ev("Mishka Bear", 5582, 100)), "otra variante del mismo regalo");
+        let rosa = Trigger::Gift { gift_id: None, gift_name: Some("rosa".into()), min_coins: None };
+        assert!(m(&rosa, &gift_ev("Rose", 5655, 1)), "alias en español");
+        let accents = Trigger::Gift { gift_id: None, gift_name: Some("MÍSHKA bear".into()), min_coins: None };
+        assert!(m(&accents, &gift_ev("Mishka Bear", 5566, 100)));
+        let cheap = Trigger::Gift { gift_id: Some(7000), gift_name: None, min_coins: None };
+        assert!(!m(&cheap, &gift_ev("Freestyle", 7001, 1800)), "mismo nombre y otro precio: regalo distinto");
+        assert!(!m(&rosa, &gift_ev("Mishka Bear", 5566, 100)));
     }
 
     #[test]
@@ -256,7 +269,7 @@ mod tests {
     fn likes_accumulate_and_fire_every_n() {
         let t = Trigger::Like { every: 100 };
         let mut acc = 0;
-        let go = |n, acc: &mut u64| match_trigger(&t, &TriggerInput::Live(&like_ev(n)), acc);
+        let go = |n, acc: &mut u64| match_trigger(&t, &TriggerInput::Live(&like_ev(n)), acc, &Catalog::default());
         assert!(go(60, &mut acc).is_none());
         assert_eq!(acc, 60);
         let hit = go(50, &mut acc).expect("cruza 100");
@@ -271,7 +284,7 @@ mod tests {
     #[test]
     fn like_every_zero_never_fires() {
         let mut acc = 0;
-        assert!(match_trigger(&Trigger::Like { every: 0 }, &TriggerInput::Live(&like_ev(5)), &mut acc).is_none());
+        assert!(match_trigger(&Trigger::Like { every: 0 }, &TriggerInput::Live(&like_ev(5)), &mut acc, &Catalog::default()).is_none());
     }
 
     #[test]
@@ -320,10 +333,10 @@ mod tests {
         let goal = Trigger::GoalReached { goal_id: "g1".into() };
         let timer = Trigger::TimerEnded { timer_id: "t1".into() };
         let mut acc = 0;
-        assert!(match_trigger(&goal, &TriggerInput::GoalReached("g1"), &mut acc).is_some());
-        assert!(match_trigger(&goal, &TriggerInput::GoalReached("g2"), &mut acc).is_none());
-        assert!(match_trigger(&goal, &TriggerInput::TimerEnded("g1"), &mut acc).is_none());
-        assert!(match_trigger(&timer, &TriggerInput::TimerEnded("t1"), &mut acc).is_some());
-        assert!(match_trigger(&Trigger::Follow, &TriggerInput::GoalReached("g1"), &mut acc).is_none());
+        assert!(match_trigger(&goal, &TriggerInput::GoalReached("g1"), &mut acc, &Catalog::default()).is_some());
+        assert!(match_trigger(&goal, &TriggerInput::GoalReached("g2"), &mut acc, &Catalog::default()).is_none());
+        assert!(match_trigger(&goal, &TriggerInput::TimerEnded("g1"), &mut acc, &Catalog::default()).is_none());
+        assert!(match_trigger(&timer, &TriggerInput::TimerEnded("t1"), &mut acc, &Catalog::default()).is_some());
+        assert!(match_trigger(&Trigger::Follow, &TriggerInput::GoalReached("g1"), &mut acc, &Catalog::default()).is_none());
     }
 }

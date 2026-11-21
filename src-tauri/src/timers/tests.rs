@@ -35,6 +35,16 @@ fn like_ev(count: u64) -> LiveEvent {
     e
 }
 
+#[test]
+fn gift_extension_counts_variants_and_aliases() {
+    let gifts = crate::gifts::testing::catalog();
+    let c = cfg(vec![ext(ExtensionSource::Gift { gift_id: None, gift_name: Some("rosa".into()) }, 10)]);
+    let mut left = Vec::new();
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 5655, 3, 3), &gifts), 30);
+    let c = cfg(vec![ext(ExtensionSource::Gift { gift_id: Some(5582), gift_name: None }, 10)]);
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Mishka Bear", 5566, 100, 1), &gifts), 10);
+}
+
 // ---- Estado ----
 
 #[test]
@@ -169,10 +179,10 @@ fn zero_delta_is_a_no_op() {
 fn coins_extension_accumulates_leftovers_across_gifts() {
     let c = cfg(vec![ext(ExtensionSource::Coins { per_coins: 100 }, 60)]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 70, 1)), 0);
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 70, 1)), 60, "140 monedas → 1 paso, sobran 40");
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 70, 1), &Catalog::default()), 0);
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 70, 1), &Catalog::default()), 60, "140 monedas → 1 paso, sobran 40");
     assert_eq!(left, [40]);
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Lion", 2, 460, 1)), 300, "40+460 = 500 → 5 pasos");
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Lion", 2, 460, 1), &Catalog::default()), 300, "40+460 = 500 → 5 pasos");
     assert_eq!(left, [0]);
 }
 
@@ -180,8 +190,8 @@ fn coins_extension_accumulates_leftovers_across_gifts() {
 fn likes_extension_accumulates_too() {
     let c = cfg(vec![ext(ExtensionSource::Likes { per_likes: 50 }, 10)]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &like_ev(30)), 0);
-    assert_eq!(extension_seconds(&c, &mut left, &like_ev(30)), 10);
+    assert_eq!(extension_seconds(&c, &mut left, &like_ev(30), &Catalog::default()), 0);
+    assert_eq!(extension_seconds(&c, &mut left, &like_ev(30), &Catalog::default()), 10);
     assert_eq!(left, [10]);
 }
 
@@ -193,18 +203,18 @@ fn follow_share_and_subscribe_add_a_fixed_amount_per_event() {
         ext(ExtensionSource::Subscribe, 120),
     ]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Follow)), 30);
-    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Share)), 20);
-    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Subscribe)), 120);
-    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Chat)), 0);
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Follow), &Catalog::default()), 30);
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Share), &Catalog::default()), 20);
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Subscribe), &Catalog::default()), 120);
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Chat), &Catalog::default()), 0);
 }
 
 #[test]
 fn specific_gift_extension_counts_units_and_matches_name_or_id() {
     let c = cfg(vec![ext(ExtensionSource::Gift { gift_id: None, gift_name: Some("galaxy".into()) }, 600)]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Galaxy", 9, 1000, 2)), 1200);
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 1, 50)), 0);
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Galaxy", 9, 1000, 2), &Catalog::default()), 1200);
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 1, 50), &Catalog::default()), 0);
 }
 
 #[test]
@@ -214,14 +224,14 @@ fn several_extensions_can_apply_to_one_event() {
         ext(ExtensionSource::Gift { gift_id: Some(1), gift_name: None }, 5),
     ]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 30, 3)), 3 + 15);
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 30, 3), &Catalog::default()), 3 + 15);
 }
 
 #[test]
 fn leftovers_resize_when_the_config_changes() {
     let c = cfg(vec![ext(ExtensionSource::Follow, 1), ext(ExtensionSource::Coins { per_coins: 10 }, 1)]);
     let mut left = vec![7];
-    extension_seconds(&c, &mut left, &ev(EventType::Chat));
+    extension_seconds(&c, &mut left, &ev(EventType::Chat), &Catalog::default());
     assert_eq!(left.len(), 2);
 }
 
@@ -229,7 +239,7 @@ fn leftovers_resize_when_the_config_changes() {
 fn huge_values_saturate_instead_of_overflowing() {
     let c = cfg(vec![ext(ExtensionSource::Coins { per_coins: 1 }, i64::MAX)]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, u64::MAX, 1)), i64::MAX);
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, u64::MAX, 1), &Catalog::default()), i64::MAX);
 }
 
 // ---- Validación y serialización ----
@@ -310,7 +320,7 @@ fn a_stopwatch_ends_only_when_it_reaches_its_limit() {
 fn a_stopwatch_ignores_extensions_and_manual_additions() {
     let c = TimerConfig { extensions: vec![ext(ExtensionSource::Follow, 30)], ..stopwatch_cfg(None) };
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Follow)), 0);
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Follow), &Catalog::default()), 0);
     let mut s = TimerState::with_mode(TimerMode::Stopwatch, 0);
     s.start(0, 0);
     assert!(!s.add(10_000, 5_000, None));
@@ -321,7 +331,7 @@ fn a_stopwatch_ignores_extensions_and_manual_additions() {
 fn a_negative_extension_subtracts_and_never_goes_below_zero() {
     let c = cfg(vec![ext(ExtensionSource::Coins { per_coins: 100 }, -60)]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 250, 1)), -120, "250 monedas = 2 pasos de −60 s");
+    assert_eq!(extension_seconds(&c, &mut left, &gift_ev("Rose", 1, 250, 1), &Catalog::default()), -120, "250 monedas = 2 pasos de −60 s");
     let mut s = running(0, 100_000);
     assert!(s.add(0, -120_000, None));
     assert_eq!(s.remaining(0), 0, "no baja de cero");
@@ -332,8 +342,8 @@ fn a_negative_extension_subtracts_and_never_goes_below_zero() {
 fn positive_and_negative_extensions_can_be_mixed() {
     let c = cfg(vec![ext(ExtensionSource::Follow, 30), ext(ExtensionSource::Share, -10)]);
     let mut left = Vec::new();
-    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Follow)), 30);
-    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Share)), -10);
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Follow), &Catalog::default()), 30);
+    assert_eq!(extension_seconds(&c, &mut left, &ev(EventType::Share), &Catalog::default()), -10);
 }
 
 #[test]

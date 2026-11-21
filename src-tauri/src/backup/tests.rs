@@ -306,6 +306,7 @@ fn risky_actions_are_counted_across_rules_and_profiles() {
         media: vec![],
         fonts: vec![],
         profiles: vec![],
+        gifts: vec![],
     };
     assert!(risky_actions(&bundle).is_empty(), "noop no es una acción de riesgo");
     let with = |kind: &str| {
@@ -430,4 +431,47 @@ async fn a_package_cannot_write_fonts_outside_the_fonts_folder() {
     apply_pending(&dst.db, dst.dir.path(), 5).await.unwrap();
     assert!(!dst.dir.path().parent().unwrap().join("escape.woff2").exists());
     assert!(fonts::read_index(&dst.path("fonts")).is_empty());
+}
+
+// ---- Regalos ----
+
+fn gift(key: &str, id: Option<i64>, es: Option<&str>, manual: bool) -> LearnedGift {
+    LearnedGift { key: key.into(), gift_id: id, name_es: es.map(Into::into), seen: 2, manual, ..LearnedGift::default() }
+}
+
+#[tokio::test]
+async fn hand_made_gifts_travel_and_learned_ones_stay_put() {
+    let src = Install::new().await;
+    let made = gift("5655", Some(5655), Some("Rosa"), true);
+    src.db.upsert_learned_gifts(&[made.clone(), gift("7", Some(7), Some("Aprendido"), false)]).await.unwrap();
+    let file = src.path("backup.zip");
+    let summary = export(&src.db, src.dir.path(), &file, "0.1.0", 1).await.unwrap();
+    assert_eq!(summary.gifts, 1, "solo viaja lo hecho a mano");
+
+    let dst = Install::new().await;
+    let local = gift("9", Some(9), Some("Local"), false);
+    dst.db.upsert_learned_gifts(&[local.clone(), gift("name:vieja", None, Some("Vieja"), true)]).await.unwrap();
+    stage_import(&file, dst.dir.path()).unwrap();
+    apply_pending(&dst.db, dst.dir.path(), 5).await.unwrap().unwrap();
+    let mut rows = dst.db.list_learned_gifts().await.unwrap();
+    rows.sort_by(|a, b| a.key.cmp(&b.key));
+    assert_eq!(rows, vec![made, local], "lo hecho a mano se sustituye; lo aprendido en este equipo se queda");
+}
+
+#[test]
+fn imported_gifts_are_validated_and_rekeyed() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("g.zip");
+    let gifts = json!([
+        { "key": "../hack", "giftId": 5655, "nameEs": " Rosa ", "manual": false },
+        { "key": "x", "giftId": 5655, "nameEs": "Otra" },
+        { "key": "y", "nameEn": "x".repeat(81) },
+        { "key": "z", "giftId": -3, "nameEs": "Mal" },
+        { "key": "w" },
+    ]);
+    zip_with(&p, &config(json!({ "gifts": gifts })), &[]);
+    let (b, skipped) = inspect(&p).unwrap();
+    assert_eq!(b.gifts.len(), 1);
+    assert_eq!((b.gifts[0].key.as_str(), b.gifts[0].name_es.as_deref(), b.gifts[0].manual), ("5655", Some("Rosa"), true));
+    assert_eq!(skipped.iter().filter(|s| s.starts_with("regalo")).count(), 4, "{skipped:?}");
 }

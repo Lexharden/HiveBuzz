@@ -59,6 +59,8 @@ export interface BackupSummary {
   sounds: number;
   media: number;
   fonts: number;
+  /** Regalos hechos a mano en el catálogo. */
+  gifts: number;
   profiles: number;
   skipped: string[];
   /** Acciones que tocan red, teclado u OBS, p. ej. "webhook × 3". */

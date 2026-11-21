@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, Result};
 use crate::events::{EventType, LiveEvent};
+use crate::gifts::catalog::Catalog;
 
 /// Tope de veces que una sola aportación puede cruzar la meta (evita bucles con metas diminutas).
 const MAX_REACHES_PER_ADD: u32 = 50;
@@ -92,15 +93,13 @@ impl Goal {
 }
 
 /// Cuánto aporta un evento a una meta.
-pub fn contribution(kind: &GoalKind, ev: &LiveEvent) -> u64 {
+pub fn contribution(kind: &GoalKind, ev: &LiveEvent, gifts: &Catalog) -> u64 {
     match (kind, ev.kind) {
         (GoalKind::Likes, EventType::Like) => ev.like.as_ref().map_or(0, |l| l.count),
         (GoalKind::Follows, EventType::Follow) | (GoalKind::Shares, EventType::Share) | (GoalKind::Subscribers, EventType::Subscribe) => 1,
         (GoalKind::Coins, EventType::Gift) => ev.gift.as_ref().map_or(0, |g| g.coins),
         (GoalKind::Gift { gift_id, gift_name }, EventType::Gift) => ev.gift.as_ref().map_or(0, |g| {
-            let id_ok = gift_id.is_none_or(|id| id == g.id);
-            let name_ok = gift_name.as_deref().is_none_or(|n| n.trim().eq_ignore_ascii_case(g.name.trim()));
-            if id_ok && name_ok {
+            if gifts.matches(*gift_id, gift_name.as_deref(), g.id, &g.name) {
                 u64::from(g.count)
             } else {
                 0

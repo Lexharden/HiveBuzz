@@ -7,6 +7,7 @@ import { GroupPicker } from "../groups/GroupPicker";
 import { useViewerGroups } from "../groups/useViewerGroups";
 import { ActionParams } from "./ActionParams";
 import { defaultAction, defaultTrigger, TRIGGER_TYPES } from "./ruleDefaults";
+import { GiftPicker } from "../gifts/GiftPicker";
 
 const ROLES: Role[] = ["moderator", "subscriber", "follower"];
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
@@ -231,11 +232,11 @@ function TriggerFields({ trigger, onChange, goals, timers }: { trigger: Trigger;
     case "gift":
       return (
         <div className="grid grid-cols-3 gap-2">
-          <Field label={t("trigger.giftName")} hint={t("trigger.giftNameHint")}>
-            <TextInput value={trigger.giftName ?? ""} onChange={(v) => onChange(v ? { ...trigger, giftName: v } : omit(trigger, "giftName"))} />
-          </Field>
-          <Field label={t("trigger.giftId")}>
-            <NumberInput value={trigger.giftId ?? null} onChange={(v) => onChange(v === null ? omit(trigger, "giftId") : { ...trigger, giftId: v })} />
+          <Field label={t("trigger.giftName")} className="col-span-2">
+            <GiftPicker
+              value={trigger}
+              onChange={(sel) => onChange({ type: "gift", ...sel, ...(trigger.minCoins !== undefined ? { minCoins: trigger.minCoins } : {}) })}
+            />
           </Field>
           <Field label={t("trigger.minCoins")} hint={t("trigger.minCoinsHint")}>
             <NumberInput value={trigger.minCoins ?? null} min={0} onChange={(v) => onChange(v === null ? omit(trigger, "minCoins") : { ...trigger, minCoins: v })} />

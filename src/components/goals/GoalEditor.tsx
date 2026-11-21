@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Goal, GoalKind, OnReach } from "../../lib/types";
 import { Btn, Card, Checkbox, ErrorText, Field, NumberInput, Select, TextInput, useAction } from "../ui";
+import { GiftPicker } from "../gifts/GiftPicker";
 
 const KINDS: GoalKind["type"][] = ["likes", "follows", "shares", "subscribers", "coins", "gift"];
 const ON_REACH: OnReach["type"][] = ["stop", "reset", "extend"];
@@ -57,14 +58,8 @@ export function GoalEditor({ initial, isNew, onSave, onCancel }: Props) {
           </Field>
           {goal.kind.type === "gift" && (
             <>
-              <Field label={t("trigger.giftName")}>
-                <TextInput value={goal.kind.giftName ?? ""} onChange={(v) => patch({ kind: { type: "gift", giftName: v, ...(goal.kind.type === "gift" && goal.kind.giftId !== undefined ? { giftId: goal.kind.giftId } : {}) } })} />
-              </Field>
-              <Field label={t("trigger.giftId")}>
-                <NumberInput
-                  value={goal.kind.giftId ?? null}
-                  onChange={(v) => patch({ kind: { type: "gift", ...(goal.kind.type === "gift" && goal.kind.giftName ? { giftName: goal.kind.giftName } : {}), ...(v === null ? {} : { giftId: v }) } })}
-                />
+              <Field label={t("trigger.giftName")} className="col-span-2">
+                <GiftPicker value={goal.kind} onChange={(sel) => patch({ kind: { type: "gift", ...sel } })} placeholder={t("gifts.picker.required")} />
               </Field>
             </>
           )}

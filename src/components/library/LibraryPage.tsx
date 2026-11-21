@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { api, errorMessage, pickFile } from "../../lib/api";
 import type { AppInfo, Media, Sound } from "../../lib/types";
 import { Btn, Card, ErrorText } from "../ui";
+import { GiftCatalogCard } from "../gifts/GiftCatalogCard";
 import { FontsCard } from "./FontsCard";
 import { MyInstantsCard } from "./MyInstantsCard";
 
@@ -106,6 +107,7 @@ export function LibraryPage({ info }: { info: AppInfo | null }) {
       </Card>
 
       <FontsCard />
+      <GiftCatalogCard />
       <ErrorText error={error} />
     </div>
   );
