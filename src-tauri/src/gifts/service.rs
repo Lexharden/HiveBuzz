@@ -59,6 +59,8 @@ pub struct GiftService {
     state: Mutex<State>,
     reference: RwLock<Arc<Reference>>,
     catalog: RwLock<Arc<Catalog>>,
+    /// Dónde sirve el servidor local las imágenes (`http://127.0.0.1:<puerto>/gifts`) y con qué token.
+    local_images: OnceLock<(String, String)>,
 }
 
 impl GiftService {
@@ -69,6 +71,7 @@ impl GiftService {
             state: Mutex::new(State::default()),
             reference: RwLock::new(Arc::new(Reference::default())),
             catalog: RwLock::new(Arc::new(Catalog::default())),
+            local_images: OnceLock::new(),
         })
     }
 
@@ -116,6 +119,28 @@ impl GiftService {
     /// Carpeta de las imágenes de la lista oficial (para servirlas en `/gifts`).
     pub fn images_dir(&self) -> Option<PathBuf> {
         self.reference.read().unwrap_or_else(PoisonError::into_inner).images_dir.clone()
+    }
+
+    /// Dónde están las imágenes locales en el servidor de overlays, para el respaldo de `{giftimage}`.
+    pub fn set_local_images(&self, base: String, token: String) {
+        let _ = self.local_images.set((base, token));
+    }
+
+    /// Un regalo que llega sin imagen toma la del catálogo: el icono oficial de TikTok o, si no lo hay, la imagen
+    /// incluida en la app servida por el servidor local. Así `{giftimage}` nunca queda vacío para un regalo conocido.
+    pub fn fill_image(&self, ev: &mut LiveEvent) {
+        let Some(gift) = ev.gift.as_mut().filter(|g| g.image.trim().is_empty()) else {
+            return;
+        };
+        let catalog = self.catalog();
+        let Some(view) = catalog.for_event(gift.id, &gift.name) else {
+            return;
+        };
+        if !view.icon_url.is_empty() {
+            gift.image.clone_from(&view.icon_url);
+        } else if let (false, Some((base, token))) = (view.image.is_empty(), self.local_images.get()) {
+            gift.image = format!("{base}/{}?token={token}", encode_path(&view.image));
+        }
     }
 
     pub fn search(&self, query: &str, limit: usize) -> Vec<GiftView> {
@@ -343,6 +368,26 @@ impl GiftLink {
         static EMPTY: LazyLock<Arc<Catalog>> = LazyLock::new(|| Arc::new(Catalog::default()));
         self.0.get().map_or_else(|| Arc::clone(&EMPTY), |g| g.catalog())
     }
+
+    /// Ver [`GiftService::fill_image`]. Sin conectar no hace nada.
+    pub fn fill_image(&self, ev: &mut LiveEvent) {
+        if let Some(g) = self.0.get() {
+            g.fill_image(ev);
+        }
+    }
+}
+
+/// Codifica un nombre de archivo para una URL (todo lo que no sea letra, número, `.`, `-`, `_` o `~`).
+fn encode_path(name: &str) -> String {
+    let mut out = String::with_capacity(name.len());
+    for b in name.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b'~') {
+            out.push(char::from(b));
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
 }
 
 /// Alias que se conservan como mucho por regalo al importar.

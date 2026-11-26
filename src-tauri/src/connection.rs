@@ -8,6 +8,7 @@ use tokio::sync::{mpsc, watch};
 use crate::bus::EventBus;
 use crate::error::{AppError, Result};
 use crate::events::Platform;
+use crate::gifts::service::{GiftLink, GiftService};
 use crate::source::protocol::ConnectionState;
 use crate::source::{ConnectTarget, LiveSource, SourceMessage, StatusUpdate};
 
@@ -16,6 +17,8 @@ pub struct ConnectionService {
     source: Arc<dyn LiveSource>,
     status: watch::Sender<StatusUpdate>,
     viewers: watch::Sender<u64>,
+    /// Para completar la imagen de los regalos que llegan sin ella.
+    gifts: GiftLink,
 }
 
 impl ConnectionService {
@@ -27,7 +30,11 @@ impl ConnectionService {
     pub fn with_platform(source: Arc<dyn LiveSource>, platform: Platform) -> Arc<Self> {
         let (status, _) = watch::channel(StatusUpdate::new(ConnectionState::Disconnected));
         let (viewers, _) = watch::channel(0);
-        Arc::new(Self { platform, source, status, viewers })
+        Arc::new(Self { platform, source, status, viewers, gifts: GiftLink::default() })
+    }
+
+    pub fn attach_gifts(&self, gifts: Arc<GiftService>) {
+        self.gifts.attach(gifts, "conexión");
     }
 
     pub fn platform(&self) -> Platform {
@@ -74,6 +81,7 @@ impl ConnectionService {
                     SourceMessage::Event(mut ev) => {
                         // La plataforma la pone la conexión, no la fuente: así ningún conector puede confundirse.
                         ev.platform = this.platform;
+                        this.gifts.fill_image(&mut ev);
                         bus.publish(*ev);
                     }
                     SourceMessage::Status(s) => {

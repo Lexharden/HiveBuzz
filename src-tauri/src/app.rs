@@ -374,6 +374,8 @@ impl AppState {
         rules.attach_gifts(Arc::clone(&gifts));
         goals.attach_gifts(Arc::clone(&gifts));
         timers.attach_gifts(Arc::clone(&gifts));
+        // Solo TikTok: los regalos de Twitch no están en el catálogo.
+        conn.attach_gifts(Arc::clone(&gifts));
 
         // Metas y timers avisan al motor de reglas («meta alcanzada», «timer terminado»).
         let sink: Arc<dyn SystemSink> = rules.clone();
@@ -414,6 +416,7 @@ impl AppState {
 
         // Servidor local para overlays y API. Un fallo aquí no debe impedir usar la app.
         let server_port = db.server_port().await?;
+        gifts.set_local_images(format!("http://127.0.0.1:{server_port}/gifts"), overlay_token.clone());
         let server_deps = server::ServerDeps {
             bus: bus.clone(),
             hub: hub.clone(),

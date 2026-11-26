@@ -12,6 +12,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 - **Los regalos se reconocen aunque cambien de nombre o de id**: una regla, meta o timer con «Rosa» salta con «Rose», sin importar mayúsculas ni acentos («corazon» = «Corazón»), y las variantes de un mismo regalo (mismo nombre y precio, otro id) cuentan como el mismo. Dos regalos con el mismo nombre y distinto precio siguen siendo distintos. Las reglas guardadas no cambian.
 - **El simulador manda regalos reales** del catálogo (id, nombre, precio e imagen), así las reglas con regalos concretos se pueden probar sin estar en vivo.
 - **La copia de seguridad incluye tus regalos hechos a mano**. Lo aprendido en directo se queda en cada equipo.
+- **`{giftimage}` ya no queda vacío**: si TikTok manda un regalo sin imagen, se usa el icono oficial del catálogo o, si no lo hay, la imagen incluida en HiveBuzz.
+
+### Seguridad
+- Actualizado el SQLite integrado (`libsqlite3-sys` 0.40, vía sqlx 0.9.1) por la vulnerabilidad CVE-2026-119375 (RUSTSEC-2026-0459), y `zip` a 9.8 por RUSTSEC-2026-0548.
 
 ## [0.6.0] - 2026-11-13
 

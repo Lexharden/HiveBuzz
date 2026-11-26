@@ -312,3 +312,40 @@ fn unattached_link_compares_with_an_empty_catalog() {
     assert!(cat.matches(Some(1), Some("Corazón"), 1, "corazon"), "sin catálogo: id exacto y nombre sin acentos");
     assert!(!cat.matches(Some(1), None, 2, "x"));
 }
+
+#[tokio::test]
+async fn gifts_without_image_take_the_official_icon_or_the_local_one() {
+    let dir = tempfile::tempdir().expect("tmp");
+    std::fs::create_dir_all(dir.path().join("images")).expect("mkdir");
+    std::fs::write(dir.path().join("images").join("9_Gato Feliz.webp"), b"x").expect("img");
+    std::fs::write(
+        dir.path().join("gifts.json"),
+        r#"{"gifts":[
+            {"id":5655,"name":"Rose","diamonds":1,"iconUrl":"https://cdn/rose.webp","image":""},
+            {"id":9,"name":"Gato Feliz","diamonds":5,"iconUrl":"","image":"9_Gato Feliz.webp"}
+        ]}"#,
+    )
+    .expect("json");
+    let (svc, _db) = service().await;
+    svc.load(Some(dir.path().to_path_buf())).await.expect("load");
+    let image = |svc: &GiftService, ev: LiveEvent| {
+        let mut ev = ev;
+        svc.fill_image(&mut ev);
+        ev.gift.map(|g| g.image).unwrap_or_default()
+    };
+
+    assert_eq!(image(&svc, gift_event("1", Platform::Tiktok, 5655, "Rose", 1, 1)), "https://cdn/rose.webp");
+    assert_eq!(image(&svc, gift_event("2", Platform::Tiktok, 0, "rose", 1, 1)), "https://cdn/rose.webp", "por nombre");
+    assert_eq!(image(&svc, gift_event("3", Platform::Tiktok, 9, "Gato Feliz", 5, 1)), "", "sin servidor no hay respaldo local");
+    assert_eq!(image(&svc, gift_event("4", Platform::Tiktok, 404, "Desconocido", 1, 1)), "");
+
+    svc.set_local_images("http://127.0.0.1:7777/gifts".into(), "tok".into());
+    assert_eq!(image(&svc, gift_event("5", Platform::Tiktok, 9, "Gato Feliz", 5, 1)), "http://127.0.0.1:7777/gifts/9_Gato%20Feliz.webp?token=tok");
+
+    // La imagen que trae el evento manda.
+    let mut ev = gift_event("6", Platform::Tiktok, 5655, "Rose", 1, 1);
+    if let Some(g) = ev.gift.as_mut() {
+        g.image = "https://tiktok/real.webp".into();
+    }
+    assert_eq!(image(&svc, ev), "https://tiktok/real.webp");
+}
