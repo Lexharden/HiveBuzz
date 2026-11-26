@@ -4,6 +4,8 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
 ## [Sin publicar]
 
+## [0.6.1] - 2026-11-25
+
 ### Añadido
 - **Catálogo de regalos** (*Biblioteca → Catálogo de regalos*): HiveBuzz trae la lista oficial de regalos de TikTok (más de 680, con su imagen, precio e id) y aprende sola los que llegan en tus directos. Puedes buscar por nombre en español o en inglés, por alias o por id, y corregir a mano el nombre en español, el precio o el id.
 - **Selector de regalos** en reglas, metas y timers: en lugar de escribir el nombre exacto, busca el regalo y elígelo con su imagen. Si escribes un nombre que no está en el catálogo también vale, y `#5655` elige por id.
